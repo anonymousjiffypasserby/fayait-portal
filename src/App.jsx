@@ -8,6 +8,8 @@ import Tickets from './pages/Tickets'
 import Assets from './pages/Assets'
 import Status from './pages/Status'
 import Users from './pages/Users'
+import Profile from './pages/Profile'
+import Billing from './pages/Billing'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -26,6 +28,8 @@ function AppRoutes() {
         <Route path="assets" element={<Assets />} />
         <Route path="status" element={<Status />} />
         <Route path="users" element={<Users />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="billing" element={<Billing />} />
       </Route>
     </Routes>
   )

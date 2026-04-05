@@ -14,15 +14,40 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const navItems = [
-    { to: '/', label: t('dashboard'), section: t('overview') },
-    { to: '/tickets', label: t('tickets'), section: t('services') },
-    { to: '/assets', label: t('assets'), section: null },
-    { to: '/status', label: t('status'), section: null },
-    { to: '/users', label: t('users'), section: t('admin') },
-  ]
-
   const isDark = theme === 'dark'
+
+  const navSections = [
+    {
+      label: t('overview'),
+      items: [
+        { to: '/', label: t('dashboard') },
+      ]
+    },
+    {
+      label: t('services'),
+      items: [
+        { to: '/tickets', label: t('tickets') },
+        { to: '/assets', label: t('assets') },
+        { to: '/status', label: t('status') },
+        { to: '/passwords', label: t('passwords') },
+        { to: '/chat', label: t('chat') },
+        { to: '/storage', label: t('storage') },
+      ]
+    },
+    {
+      label: t('admin'),
+      items: [
+        { to: '/users', label: t('users') },
+        { to: '/billing', label: t('billing') },
+      ]
+    },
+    {
+      label: null,
+      items: [
+        { to: '/profile', label: t('profile') },
+      ]
+    }
+  ]
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: isDark ? '#0f1420' : 'var(--faya-gray)' }}>
@@ -61,28 +86,30 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav style={{ flex: 1 }}>
-          {navItems.map((item) => (
-            <div key={item.to}>
-              {item.section && (
+        <nav style={{ flex: 1, overflowY: 'auto' }}>
+          {navSections.map((section, si) => (
+            <div key={si}>
+              {section.label && (
                 <div style={{
                   fontSize: 10, color: 'rgba(255,255,255,0.25)',
                   letterSpacing: 2, padding: '14px 20px 6px',
                   textTransform: 'uppercase'
                 }}>
-                  {item.section}
+                  {section.label}
                 </div>
               )}
-              <NavLink to={item.to} end={item.to === '/'} style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 20px', fontSize: 13, cursor: 'pointer',
-                color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
-                background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent',
-                borderLeft: isActive ? '3px solid var(--faya-orange)' : '3px solid transparent',
-                textDecoration: 'none'
-              })}>
-                {item.label}
-              </NavLink>
+              {section.items.map(item => (
+                <NavLink key={item.to} to={item.to} end={item.to === '/'} style={({ isActive }) => ({
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 20px', fontSize: 13, cursor: 'pointer',
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+                  background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent',
+                  borderLeft: isActive ? '3px solid var(--faya-orange)' : '3px solid transparent',
+                  textDecoration: 'none'
+                })}>
+                  {item.label}
+                </NavLink>
+              ))}
             </div>
           ))}
         </nav>
@@ -95,7 +122,7 @@ export default function Layout() {
               color: 'rgba(255,255,255,0.6)', fontSize: 14, padding: '4px 8px',
               borderRadius: 6, cursor: 'pointer'
             }}>
-              {isDark ? '☀️' : '🌙'}
+              {isDark ? '☀' : '☾'}
             </button>
           </div>
           <button onClick={handleLogout} style={{
