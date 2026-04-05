@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import api from '../services/api'
 
 const AuthContext = createContext(null)
 
@@ -8,22 +9,33 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const stored = localStorage.getItem('faya_user')
-    if (stored) setUser(JSON.parse(stored))
+    const token = localStorage.getItem('faya_token')
+    if (stored && token) setUser(JSON.parse(stored))
     setLoading(false)
   }, [])
 
-  const login = (userData) => {
-    localStorage.setItem('faya_user', JSON.stringify(userData))
-    setUser(userData)
+  const login = async (email, password) => {
+    const data = await api.login(email, password)
+    localStorage.setItem('faya_token', data.token)
+    localStorage.setItem('faya_user', JSON.stringify(data.user))
+    setUser(data.user)
+    return data.user
   }
 
   const logout = () => {
+    localStorage.removeItem('faya_token')
     localStorage.removeItem('faya_user')
     setUser(null)
   }
 
+  const updateUser = (updates) => {
+    const updated = { ...user, ...updates }
+    localStorage.setItem('faya_user', JSON.stringify(updated))
+    setUser(updated)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

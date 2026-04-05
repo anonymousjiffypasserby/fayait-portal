@@ -1,28 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-
-const DEMO_USERS = [
-  { email: 'admin@acme.com', password: 'admin123', name: 'John Doe', company: 'Acme Corp', role: 'IT Admin' },
-  { email: 'admin@fayait.com', password: 'faya123', name: 'Anfarcio', company: 'Faya IT', role: 'Super Admin' },
-]
+import { useLang } from '../context/LangContext'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [lang, setLang] = useState('EN')
+  const [loading, setLoading] = useState(false)
   const { login } = useAuth()
+  const { lang, switchLang, t } = useLang()
   const navigate = useNavigate()
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
-    const user = DEMO_USERS.find(u => u.email === email && u.password === password)
-    if (user) {
-      login(user)
+    setError('')
+    setLoading(true)
+    try {
+      await login(email, password)
       navigate('/')
-    } else {
-      setError(lang === 'EN' ? 'Invalid email or password' : 'Ongeldig e-mailadres of wachtwoord')
+    } catch (err) {
+      setError(t('invalidCredentials'))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -44,7 +44,7 @@ export default function Login() {
             FAYA<span style={{ color: 'var(--faya-orange)' }}>IT</span>
           </div>
           <div style={{ fontSize: 13, color: '#888780' }}>
-            {lang === 'EN' ? 'Client Portal' : 'Klantportaal'}
+            {t('clientPortal')}
           </div>
         </div>
 
@@ -53,13 +53,12 @@ export default function Login() {
           borderRadius: 8, padding: 3, marginBottom: 24
         }}>
           {['EN', 'NL'].map(l => (
-            <button key={l} onClick={() => setLang(l)} style={{
-              flex: 1, border: 'none', borderRadius: 6, padding: '6px 0',
-              fontSize: 12, cursor: 'pointer',
+            <button key={l} onClick={() => switchLang(l)} style={{
+              flex: 1, border: lang === l ? '0.5px solid rgba(0,0,0,0.08)' : 'none',
+              borderRadius: 6, padding: '6px 0', fontSize: 12, cursor: 'pointer',
               background: lang === l ? '#fff' : 'transparent',
               color: lang === l ? 'var(--faya-navy)' : '#888780',
               fontWeight: lang === l ? 500 : 400,
-              border: lang === l ? '0.5px solid rgba(0,0,0,0.08)' : 'none'
             }}>{l}</button>
           ))}
         </div>
@@ -67,13 +66,13 @@ export default function Login() {
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 13, color: '#5F5E5A', display: 'block', marginBottom: 6 }}>
-              {lang === 'EN' ? 'Email address' : 'E-mailadres'}
+              {t('emailAddress')}
             </label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder={lang === 'EN' ? 'you@company.com' : 'u@bedrijf.com'}
+              placeholder={t('emailPlaceholder')}
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8,
                 border: '0.5px solid rgba(0,0,0,0.15)', fontSize: 14, outline: 'none' }}
               required
@@ -82,7 +81,7 @@ export default function Login() {
 
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 13, color: '#5F5E5A', display: 'block', marginBottom: 6 }}>
-              {lang === 'EN' ? 'Password' : 'Wachtwoord'}
+              {t('password')}
             </label>
             <input
               type="password"
@@ -101,18 +100,18 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" style={{
+          <button type="submit" disabled={loading} style={{
             width: '100%', padding: '11px 0', marginTop: 16,
-            background: 'var(--faya-orange)', color: '#fff',
+            background: loading ? '#ccc' : 'var(--faya-orange)', color: '#fff',
             border: 'none', borderRadius: 8, fontSize: 14,
-            fontWeight: 500, cursor: 'pointer'
+            fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer'
           }}>
-            {lang === 'EN' ? 'Sign in' : 'Inloggen'}
+            {loading ? t('loading') : t('signIn')}
           </button>
         </form>
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#B4B2A9' }}>
-          {lang === 'EN' ? 'Need help?' : 'Hulp nodig?'}{' '}
+          {t('needHelp')}{' '}
           <a href="mailto:support@fayait.com" style={{ color: 'var(--faya-orange)' }}>
             support@fayait.com
           </a>

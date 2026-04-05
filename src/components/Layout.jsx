@@ -1,11 +1,13 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useState } from 'react'
+import { useLang } from '../context/LangContext'
+import { useTheme } from '../context/ThemeContext'
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const { lang, switchLang, t } = useLang()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
-  const [lang, setLang] = useState('EN')
 
   const handleLogout = () => {
     logout()
@@ -13,22 +15,24 @@ export default function Layout() {
   }
 
   const navItems = [
-    { to: '/', label: lang === 'EN' ? 'Dashboard' : 'Dashboard', section: 'Overview' },
-    { to: '/tickets', label: lang === 'EN' ? 'Tickets' : 'Tickets', section: 'Services' },
-    { to: '/assets', label: lang === 'EN' ? 'Assets' : 'Activa', section: null },
-    { to: '/status', label: lang === 'EN' ? 'Status' : 'Status', section: null },
-    { to: '/users', label: lang === 'EN' ? 'Users' : 'Gebruikers', section: 'Admin' },
+    { to: '/', label: t('dashboard'), section: t('overview') },
+    { to: '/tickets', label: t('tickets'), section: t('services') },
+    { to: '/assets', label: t('assets'), section: null },
+    { to: '/status', label: t('status'), section: null },
+    { to: '/users', label: t('users'), section: t('admin') },
   ]
 
+  const isDark = theme === 'dark'
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: isDark ? '#0f1420' : 'var(--faya-gray)' }}>
       <aside style={{
-        width: 220, background: 'var(--faya-navy)', display: 'flex',
-        flexDirection: 'column', flexShrink: 0
+        width: 220, background: isDark ? '#0a0f1a' : 'var(--faya-navy)',
+        display: 'flex', flexDirection: 'column', flexShrink: 0
       }}>
         <div style={{ padding: '24px 20px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: 2, marginBottom: 4 }}>
-            POWERED BY
+            {t('poweredBy').toUpperCase()}
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', marginBottom: 8 }}>
             Faya IT Services
@@ -37,7 +41,7 @@ export default function Layout() {
             background: 'var(--faya-orange)', color: '#fff',
             fontSize: 10, padding: '2px 10px', borderRadius: 20, fontWeight: 500
           }}>
-            {user?.company || 'Acme Corp'}
+            {user?.company}
           </span>
         </div>
 
@@ -47,7 +51,7 @@ export default function Layout() {
             borderRadius: 6, padding: 3
           }}>
             {['EN', 'NL'].map(l => (
-              <button key={l} onClick={() => setLang(l)} style={{
+              <button key={l} onClick={() => switchLang(l)} style={{
                 flex: 1, border: 'none', borderRadius: 4, padding: '4px 0',
                 fontSize: 11, cursor: 'pointer',
                 background: lang === l ? 'var(--faya-orange)' : 'transparent',
@@ -58,7 +62,7 @@ export default function Layout() {
         </div>
 
         <nav style={{ flex: 1 }}>
-          {navItems.map((item, i) => (
+          {navItems.map((item) => (
             <div key={item.to}>
               {item.section && (
                 <div style={{
@@ -84,20 +88,31 @@ export default function Layout() {
         </nav>
 
         <div style={{ padding: '16px 20px', borderTop: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
-            {user?.name}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{user?.name}</div>
+            <button onClick={toggleTheme} style={{
+              background: 'rgba(255,255,255,0.08)', border: 'none',
+              color: 'rgba(255,255,255,0.6)', fontSize: 14, padding: '4px 8px',
+              borderRadius: 6, cursor: 'pointer'
+            }}>
+              {isDark ? '☀️' : '🌙'}
+            </button>
           </div>
           <button onClick={handleLogout} style={{
             background: 'none', border: '0.5px solid rgba(255,255,255,0.2)',
             color: 'rgba(255,255,255,0.6)', fontSize: 12, padding: '6px 12px',
             borderRadius: 6, cursor: 'pointer', width: '100%'
           }}>
-            {lang === 'EN' ? 'Sign out' : 'Uitloggen'}
+            {t('signOut')}
           </button>
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: 24, background: 'var(--faya-gray)', overflowY: 'auto' }}>
+      <main style={{
+        flex: 1, padding: 24,
+        background: isDark ? '#0f1420' : 'var(--faya-gray)',
+        overflowY: 'auto'
+      }}>
         <Outlet />
       </main>
     </div>
