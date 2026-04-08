@@ -36,6 +36,8 @@ const SERVICES = [
   },
 ]
 
+const ADMIN_ROLES = ['superadmin', 'admin']
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -52,6 +54,21 @@ export default function Layout({ children }) {
     return location.pathname.startsWith(path)
   }
 
+  const isAdmin = ADMIN_ROLES.includes(user?.role)
+  const services = user?.services || {}
+
+  const visibleSections = SERVICES.map(section => ({
+    ...section,
+    items: section.items.filter(item => {
+      if (item.key === 'dashboard') return true
+      if (['users', 'billing', 'profile'].includes(item.key)) return true
+      const status = services[item.key]
+      if (status === 'active') return true
+      if (isAdmin) return true
+      return false
+    })
+  })).filter(section => section.items.length > 0)
+
   return (
     <div style={{
       display: 'flex',
@@ -59,22 +76,29 @@ export default function Layout({ children }) {
       overflow: 'hidden',
       background: '#0b0f1a',
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+      position: 'relative',
     }}>
+      {/* Sidebar - overlays content */}
       <aside
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          bottom: 0,
           width: hovered ? 220 : 60,
-          minWidth: hovered ? 220 : 60,
           background: '#0b0f1a',
           borderRight: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'width 0.2s ease, min-width 0.2s ease',
+          transition: 'width 0.2s ease',
           overflow: 'hidden',
           zIndex: 100,
+          boxShadow: hovered ? '4px 0 24px rgba(0,0,0,0.4)' : 'none',
         }}
       >
+        {/* Logo */}
         <div style={{
           height: 56,
           display: 'flex',
@@ -100,8 +124,9 @@ export default function Layout({ children }) {
           )}
         </div>
 
+        {/* Nav */}
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
-          {SERVICES.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.section}>
               {hovered && (
                 <div style={{
@@ -114,6 +139,8 @@ export default function Layout({ children }) {
               )}
               {section.items.map((item) => {
                 const active = isActive(item.path)
+                const status = services[item.key]
+                const locked = status !== 'active' && !['dashboard', 'users', 'billing', 'profile'].includes(item.key)
                 return (
                   <button
                     key={item.key}
@@ -125,13 +152,18 @@ export default function Layout({ children }) {
                       border: 'none',
                       background: active ? 'rgba(255,107,53,0.12)' : 'transparent',
                       borderLeft: active ? '2px solid #ff6b35' : '2px solid transparent',
-                      color: active ? '#ff6b35' : 'rgba(255,255,255,0.45)',
+                      color: active ? '#ff6b35' : locked ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.55)',
                       cursor: 'pointer', fontSize: 13, textAlign: 'left',
                       whiteSpace: 'nowrap', overflow: 'hidden',
                     }}
                   >
                     <span style={{ fontSize: 16, flexShrink: 0, width: 20, textAlign: 'center' }}>{item.icon}</span>
-                    {hovered && <span>{item.label}</span>}
+                    {hovered && (
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                    )}
+                    {hovered && locked && (
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>🔒</span>
+                    )}
                   </button>
                 )
               })}
@@ -140,6 +172,7 @@ export default function Layout({ children }) {
           ))}
         </nav>
 
+        {/* Footer */}
         <div style={{
           borderTop: '1px solid rgba(255,255,255,0.06)',
           padding: '12px 16px', flexShrink: 0,
@@ -167,10 +200,15 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
+      {/* Main - full width, sidebar overlays it */}
       <main style={{
-        flex: 1, overflow: 'hidden',
-        display: 'flex', flexDirection: 'column',
+        flex: 1,
+        marginLeft: 60,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
         background: '#f0f2f5',
+        height: '100vh',
       }}>
         {children}
       </main>

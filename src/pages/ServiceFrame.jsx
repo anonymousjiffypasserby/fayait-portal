@@ -10,52 +10,124 @@ const SERVICE_URLS = {
   grafana: 'https://grafana.fayait.com',
 }
 
+const SERVICE_INFO = {
+  tickets: {
+    name: 'Helpdesk & Ticketing',
+    description: 'Submit and track IT support requests. Your team can create tickets for any IT issue — hardware, software, access requests — and get updates in real time.',
+    icon: '🎫',
+  },
+  assets: {
+    name: 'Asset Management',
+    description: 'Keep track of all your company devices — laptops, desktops, printers, servers. Know what you own, who has it, and when warranties expire.',
+    icon: '💻',
+  },
+  chat: {
+    name: 'Team Chat',
+    description: 'A secure, private team messaging platform. Create channels for departments, share files, and collaborate — all hosted on your own infrastructure.',
+    icon: '💬',
+  },
+  files: {
+    name: 'File Storage',
+    description: 'Secure cloud storage for your company files. Share documents, collaborate in real time with built-in office tools, and control who has access to what.',
+    icon: '📁',
+  },
+  projects: {
+    name: 'Project Management',
+    description: 'Plan and track projects with boards, timelines, and task assignments. Keep your team aligned and deadlines visible.',
+    icon: '📋',
+  },
+  status: {
+    name: 'Service Status',
+    description: 'Real-time uptime monitoring for all your services. See what\'s online, get notified of outages, and review historical uptime reports.',
+    icon: '🟢',
+  },
+  grafana: {
+    name: 'Analytics',
+    description: 'Visual dashboards showing your infrastructure health, performance metrics, and trends. Understand your systems at a glance.',
+    icon: '📊',
+  },
+}
+
+const ADMIN_ROLES = ['superadmin', 'admin']
+
 export default function ServiceFrame({ service }) {
   const { user } = useAuth()
   const url = SERVICE_URLS[service]
-  const activeServices = user?.services || {}
-  const isActive = activeServices[service] === 'active'
+  const services = user?.services || {}
+  const isActive = services[service] === 'active'
+  const isAdmin = ADMIN_ROLES.includes(user?.role)
+  const info = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
 
   if (!isActive) {
     return (
       <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: '#f0f2f5', gap: 16, height: '100%',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0f2f5',
+        padding: 40,
       }}>
-        <div style={{ fontSize: 48 }}>🔒</div>
-        <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1f2e' }}>Service not activated</div>
-        <div style={{ fontSize: 14, color: '#888', textAlign: 'center', maxWidth: 320 }}>
-          This service is not included in your current plan. Contact Faya IT to activate it.
-        </div>
-        <a href="mailto:support@fayait.com" style={{
-          background: '#ff6b35', color: '#fff',
-          padding: '10px 24px', borderRadius: 8,
-          fontSize: 13, fontWeight: 500, textDecoration: 'none', marginTop: 8,
+        <div style={{
+          background: '#fff',
+          borderRadius: 16,
+          padding: '48px 40px',
+          maxWidth: 480,
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+          border: '1px solid rgba(0,0,0,0.06)',
         }}>
-          Contact support
-        </a>
-      </div>
-    )
-  }
-
-  if (!url) {
-    return (
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', color: '#888', fontSize: 14, height: '100%',
-      }}>
-        Service URL not configured
+          <div style={{ fontSize: 52, marginBottom: 16 }}>{info.icon}</div>
+          <div style={{ fontSize: 11, color: '#ff6b35', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+            Not activated
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1f2e', marginBottom: 12 }}>
+            {info.name}
+          </div>
+          <div style={{ fontSize: 14, color: '#666', lineHeight: 1.6, marginBottom: 28 }}>
+            {info.description}
+          </div>
+          {isAdmin && (
+            <div style={{
+              background: '#fff8f5',
+              border: '1px solid rgba(255,107,53,0.2)',
+              borderRadius: 10,
+              padding: '14px 18px',
+              marginBottom: 24,
+              fontSize: 13,
+              color: '#888',
+              textAlign: 'left',
+            }}>
+              <strong style={{ color: '#1a1f2e' }}>Admin note:</strong> Contact Faya IT to activate this service for your organization.
+            </div>
+          )}
+          <a href="mailto:support@fayait.com" style={{
+            display: 'inline-block',
+            background: '#ff6b35',
+            color: '#fff',
+            padding: '12px 28px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}>
+            Contact Faya IT to unlock
+          </a>
+        </div>
       </div>
     )
   }
 
   return (
-    <iframe
-      src={url}
-      style={{ flex: 1, width: '100%', height: '100%', border: 'none', display: 'block' }}
-      title={service}
-      allow="fullscreen"
-    />
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <iframe
+        src={url}
+        style={{ flex: 1, width: '100%', border: 'none', display: 'block' }}
+        title={service}
+        allow="fullscreen"
+      />
+    </div>
   )
 }
