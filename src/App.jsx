@@ -1,15 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { LangProvider } from './context/LangContext'
-import { ThemeProvider } from './context/ThemeContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import Tickets from './pages/Tickets'
-import Assets from './pages/Assets'
-import Status from './pages/Status'
-import Users from './pages/Users'
-import Profile from './pages/Profile'
-import Billing from './pages/Billing'
+import ServiceFrame from './pages/ServiceFrame'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -22,27 +15,36 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<Dashboard />} />
-        <Route path="tickets" element={<Tickets />} />
-        <Route path="assets" element={<Assets />} />
-        <Route path="status" element={<Status />} />
-        <Route path="users" element={<Users />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="billing" element={<Billing />} />
-      </Route>
+      <Route
+        path="/*"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/tickets" element={<ServiceFrame service="tickets" />} />
+                <Route path="/assets" element={<ServiceFrame service="assets" />} />
+                <Route path="/chat" element={<ServiceFrame service="chat" />} />
+                <Route path="/files" element={<ServiceFrame service="files" />} />
+                <Route path="/projects" element={<ServiceFrame service="projects" />} />
+                <Route path="/status" element={<ServiceFrame service="status" />} />
+                <Route path="/grafana" element={<ServiceFrame service="grafana" />} />
+                <Route path="/users" element={<ServiceFrame service="users" />} />
+                <Route path="/billing" element={<ServiceFrame service="billing" />} />
+                <Route path="/profile" element={<ServiceFrame service="profile" />} />
+              </Routes>
+            </Layout>
+          </PrivateRoute>
+        }
+      />
     </Routes>
   )
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LangProvider>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </LangProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }

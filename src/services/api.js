@@ -88,3 +88,53 @@ export const api = {
 }
 
 export default api
+
+export const rolesApi = {
+  getRoles: () =>
+    fetch(`${BASE}/api/roles`, { headers: headers() }).then(handle),
+
+  createRole: (data) =>
+    fetch(`${BASE}/api/roles`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  updateRole: (id, data) =>
+    fetch(`${BASE}/api/roles/${id}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  deleteRole: (id) =>
+    fetch(`${BASE}/api/roles/${id}`, {
+      method: 'DELETE',
+      headers: headers()
+    }).then(handle),
+}
+
+export const departmentsApi = {
+  getDepartments: () =>
+    fetch(`${BASE}/api/departments`, { headers: headers() }).then(handle),
+
+  createDepartment: (data) =>
+    fetch(`${BASE}/api/departments`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  updateDepartment: (id, data) =>
+    fetch(`${BASE}/api/departments/${id}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  deleteDepartment: (id) =>
+    fetch(`${BASE}/api/departments/${id}`, {
+      method: 'DELETE',
+      headers: headers()
+    }).then(handle),
+}
