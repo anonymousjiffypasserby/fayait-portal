@@ -79,6 +79,9 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  getAssets: () =>
+    fetch(`${BASE}/api/assets`, { headers: headers() }).then(handle),
+
   createAnnouncement: (data) =>
     fetch(`${BASE}/api/admin/announcements`, {
       method: 'POST',

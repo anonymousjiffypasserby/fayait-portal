@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
+import Assets from './pages/Assets'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -23,7 +24,7 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/tickets" element={<ServiceFrame service="tickets" />} />
-                <Route path="/assets" element={<ServiceFrame service="assets" />} />
+                <Route path="/assets" element={<Assets />} />
                 <Route path="/chat" element={<ServiceFrame service="chat" />} />
                 <Route path="/files" element={<ServiceFrame service="files" />} />
                 <Route path="/projects" element={<ServiceFrame service="projects" />} />
