@@ -10,7 +10,22 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const stored = localStorage.getItem('faya_user')
     const token = localStorage.getItem('faya_token')
-    if (stored && token) setUser(JSON.parse(stored))
+    if (stored && token) {
+      const parsedUser = JSON.parse(stored)
+      setUser(parsedUser)
+      // Refresh services from API
+      api.getCompanyConfig()
+        .then(data => {
+          const services = {}
+          Object.entries(data.services).forEach(([k, v]) => {
+            services[k] = v.status
+          })
+          const updated = { ...parsedUser, services }
+          localStorage.setItem('faya_user', JSON.stringify(updated))
+          setUser(updated)
+        })
+        .catch(() => {}) // fail silently, use cached data
+    }
     setLoading(false)
   }, [])
 
