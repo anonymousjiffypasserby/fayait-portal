@@ -11,7 +11,7 @@ export function useAssets() {
     setError(null)
     try {
       const data = await api.getAssets(retired)
-      setAssets(data)
+      setAssets(Array.isArray(data) ? data : (data.rows || []))
     } catch (e) {
       setError(e.message)
     } finally {
