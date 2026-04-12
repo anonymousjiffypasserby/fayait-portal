@@ -417,13 +417,27 @@ export default function Assets() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
             {/* Health */}
             <Section title="Health">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', background: '#f7f8fa', borderRadius: 8 }}>
-                <HealthScore asset={selected} />
-                <div style={{ flex: 1 }}>
-                  <UsageBar value={selected.ram_usage} label="RAM Usage" />
-                  <UsageBar value={selected.cpu_usage} label="CPU Usage" color={theme.orange} />
+              <div style={{ padding: '10px 14px', background: '#f7f8fa', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: selected.disk_usage ? 10 : 0 }}>
+                  <HealthScore asset={selected} />
+                  <div style={{ flex: 1 }}>
+                    <UsageBar value={selected.ram_usage} label="RAM Usage" />
+                    <UsageBar value={selected.cpu_usage} label="CPU Usage" color={theme.orange} />
+                  </div>
                 </div>
+                {selected.disk_usage && typeof selected.disk_usage === 'object' && Object.keys(selected.disk_usage).length > 0 && (
+                  <div>
+                    {Object.entries(selected.disk_usage).map(([drive, pct]) => (
+                      <UsageBar key={drive} value={pct} label={`Disk ${drive}`} color={theme.navy} />
+                    ))}
+                  </div>
+                )}
               </div>
+              {selected.disk_health && selected.disk_health !== 'OK' && (
+                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fff3cd', borderRadius: 6, fontSize: 12, color: '#856404', fontWeight: 600 }}>
+                  ⚠ Disk health: {selected.disk_health}
+                </div>
+              )}
             </Section>
 
             {/* Hardware */}
@@ -445,6 +459,7 @@ export default function Assets() {
             <Section title="System">
               <InfoRow label="OS" value={selected.os} />
               <InfoRow label="Antivirus" value={selected.antivirus} />
+              <InfoRow label="Disk Health" value={selected.disk_health && selected.disk_health !== 'OK' ? selected.disk_health : selected.disk_health === 'OK' ? 'Good' : null} />
               <InfoRow label="Pending Updates" value={selected.pending_updates && selected.pending_updates !== 'Unknown' ? `${selected.pending_updates} updates` : null} />
               <InfoRow label="Last Update" value={selected.last_update} />
               <InfoRow label="Battery" value={selected.battery_status !== 'N/A' ? selected.battery_status : null} />
