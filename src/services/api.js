@@ -112,6 +112,52 @@ export const api = {
       body: JSON.stringify({ command, payload })
     }).then(handle),
 
+  checkoutAsset: (id, data) =>
+    fetch(`${BASE}/api/assets/${id}/checkout`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data)
+    }).then(handle),
+
+  checkinAsset: (id) =>
+    fetch(`${BASE}/api/assets/${id}/checkin`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({})
+    }).then(handle),
+
+  auditAsset: (id, data = {}) =>
+    fetch(`${BASE}/api/assets/${id}/audit`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data)
+    }).then(handle),
+
+  cloneAsset: (id) =>
+    fetch(`${BASE}/api/assets/${id}/clone`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({})
+    }).then(handle),
+
+  getAssetHistory: (id) =>
+    fetch(`${BASE}/api/assets/${id}/history`, { headers: headers() }).then(handle),
+
+  getAssetMaintenance: (id) =>
+    fetch(`${BASE}/api/assets/${id}/maintenance`, { headers: headers() }).then(handle),
+
+  createMaintenance: (id, data) =>
+    fetch(`${BASE}/api/assets/${id}/maintenance`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data)
+    }).then(handle),
+
+  getDiscovered: () =>
+    fetch(`${BASE}/api/assets/discovered`, { headers: headers() }).then(handle),
+
+  approveDiscovered: (id) =>
+    fetch(`${BASE}/api/assets/discovered/${id}/approve`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({})
+    }).then(handle),
+
+  ignoreDiscovered: (id) =>
+    fetch(`${BASE}/api/assets/discovered/${id}/ignore`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({})
+    }).then(handle),
+
+  getLiveUrl: () => `${BASE}/api/assets/live?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+
   createAnnouncement: (data) =>
     fetch(`${BASE}/api/admin/announcements`, {
       method: 'POST',

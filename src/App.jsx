@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
-import Assets from './pages/Assets'
+import Assets from './pages/assets'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
