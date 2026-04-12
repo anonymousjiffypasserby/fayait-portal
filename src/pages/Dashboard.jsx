@@ -1,17 +1,28 @@
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import api from '../services/api'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [assetCount, setAssetCount] = useState('—')
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const firstName = user?.name?.split(' ')[0]
   const services = user?.services || {}
 
+  useEffect(() => {
+    if (services.assets === 'active') {
+      api.getAssets()
+        .then(data => setAssetCount(data.total ?? data.rows?.length ?? '—'))
+        .catch(() => {})
+    }
+  }, [])
+
   const stats = [
     { label: 'Open Tickets', value: '—', sub: 'View in tickets', icon: '🎫', path: '/tickets', color: '#ff6b35' },
-    { label: 'Total Assets', value: '—', sub: 'View in assets', icon: '💻', path: '/assets', color: '#378ADD' },
+    { label: 'Total Assets', value: assetCount, sub: 'View in assets', icon: '💻', path: '/assets', color: '#378ADD' },
     { label: 'Services Active', value: Object.values(services).filter(s => s === 'active').length, sub: 'of ' + Object.keys(services).length + ' total', icon: '🟢', color: '#1D9E75' },
     { label: 'Team Members', value: '—', sub: 'Manage users', icon: '👥', path: '/users', color: '#9b59b6' },
   ]
