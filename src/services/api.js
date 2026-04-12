@@ -79,8 +79,38 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
-  getAssets: () =>
-    fetch(`${BASE}/api/assets`, { headers: headers() }).then(handle),
+  getAssets: (retired = false) =>
+    fetch(`${BASE}/api/assets${retired ? '?retired=true' : ''}`, { headers: headers() }).then(handle),
+
+  createAsset: (data) =>
+    fetch(`${BASE}/api/assets`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  updateAsset: (id, data) =>
+    fetch(`${BASE}/api/assets/${id}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
+  retireAsset: (id) =>
+    fetch(`${BASE}/api/assets/${id}`, {
+      method: 'DELETE',
+      headers: headers()
+    }).then(handle),
+
+  getAssetCommands: (id) =>
+    fetch(`${BASE}/api/assets/${id}/commands`, { headers: headers() }).then(handle),
+
+  sendAssetCommand: (id, command, payload = {}) =>
+    fetch(`${BASE}/api/assets/${id}/commands`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ command, payload })
+    }).then(handle),
 
   createAnnouncement: (data) =>
     fetch(`${BASE}/api/admin/announcements`, {
