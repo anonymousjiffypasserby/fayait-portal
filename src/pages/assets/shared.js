@@ -13,13 +13,15 @@ export const T = {
   font: "'DM Sans', 'Helvetica Neue', sans-serif",
 }
 
-export const STATUS_OPTIONS = ['Ready to Deploy', 'Deployed', 'Pending', 'Maintenance', 'Retired', 'Lost/Stolen']
+export const STATUS_OPTIONS = ['Ready to Deploy', 'Deployed', 'Pending', 'Maintenance', 'Archived', 'Un-deployable', 'Lost/Stolen', 'Retired']
 
 export const STATUS_COLORS = {
   'Ready to Deploy': '#1D9E75',
   'Deployed': '#378ADD',
   'Pending': '#f39c12',
-  'Maintenance': '#e67e22',
+  'Maintenance': '#f39c12',
+  'Archived': '#888',
+  'Un-deployable': '#888',
   'Retired': '#888',
   'Lost/Stolen': '#e74c3c',
 }

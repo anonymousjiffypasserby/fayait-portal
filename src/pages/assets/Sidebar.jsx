@@ -6,7 +6,8 @@ const VIEWS = [
   { key: 'ready', label: 'Ready to Deploy', icon: '◯', status: 'Ready to Deploy' },
   { key: 'pending', label: 'Pending', icon: '◔', status: 'Pending' },
   { key: 'maintenance', label: 'Maintenance', icon: '⚙', status: 'Maintenance' },
-  { key: 'archived', label: 'Archived', icon: '▣', status: 'Retired' },
+  { key: 'archived', label: 'Archived', icon: '▣', status: 'Archived' },
+  { key: 'undeployable', label: 'Un-deployable', icon: '⊘', status: 'Un-deployable' },
   { key: 'lost_stolen', label: 'Lost / Stolen', icon: '⚠', status: 'Lost/Stolen' },
 ]
 

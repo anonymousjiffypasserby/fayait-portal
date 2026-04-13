@@ -20,7 +20,7 @@ import api from '../../services/api'
 const ADMIN_ROLES = ['superadmin', 'admin']
 
 // Which activeView values require loading retired assets
-const RETIRED_VIEWS = new Set(['archived', 'deleted', 'lost_stolen'])
+const RETIRED_VIEWS = new Set(['deleted'])
 
 // Status filter implied by the active sidebar view
 const STATUS_FOR_VIEW = {
@@ -28,7 +28,8 @@ const STATUS_FOR_VIEW = {
   ready: 'Ready to Deploy',
   pending: 'Pending',
   maintenance: 'Maintenance',
-  archived: 'Retired',
+  archived: 'Archived',
+  undeployable: 'Un-deployable',
   lost_stolen: 'Lost/Stolen',
 }
 
@@ -39,6 +40,7 @@ const VIEW_TITLES = {
   pending: 'Pending',
   maintenance: 'Maintenance',
   archived: 'Archived',
+  undeployable: 'Un-deployable',
   lost_stolen: 'Lost / Stolen',
   due_audit: 'Due for Audit',
   due_checkin: 'Due for Checkin',
@@ -113,7 +115,7 @@ export default function Assets() {
       const overdue = !a.last_audited_at || new Date(a.last_audited_at).getTime() < oneYearAgo
       if (!overdue) return false
     } else if (activeView === 'due_checkin') {
-      if (!a.expected_checkin_date || new Date(a.expected_checkin_date) >= new Date()) return false
+      if (!a.expected_checkin_date || !a.checked_out_to || new Date(a.expected_checkin_date) >= new Date()) return false
     } else if (viewStatus) {
       if (a.status !== viewStatus) return false
     }
