@@ -334,7 +334,7 @@ export function EditAssetModal({ asset, onClose, onSave }) {
 }
 
 // ── Checkout modal ────────────────────────────────────────────────────────────
-export function CheckOutModal({ asset, onClose, onCheckout }) {
+export function CheckOutModal({ asset, onClose, onCheckout, locations = [] }) {
   const [form, setForm] = useState({
     assigned_to: asset?.assigned_user || '',
     location: asset?.location || '',
@@ -342,7 +342,14 @@ export function CheckOutModal({ asset, onClose, onCheckout }) {
     expected_checkin_date: '',
     note: '',
   })
+  const [users, setUsers] = useState([])
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    import('../../services/api').then(m => m.default.getUsers()).then(data => {
+      setUsers(Array.isArray(data) ? data : [])
+    }).catch(() => {})
+  }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -359,11 +366,28 @@ export function CheckOutModal({ asset, onClose, onCheckout }) {
     }
   }
 
+  const locationOpts = [...new Set([asset?.location, ...locations].filter(Boolean))].sort()
+
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title={`Check Out — ${asset?.hostname}`} onClose={onClose} />
-      <Field label="Assign To" name="assigned_to" value={form.assigned_to} onChange={set} required placeholder="Full name" />
-      <Field label="Location" name="location" value={form.location} onChange={set} placeholder="Where is this going?" />
+
+      <div style={{ marginBottom: 14 }}>
+        <Label text="Assign To" required />
+        <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)} style={selectStyle}>
+          <option value="">Select user...</option>
+          {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+        </select>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <Label text="Location" />
+        <select value={form.location} onChange={e => set('location', e.target.value)} style={selectStyle}>
+          <option value="">Select location...</option>
+          {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
         <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
         <Field label="Expected Return" name="expected_checkin_date" type="date" value={form.expected_checkin_date} onChange={set} />
@@ -379,9 +403,8 @@ export function CheckOutModal({ asset, onClose, onCheckout }) {
 }
 
 // ── Check In modal ────────────────────────────────────────────────────────────
-export function CheckInModal({ asset, onClose, onCheckin }) {
+export function CheckInModal({ asset, onClose, onCheckin, locations = [] }) {
   const [form, setForm] = useState({
-    status: 'Ready to Deploy',
     location: asset?.location || '',
     note: '',
   })
@@ -401,6 +424,8 @@ export function CheckInModal({ asset, onClose, onCheckin }) {
     }
   }
 
+  const locationOpts = [...new Set([asset?.location, ...locations].filter(Boolean))].sort()
+
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title={`Check In — ${asset?.hostname}`} onClose={onClose} />
@@ -409,8 +434,13 @@ export function CheckInModal({ asset, onClose, onCheckin }) {
           Currently checked out to <strong style={{ color: T.text }}>{asset.checked_out_to}</strong>
         </div>
       )}
-      <Field label="Set Status To" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
-      <Field label="Return to Location" name="location" value={form.location} onChange={set} placeholder="Where is this being returned?" />
+      <div style={{ marginBottom: 14 }}>
+        <Label text="Return to Location" />
+        <select value={form.location} onChange={e => set('location', e.target.value)} style={selectStyle}>
+          <option value="">Select location...</option>
+          {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </div>
       <div style={{ marginBottom: 20 }}>
         <Label text="Note" />
         <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2}

@@ -204,6 +204,7 @@ export default function Assets() {
 
   const onlineCount = assets.filter(isOnline).length
   const types = [...new Set(assets.map(a => a.asset_type).filter(Boolean))].sort()
+  const locations = [...new Set(assets.map(a => a.location).filter(Boolean))].sort()
 
   // ── Special view: Maintenances ─────────────────────────────────────────────
   if (activeView === 'maintenances') {
@@ -377,10 +378,10 @@ export default function Assets() {
         <EditAssetModal asset={openAsset} onClose={() => setModal(null)} onSave={updateAsset} />
       )}
       {modal === 'checkout' && openAsset && (
-        <CheckOutModal asset={openAsset} onClose={() => setModal(null)} onCheckout={checkoutAsset} />
+        <CheckOutModal asset={openAsset} onClose={() => setModal(null)} onCheckout={checkoutAsset} locations={locations} />
       )}
       {modal === 'checkin' && openAsset && (
-        <CheckInModal asset={openAsset} onClose={() => setModal(null)} onCheckin={checkinAsset} />
+        <CheckInModal asset={openAsset} onClose={() => setModal(null)} onCheckin={checkinAsset} locations={locations} />
       )}
       {modal === 'audit' && openAsset && (
         <AuditModal asset={openAsset} onClose={() => setModal(null)} onAudit={auditAsset} />
