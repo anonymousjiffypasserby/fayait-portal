@@ -13,6 +13,17 @@ export const T = {
   font: "'DM Sans', 'Helvetica Neue', sans-serif",
 }
 
+export const STATUS_OPTIONS = ['Ready to Deploy', 'Deployed', 'Pending', 'Maintenance', 'Retired', 'Lost/Stolen']
+
+export const STATUS_COLORS = {
+  'Ready to Deploy': '#1D9E75',
+  'Deployed': '#378ADD',
+  'Pending': '#f39c12',
+  'Maintenance': '#e67e22',
+  'Retired': '#888',
+  'Lost/Stolen': '#e74c3c',
+}
+
 export const fmtAgo = (ms) => {
   if (!ms && ms !== 0) return 'never'
   const m = Math.floor(ms / 60000)
@@ -20,6 +31,11 @@ export const fmtAgo = (ms) => {
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
+}
+
+export const fmtDate = (d) => {
+  if (!d) return null
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export const healthScore = (asset) => {

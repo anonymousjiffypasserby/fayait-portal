@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { T } from './shared'
+import { useState, useEffect } from 'react'
+import QRCode from 'qrcode'
+import { T, STATUS_OPTIONS } from './shared'
 
 const Overlay = ({ children, onClose }) => (
   <div onClick={onClose} style={{
@@ -7,7 +8,7 @@ const Overlay = ({ children, onClose }) => (
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
   }}>
     <div onClick={e => e.stopPropagation()} style={{
-      background: T.card, borderRadius: 14, padding: 24, width: 440,
+      background: T.card, borderRadius: 14, padding: 24, width: 480,
       boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: T.font,
       maxHeight: '90vh', overflowY: 'auto',
     }}>
@@ -23,18 +24,37 @@ const ModalHeader = ({ title, onClose }) => (
   </div>
 )
 
-const Field = ({ label, name, type = 'text', value, onChange, options, required, placeholder }) => (
+const Label = ({ text, required }) => (
+  <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+    {text}{required && ' *'}
+  </label>
+)
+
+const inputStyle = {
+  width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`,
+  fontSize: 13, boxSizing: 'border-box', fontFamily: T.font, outline: 'none',
+}
+
+const selectStyle = {
+  ...inputStyle, background: T.card, cursor: 'pointer',
+}
+
+const Field = ({ label, name, type = 'text', value, onChange, options, required, placeholder, mono }) => (
   <div style={{ marginBottom: 14 }}>
-    <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}{required && ' *'}</label>
+    <Label text={label} required={required} />
     {options ? (
-      <select value={value} onChange={e => onChange(name, e.target.value)}
-        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, background: T.card, boxSizing: 'border-box' }}>
+      <select value={value} onChange={e => onChange(name, e.target.value)} style={selectStyle}>
         <option value="">Select...</option>
         {options.map(o => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
       </select>
     ) : (
-      <input type={type} value={value} onChange={e => onChange(name, e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, boxSizing: 'border-box' }} />
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(name, e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inputStyle, fontFamily: mono ? 'monospace' : T.font }}
+      />
     )}
   </div>
 )
@@ -45,6 +65,90 @@ const SaveBtn = ({ label, onClick, disabled, color }) => (
     {label}
   </button>
 )
+
+const SectionTitle = ({ children }) => (
+  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: T.muted, margin: '18px 0 10px', paddingBottom: 4, borderBottom: `1px solid ${T.border}` }}>
+    {children}
+  </div>
+)
+
+// ── Asset form fields (shared between New + Edit) ─────────────────────────────
+function AssetFormFields({ form, set, isEdit }) {
+  return (
+    <>
+      <SectionTitle>Identity</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Hostname" name="hostname" value={form.hostname} onChange={set} required />
+        <Field label="Asset Tag" name="asset_tag" value={form.asset_tag} onChange={set} placeholder="Auto-generated if blank" mono />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Status" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
+        <Field label="Category" name="asset_type" value={form.asset_type} onChange={set} options={['Desktop', 'Laptop', 'Server', 'Other']} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Serial" name="serial" value={form.serial} onChange={set} mono />
+        <Field label="MAC Address" name="mac_address" value={form.mac_address} onChange={set} placeholder="AA:BB:CC:DD:EE:FF" mono />
+      </div>
+
+      <SectionTitle>Hardware</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Manufacturer" name="manufacturer" value={form.manufacturer} onChange={set} />
+        <Field label="Model" name="model" value={form.model} onChange={set} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={set} mono />
+        <Field label="OS" name="os" value={form.os} onChange={set} />
+      </div>
+
+      <SectionTitle>Assignment</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Assigned To" name="assigned_user" value={form.assigned_user} onChange={set} />
+        <Field label="Department" name="department" value={form.department} onChange={set} />
+      </div>
+      <Field label="Location" name="location" value={form.location} onChange={set} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
+        <Field label="Expected Checkin" name="expected_checkin_date" type="date" value={form.expected_checkin_date} onChange={set} />
+      </div>
+
+      <SectionTitle>Purchase Info</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Purchase Date" name="purchase_date" type="date" value={form.purchase_date} onChange={set} />
+        <Field label="Purchase Cost ($)" name="purchase_cost" type="number" value={form.purchase_cost} onChange={set} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Order Number" name="order_number" value={form.order_number} onChange={set} />
+        <Field label="Supplier" name="supplier" value={form.supplier} onChange={set} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Warranty Months" name="warranty_months" type="number" value={form.warranty_months} onChange={set} />
+        <Field label="Warranty Expires" name="warranty_expires" type="date" value={form.warranty_expires} onChange={set} />
+      </div>
+      <Field label="EOL Date" name="eol_date" type="date" value={form.eol_date} onChange={set} />
+
+      {isEdit && (
+        <>
+          <SectionTitle>Remote Access</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+            <Field label="RustDesk ID" name="rustdesk_id" value={form.rustdesk_id} onChange={set} mono />
+            <Field label="RustDesk Password" name="rustdesk_password" value={form.rustdesk_password} onChange={set} mono />
+          </div>
+        </>
+      )}
+
+      <SectionTitle>Notes</SectionTitle>
+      <div style={{ marginBottom: 14 }}>
+        <textarea
+          value={form.notes}
+          onChange={e => set('notes', e.target.value)}
+          rows={3}
+          placeholder="Any additional notes..."
+          style={{ ...inputStyle, resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
+}
 
 // ── Connect modal ─────────────────────────────────────────────────────────────
 export function ConnectModal({ asset, onClose }) {
@@ -61,6 +165,47 @@ export function ConnectModal({ asset, onClose }) {
         {asset.rustdesk_password && <>Password: {asset.rustdesk_password}</>}
       </div>
       <SaveBtn label="Open RustDesk" onClick={() => { window.location.href = uri; onClose() }} color={T.navy} />
+    </Overlay>
+  )
+}
+
+// ── QR Code modal ─────────────────────────────────────────────────────────────
+export function QRModal({ asset, onClose }) {
+  const [dataUrl, setDataUrl] = useState(null)
+
+  useEffect(() => {
+    const text = asset.asset_tag || asset.hostname || asset.id?.toString()
+    QRCode.toDataURL(text, { width: 240, margin: 2, color: { dark: '#1a1f2e', light: '#ffffff' } })
+      .then(url => setDataUrl(url))
+      .catch(() => {})
+  }, [asset])
+
+  const download = () => {
+    const a = document.createElement('a')
+    a.href = dataUrl
+    a.download = `qr-${asset.asset_tag || asset.hostname}.png`
+    a.click()
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <ModalHeader title="QR Code Tag" onClose={onClose} />
+      <div style={{ textAlign: 'center' }}>
+        {dataUrl ? (
+          <>
+            <div style={{ display: 'inline-block', background: '#fff', padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, marginBottom: 14 }}>
+              <img src={dataUrl} alt="QR Code" style={{ display: 'block', width: 200, height: 200 }} />
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text, fontFamily: 'monospace', marginBottom: 4 }}>
+              {asset.asset_tag || '—'}
+            </div>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 20 }}>{asset.hostname}</div>
+            <SaveBtn label="Download PNG" onClick={download} color={T.navy} />
+          </>
+        ) : (
+          <div style={{ padding: 40, color: T.muted, fontSize: 13 }}>Generating QR code...</div>
+        )}
+      </div>
     </Overlay>
   )
 }
@@ -87,9 +232,8 @@ export function RenameModal({ asset, onClose, onRename }) {
     <Overlay onClose={onClose}>
       <ModalHeader title={`Rename ${asset?.hostname}`} onClose={onClose} />
       <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>New Hostname</label>
-        <input value={softName} onChange={e => setSoftName(e.target.value)}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, boxSizing: 'border-box' }} />
+        <Label text="New Hostname" required />
+        <input value={softName} onChange={e => setSoftName(e.target.value)} style={inputStyle} />
       </div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.text, marginBottom: 20, cursor: 'pointer' }}>
         <input type="checkbox" checked={sendToAgent} onChange={e => setSendToAgent(e.target.checked)} />
@@ -103,9 +247,11 @@ export function RenameModal({ asset, onClose, onRename }) {
 // ── New asset modal ───────────────────────────────────────────────────────────
 export function NewAssetModal({ onClose, onCreate }) {
   const [form, setForm] = useState({
-    hostname: '', asset_type: 'Desktop', manufacturer: '', model: '', serial: '',
-    mac_address: '', ip_address: '', os: '', assigned_user: '', department: '', location: '',
-    purchase_date: '', purchase_cost: '', warranty_expires: '', notes: '',
+    hostname: '', asset_tag: '', status: 'Ready to Deploy', asset_type: 'Desktop',
+    manufacturer: '', model: '', serial: '', mac_address: '', ip_address: '', os: '',
+    assigned_user: '', department: '', location: '', checkout_date: '', expected_checkin_date: '',
+    purchase_date: '', purchase_cost: '', order_number: '', supplier: '',
+    warranty_months: '', warranty_expires: '', eol_date: '', notes: '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -127,25 +273,7 @@ export function NewAssetModal({ onClose, onCreate }) {
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title="Add Asset" onClose={onClose} />
-      <Field label="Hostname" name="hostname" value={form.hostname} onChange={set} required />
-      <Field label="Type" name="asset_type" value={form.asset_type} onChange={set} options={['Desktop', 'Laptop', 'Server', 'Other']} />
-      <Field label="Manufacturer" name="manufacturer" value={form.manufacturer} onChange={set} />
-      <Field label="Model" name="model" value={form.model} onChange={set} />
-      <Field label="Serial" name="serial" value={form.serial} onChange={set} />
-      <Field label="MAC Address" name="mac_address" value={form.mac_address} onChange={set} placeholder="AA:BB:CC:DD:EE:FF" />
-      <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={set} />
-      <Field label="OS" name="os" value={form.os} onChange={set} />
-      <Field label="Assigned To" name="assigned_user" value={form.assigned_user} onChange={set} />
-      <Field label="Department" name="department" value={form.department} onChange={set} />
-      <Field label="Location" name="location" value={form.location} onChange={set} />
-      <Field label="Purchase Date" name="purchase_date" type="date" value={form.purchase_date} onChange={set} />
-      <Field label="Purchase Cost ($)" name="purchase_cost" type="number" value={form.purchase_cost} onChange={set} />
-      <Field label="Warranty Expires" name="warranty_expires" type="date" value={form.warranty_expires} onChange={set} />
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Notes</label>
-        <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
-      </div>
+      <AssetFormFields form={form} set={set} isEdit={false} />
       <SaveBtn label={saving ? 'Creating...' : 'Create Asset'} onClick={submit} disabled={saving || !form.hostname} />
     </Overlay>
   )
@@ -155,18 +283,27 @@ export function NewAssetModal({ onClose, onCreate }) {
 export function EditAssetModal({ asset, onClose, onSave }) {
   const [form, setForm] = useState({
     hostname: asset?.hostname || '',
+    asset_tag: asset?.asset_tag || '',
+    status: asset?.status || '',
     asset_type: asset?.asset_type || 'Desktop',
     manufacturer: asset?.manufacturer || '',
     model: asset?.model || '',
     serial: asset?.serial || '',
+    mac_address: asset?.mac_address || '',
     ip_address: asset?.ip_address || '',
     os: asset?.os || '',
     assigned_user: asset?.assigned_user || '',
     department: asset?.department || '',
     location: asset?.location || '',
+    checkout_date: asset?.checkout_date?.slice(0, 10) || '',
+    expected_checkin_date: asset?.expected_checkin_date?.slice(0, 10) || '',
     purchase_date: asset?.purchase_date?.slice(0, 10) || '',
     purchase_cost: asset?.purchase_cost || '',
+    order_number: asset?.order_number || '',
+    supplier: asset?.supplier || '',
+    warranty_months: asset?.warranty_months || '',
     warranty_expires: asset?.warranty_expires?.slice(0, 10) || '',
+    eol_date: asset?.eol_date?.slice(0, 10) || '',
     notes: asset?.notes || '',
     rustdesk_id: asset?.rustdesk_id || '',
     rustdesk_password: asset?.rustdesk_password || '',
@@ -190,26 +327,7 @@ export function EditAssetModal({ asset, onClose, onSave }) {
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title={`Edit ${asset?.hostname}`} onClose={onClose} />
-      <Field label="Hostname" name="hostname" value={form.hostname} onChange={set} required />
-      <Field label="Type" name="asset_type" value={form.asset_type} onChange={set} options={['Desktop', 'Laptop', 'Server', 'Other']} />
-      <Field label="Manufacturer" name="manufacturer" value={form.manufacturer} onChange={set} />
-      <Field label="Model" name="model" value={form.model} onChange={set} />
-      <Field label="Serial" name="serial" value={form.serial} onChange={set} />
-      <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={set} />
-      <Field label="OS" name="os" value={form.os} onChange={set} />
-      <Field label="Assigned To" name="assigned_user" value={form.assigned_user} onChange={set} />
-      <Field label="Department" name="department" value={form.department} onChange={set} />
-      <Field label="Location" name="location" value={form.location} onChange={set} />
-      <Field label="Purchase Date" name="purchase_date" type="date" value={form.purchase_date} onChange={set} />
-      <Field label="Purchase Cost ($)" name="purchase_cost" type="number" value={form.purchase_cost} onChange={set} />
-      <Field label="Warranty Expires" name="warranty_expires" type="date" value={form.warranty_expires} onChange={set} />
-      <Field label="RustDesk ID" name="rustdesk_id" value={form.rustdesk_id} onChange={set} />
-      <Field label="RustDesk Password" name="rustdesk_password" value={form.rustdesk_password} onChange={set} />
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Notes</label>
-        <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
-      </div>
+      <AssetFormFields form={form} set={set} isEdit={true} />
       <SaveBtn label={saving ? 'Saving...' : 'Save Changes'} onClick={submit} disabled={saving || !form.hostname} />
     </Overlay>
   )
@@ -217,7 +335,13 @@ export function EditAssetModal({ asset, onClose, onSave }) {
 
 // ── Checkout modal ────────────────────────────────────────────────────────────
 export function CheckOutModal({ asset, onClose, onCheckout }) {
-  const [form, setForm] = useState({ assigned_to: asset?.assigned_user || '', checkout_date: new Date().toISOString().slice(0, 10), note: '' })
+  const [form, setForm] = useState({
+    assigned_to: asset?.assigned_user || '',
+    location: asset?.location || '',
+    checkout_date: new Date().toISOString().slice(0, 10),
+    expected_checkin_date: '',
+    note: '',
+  })
   const [saving, setSaving] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -237,15 +361,62 @@ export function CheckOutModal({ asset, onClose, onCheckout }) {
 
   return (
     <Overlay onClose={onClose}>
-      <ModalHeader title={`Check Out ${asset?.hostname}`} onClose={onClose} />
-      <Field label="Assign To" name="assigned_to" value={form.assigned_to} onChange={set} required />
-      <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Note</label>
+      <ModalHeader title={`Check Out — ${asset?.hostname}`} onClose={onClose} />
+      <Field label="Assign To" name="assigned_to" value={form.assigned_to} onChange={set} required placeholder="Full name" />
+      <Field label="Location" name="location" value={form.location} onChange={set} placeholder="Where is this going?" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
+        <Field label="Expected Return" name="expected_checkin_date" type="date" value={form.expected_checkin_date} onChange={set} />
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <Label text="Note" />
         <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+          style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
       <SaveBtn label={saving ? 'Checking Out...' : 'Check Out'} onClick={submit} disabled={saving || !form.assigned_to} color={T.blue} />
+    </Overlay>
+  )
+}
+
+// ── Check In modal ────────────────────────────────────────────────────────────
+export function CheckInModal({ asset, onClose, onCheckin }) {
+  const [form, setForm] = useState({
+    status: 'Ready to Deploy',
+    location: asset?.location || '',
+    note: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    setSaving(true)
+    try {
+      await onCheckin(asset.id, form)
+      onClose()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <ModalHeader title={`Check In — ${asset?.hostname}`} onClose={onClose} />
+      {asset?.checked_out_to && (
+        <div style={{ background: '#f8f9fa', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: T.muted }}>
+          Currently checked out to <strong style={{ color: T.text }}>{asset.checked_out_to}</strong>
+        </div>
+      )}
+      <Field label="Set Status To" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
+      <Field label="Return to Location" name="location" value={form.location} onChange={set} placeholder="Where is this being returned?" />
+      <div style={{ marginBottom: 20 }}>
+        <Label text="Note" />
+        <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2}
+          style={{ ...inputStyle, resize: 'vertical' }} />
+      </div>
+      <SaveBtn label={saving ? 'Checking In...' : 'Check In'} onClick={submit} disabled={saving} color={T.navy} />
     </Overlay>
   )
 }
@@ -269,12 +440,20 @@ export function AuditModal({ asset, onClose, onAudit }) {
 
   return (
     <Overlay onClose={onClose}>
-      <ModalHeader title={`Audit ${asset?.hostname}`} onClose={onClose} />
-      <p style={{ fontSize: 13, color: T.muted, marginBottom: 14 }}>Record that you have physically verified this asset.</p>
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Note (optional)</label>
+      <ModalHeader title={`Audit — ${asset?.hostname}`} onClose={onClose} />
+      <p style={{ fontSize: 13, color: T.muted, marginBottom: 14 }}>
+        Record that you have physically verified this asset is present and in the expected condition.
+      </p>
+      <div style={{ background: '#f8f9fa', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12 }}>
+        <div style={{ color: T.muted }}>Last audited</div>
+        <div style={{ color: T.text, fontWeight: 600, marginTop: 2 }}>
+          {asset?.last_audited_at ? new Date(asset.last_audited_at).toLocaleString() : 'Never'}
+        </div>
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <Label text="Note (optional)" />
         <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+          style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
       <SaveBtn label={saving ? 'Saving...' : 'Confirm Audit'} onClick={submit} disabled={saving} color={T.green} />
     </Overlay>
@@ -293,11 +472,11 @@ export function ConfirmRetireModal({ asset, onClose, onConfirm }) {
     <Overlay onClose={onClose}>
       <ModalHeader title="Delete Asset" onClose={onClose} />
       <p style={{ fontSize: 13, color: T.text, marginBottom: 20 }}>
-        Are you sure you want to retire <strong>{asset?.hostname}</strong>? This will mark it as retired.
+        Are you sure you want to delete <strong>{asset?.hostname}</strong>? This asset will be moved to the trash and can be restored later.
       </p>
       <div style={{ display: 'flex', gap: 10 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 9, border: `1px solid ${T.border}`, background: T.card, cursor: 'pointer', fontFamily: T.font }}>Cancel</button>
-        <SaveBtn label={saving ? 'Deleting...' : 'Retire Asset'} onClick={submit} disabled={saving} color={T.red} />
+        <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 9, border: `1px solid ${T.border}`, background: T.card, cursor: 'pointer', fontFamily: T.font, fontSize: 14 }}>Cancel</button>
+        <SaveBtn label={saving ? 'Deleting...' : 'Delete Asset'} onClick={submit} disabled={saving} color={T.red} />
       </div>
     </Overlay>
   )
@@ -316,7 +495,7 @@ export function BulkAssignModal({ count, onClose, onConfirm }) {
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title={`Assign ${count} assets`} onClose={onClose} />
-      <Field label="Assign To" name="user" value={value} onChange={(_, v) => setValue(v)} required />
+      <Field label="Assign To" name="user" value={value} onChange={(_, v) => setValue(v)} required placeholder="Full name" />
       <SaveBtn label={saving ? 'Saving...' : 'Assign'} onClick={submit} disabled={saving || !value} color={T.blue} />
     </Overlay>
   )
@@ -337,6 +516,25 @@ export function BulkLocationModal({ count, onClose, onConfirm }) {
       <ModalHeader title={`Update location for ${count} assets`} onClose={onClose} />
       <Field label="Location" name="location" value={value} onChange={(_, v) => setValue(v)} required />
       <SaveBtn label={saving ? 'Saving...' : 'Update'} onClick={submit} disabled={saving || !value} color={T.blue} />
+    </Overlay>
+  )
+}
+
+// ── Bulk status modal ─────────────────────────────────────────────────────────
+export function BulkStatusModal({ count, onClose, onConfirm }) {
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const submit = async () => {
+    if (!value) return
+    setSaving(true)
+    try { await onConfirm(value); onClose() }
+    catch (e) { alert(e.message); setSaving(false) }
+  }
+  return (
+    <Overlay onClose={onClose}>
+      <ModalHeader title={`Update status for ${count} assets`} onClose={onClose} />
+      <Field label="New Status" name="status" value={value} onChange={(_, v) => setValue(v)} options={STATUS_OPTIONS} required />
+      <SaveBtn label={saving ? 'Saving...' : 'Update Status'} onClick={submit} disabled={saving || !value} color={T.blue} />
     </Overlay>
   )
 }

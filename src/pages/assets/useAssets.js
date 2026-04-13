@@ -36,15 +36,33 @@ export function useAssets() {
     setAssets(prev => prev.filter(a => a.id !== id))
   }, [])
 
+  const restoreAsset = useCallback(async (id) => {
+    await api.restoreAsset(id)
+    setAssets(prev => prev.filter(a => a.id !== id))
+  }, [])
+
   const checkoutAsset = useCallback(async (id, data) => {
     const res = await api.checkoutAsset(id, data)
-    setAssets(prev => prev.map(a => a.id === id ? { ...a, checked_out_to: data.assigned_to } : a))
+    setAssets(prev => prev.map(a => a.id === id ? {
+      ...a,
+      checked_out_to: data.assigned_to,
+      checkout_date: data.checkout_date,
+      expected_checkin_date: data.expected_checkin_date,
+      status: 'Deployed',
+    } : a))
     return res
   }, [])
 
-  const checkinAsset = useCallback(async (id) => {
-    const res = await api.checkinAsset(id)
-    setAssets(prev => prev.map(a => a.id === id ? { ...a, checked_out_to: null } : a))
+  const checkinAsset = useCallback(async (id, data = {}) => {
+    const res = await api.checkinAsset(id, data)
+    setAssets(prev => prev.map(a => a.id === id ? {
+      ...a,
+      checked_out_to: null,
+      checkout_date: null,
+      expected_checkin_date: null,
+      status: data.status || 'Ready to Deploy',
+      location: data.location || a.location,
+    } : a))
     return res
   }, [])
 
@@ -55,7 +73,9 @@ export function useAssets() {
   }, [load])
 
   const auditAsset = useCallback(async (id, data) => {
-    return api.auditAsset(id, data)
+    const res = await api.auditAsset(id, data)
+    setAssets(prev => prev.map(a => a.id === id ? { ...a, last_audited_at: new Date().toISOString() } : a))
+    return res
   }, [])
 
   const sendCommand = useCallback(async (id, command, payload = {}) => {
@@ -64,7 +84,7 @@ export function useAssets() {
 
   return {
     assets, setAssets, loading, error, load,
-    createAsset, updateAsset, retireAsset,
+    createAsset, updateAsset, retireAsset, restoreAsset,
     checkoutAsset, checkinAsset, cloneAsset, auditAsset, sendCommand,
   }
 }

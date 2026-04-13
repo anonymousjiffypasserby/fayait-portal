@@ -79,6 +79,8 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  // ── Assets ──────────────────────────────────────────────────────────────────
+
   getAssets: (retired = false) =>
     fetch(`${BASE}/api/assets${retired ? '?retired=true' : ''}`, { headers: headers() }).then(handle),
 
@@ -102,6 +104,13 @@ export const api = {
       headers: headers()
     }).then(handle),
 
+  restoreAsset: (id) =>
+    fetch(`${BASE}/api/assets/${id}/restore`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({})
+    }).then(handle),
+
   getAssetCommands: (id) =>
     fetch(`${BASE}/api/assets/${id}/commands`, { headers: headers() }).then(handle),
 
@@ -117,9 +126,9 @@ export const api = {
       method: 'POST', headers: headers(), body: JSON.stringify(data)
     }).then(handle),
 
-  checkinAsset: (id) =>
+  checkinAsset: (id, data = {}) =>
     fetch(`${BASE}/api/assets/${id}/checkin`, {
-      method: 'POST', headers: headers(), body: JSON.stringify({})
+      method: 'POST', headers: headers(), body: JSON.stringify(data)
     }).then(handle),
 
   auditAsset: (id, data = {}) =>
@@ -135,6 +144,8 @@ export const api = {
   getAssetHistory: (id) =>
     fetch(`${BASE}/api/assets/${id}/history`, { headers: headers() }).then(handle),
 
+  // ── Maintenance ──────────────────────────────────────────────────────────────
+
   getAssetMaintenance: (id) =>
     fetch(`${BASE}/api/assets/${id}/maintenance`, { headers: headers() }).then(handle),
 
@@ -142,6 +153,38 @@ export const api = {
     fetch(`${BASE}/api/assets/${id}/maintenance`, {
       method: 'POST', headers: headers(), body: JSON.stringify(data)
     }).then(handle),
+
+  updateMaintenance: (assetId, maintenanceId, data) =>
+    fetch(`${BASE}/api/assets/${assetId}/maintenance/${maintenanceId}`, {
+      method: 'PUT', headers: headers(), body: JSON.stringify(data)
+    }).then(handle),
+
+  deleteMaintenance: (assetId, maintenanceId) =>
+    fetch(`${BASE}/api/assets/${assetId}/maintenance/${maintenanceId}`, {
+      method: 'DELETE', headers: headers()
+    }).then(handle),
+
+  getAllMaintenance: () =>
+    fetch(`${BASE}/api/maintenance`, { headers: headers() }).then(handle),
+
+  // ── Files ────────────────────────────────────────────────────────────────────
+
+  getAssetFiles: (id) =>
+    fetch(`${BASE}/api/assets/${id}/files`, { headers: headers() }).then(handle),
+
+  uploadAssetFile: (id, formData) =>
+    fetch(`${BASE}/api/assets/${id}/files`, {
+      method: 'POST',
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+      body: formData
+    }).then(handle),
+
+  deleteAssetFile: (assetId, fileId) =>
+    fetch(`${BASE}/api/assets/${assetId}/files/${fileId}`, {
+      method: 'DELETE', headers: headers()
+    }).then(handle),
+
+  // ── Network discovery ─────────────────────────────────────────────────────────
 
   getDiscovered: () =>
     fetch(`${BASE}/api/assets/discovered`, { headers: headers() }).then(handle),
