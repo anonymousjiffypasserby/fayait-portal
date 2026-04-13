@@ -198,6 +198,9 @@ export const api = {
       method: 'DELETE', headers: headers()
     }).then(handle),
 
+  getFileDownloadUrl: (assetId, fileId) =>
+    `${BASE}/api/assets/${assetId}/files/${fileId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+
   // ── Network discovery ─────────────────────────────────────────────────────────
 
   getDiscovered: () =>

@@ -532,10 +532,28 @@ function TabMaintenance({ asset }) {
 }
 
 // ── Tab: Files ───────────────────────────────────────────────────────────────
+const fmtSize = (bytes) => {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const FILE_ICON = (name) => {
+  const ext = name?.split('.').pop()?.toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '🖼'
+  if (['pdf'].includes(ext)) return '📄'
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦'
+  if (['doc', 'docx'].includes(ext)) return '📝'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊'
+  return '📎'
+}
+
 function TabFiles({ asset }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -545,21 +563,28 @@ function TabFiles({ asset }) {
       .finally(() => setLoading(false))
   }, [asset.id])
 
-  const upload = async (e) => {
-    const file = e.target.files?.[0]
+  const uploadFile = async (file) => {
     if (!file) return
     setUploading(true)
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await api.uploadAssetFile(asset.id, fd)
-      setFiles(prev => [...prev, res])
+      setFiles(prev => [res, ...prev])
     } catch (err) {
       alert(err.message)
     } finally {
       setUploading(false)
-      e.target.value = ''
+      if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  const handleInputChange = (e) => uploadFile(e.target.files?.[0])
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    uploadFile(e.dataTransfer.files?.[0])
   }
 
   const deleteFile = async (fileId) => {
@@ -576,35 +601,70 @@ function TabFiles({ asset }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: T.muted }}>{files.length} file{files.length !== 1 ? 's' : ''} attached</span>
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          style={{ fontSize: 12, padding: '6px 14px', borderRadius: 7, border: 'none', background: T.navy, color: '#fff', cursor: 'pointer', fontWeight: 600 }}
-        >
-          {uploading ? 'Uploading...' : '+ Upload File'}
-        </button>
-        <input ref={fileRef} type="file" onChange={upload} style={{ display: 'none' }} />
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => !uploading && fileRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragOver ? T.blue : T.border}`,
+          borderRadius: 10,
+          padding: '18px 14px',
+          textAlign: 'center',
+          cursor: uploading ? 'not-allowed' : 'pointer',
+          background: dragOver ? '#f0f7ff' : '#fafbfc',
+          marginBottom: 14,
+          transition: 'all 0.15s',
+        }}
+      >
+        <div style={{ fontSize: 22, marginBottom: 4 }}>📎</div>
+        <div style={{ fontSize: 12, color: T.muted }}>
+          {uploading ? 'Uploading...' : 'Drop a file here or click to upload'}
+        </div>
+        <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>Max 10 MB</div>
+        <input ref={fileRef} type="file" onChange={handleInputChange} style={{ display: 'none' }} />
+      </div>
+
+      {/* File count */}
+      <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>
+        {files.length} file{files.length !== 1 ? 's' : ''} attached
       </div>
 
       {files.length === 0 ? (
-        <div style={{ color: T.muted, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No files attached.</div>
+        <div style={{ color: T.muted, fontSize: 13, textAlign: 'center', padding: '16px 0' }}>No files attached.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {files.map((f, i) => (
-            <div key={f.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8f9fa', borderRadius: 8, border: `1px solid ${T.border}` }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{f.filename || f.name}</div>
-                <div style={{ fontSize: 10, color: T.muted }}>{f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : ''}</div>
+            <div key={f.id || i} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 12px', background: '#f8f9fa', borderRadius: 8, border: `1px solid ${T.border}`,
+            }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{FILE_ICON(f.filename)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.filename}
+                </div>
+                <div style={{ fontSize: 10, color: T.muted, marginTop: 1 }}>
+                  {fmtSize(f.size_bytes)}
+                  {f.size_bytes ? ' • ' : ''}
+                  {f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                  {f.uploaded_by_name ? ` • ${f.uploaded_by_name}` : ''}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {f.url && (
-                  <a href={f.url} download={f.filename} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.card, color: T.blue, fontWeight: 600, textDecoration: 'none' }}>
-                    Download
-                  </a>
-                )}
-                <button onClick={() => deleteFile(f.id)} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 6, border: `1px solid ${T.red}30`, background: '#fdecea', color: T.red, cursor: 'pointer', fontWeight: 600 }}>
+              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                <a
+                  href={api.getFileDownloadUrl(asset.id, f.id)}
+                  download={f.filename}
+                  onClick={e => e.stopPropagation()}
+                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.card, color: T.blue, fontWeight: 600, textDecoration: 'none' }}
+                >
+                  Download
+                </a>
+                <button
+                  onClick={() => deleteFile(f.id)}
+                  style={{ fontSize: 11, padding: '3px 9px', borderRadius: 6, border: `1px solid ${T.red}30`, background: '#fdecea', color: T.red, cursor: 'pointer', fontWeight: 600 }}
+                >
                   Delete
                 </button>
               </div>
