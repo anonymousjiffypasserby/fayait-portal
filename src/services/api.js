@@ -79,6 +79,20 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  // ── Reference data ──────────────────────────────────────────────────────────
+
+  getDepartments: () =>
+    fetch(`${BASE}/api/departments`, { headers: headers() }).then(handle),
+
+  getManufacturers: () =>
+    fetch(`${BASE}/api/manufacturers`, { headers: headers() }).then(handle),
+
+  getModels: (manufacturerId) =>
+    fetch(`${BASE}/api/models${manufacturerId ? `?manufacturer_id=${manufacturerId}` : ''}`, { headers: headers() }).then(handle),
+
+  getLocations: () =>
+    fetch(`${BASE}/api/locations`, { headers: headers() }).then(handle),
+
   // ── Assets ──────────────────────────────────────────────────────────────────
 
   getAssets: (retired = false) =>

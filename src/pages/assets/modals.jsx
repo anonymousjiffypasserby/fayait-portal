@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
 import { T, STATUS_OPTIONS } from './shared'
+import api from '../../services/api'
 
 const Overlay = ({ children, onClose }) => (
   <div onClick={onClose} style={{
@@ -72,8 +73,89 @@ const SectionTitle = ({ children }) => (
   </div>
 )
 
+const ASSET_STATUSES = ['Ready to Deploy', 'Deployed', 'Pending', 'Un-deployable', 'Archived', 'Lost/Stolen']
+const ASSET_TYPES = ['Laptop', 'Desktop', 'Server', 'Other']
+
+function useFetch(fn, deps = []) {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    fn().then(d => { setData(Array.isArray(d) ? d : []); setLoading(false) })
+       .catch(e => { setError(e.message); setLoading(false) })
+  }, deps) // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, loading, error }
+}
+
+function DropdownField({ label, value, onChange, options, loading, error, required, placeholder = 'Select...' }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <Label text={label} required={required} />
+      <select
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        style={{ ...selectStyle, color: value ? T.text : T.muted }}
+        disabled={loading}
+      >
+        <option value="">{loading ? 'Loading...' : error ? 'Error loading' : placeholder}</option>
+        {options.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 // ── Asset form fields (shared between New + Edit) ─────────────────────────────
 function AssetFormFields({ form, set, isEdit }) {
+  const { data: manufacturers, loading: mfgLoading, error: mfgError } = useFetch(() => api.getManufacturers())
+  const { data: users, loading: usersLoading, error: usersError } = useFetch(() => api.getUsers())
+  const { data: departments, loading: deptLoading, error: deptError } = useFetch(() => api.getDepartments())
+  const { data: locations, loading: locLoading, error: locError } = useFetch(() => api.getLocations())
+
+  // Track selected manufacturer's UUID for model filtering
+  const [manufacturerId, setManufacturerId] = useState(null)
+  const [models, setModels] = useState([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const modelsInitialized = useRef(false)
+
+  // On edit: resolve initial manufacturer name → ID so models load correctly
+  useEffect(() => {
+    if (modelsInitialized.current) return
+    if (!manufacturers.length) return
+    const initial = form.manufacturer
+    if (initial) {
+      const match = manufacturers.find(m => m.name === initial)
+      if (match) {
+        setManufacturerId(match.id)
+        setModelsLoading(true)
+        api.getModels(match.id).then(d => { setModels(Array.isArray(d) ? d : []); setModelsLoading(false) }).catch(() => setModelsLoading(false))
+      }
+    }
+    modelsInitialized.current = true
+  }, [manufacturers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleManufacturerChange = (name) => {
+    set('manufacturer', name)
+    set('model', '')
+    const match = manufacturers.find(m => m.name === name)
+    const mid = match?.id || null
+    setManufacturerId(mid)
+    setModels([])
+    if (mid) {
+      setModelsLoading(true)
+      api.getModels(mid).then(d => { setModels(Array.isArray(d) ? d : []); setModelsLoading(false) }).catch(() => setModelsLoading(false))
+    }
+  }
+
+  const mfgOpts = manufacturers.map(m => ({ value: m.name, label: m.name }))
+  const modelOpts = models.map(m => ({ value: m.name, label: m.name }))
+  const userOpts = users.map(u => ({ value: u.name, label: u.name }))
+  const deptOpts = departments.map(d => ({ value: d.name, label: d.name }))
+  const locOpts = locations.map(l => ({ value: l.name, label: l.name }))
+
   return (
     <>
       <SectionTitle>Identity</SectionTitle>
@@ -82,8 +164,8 @@ function AssetFormFields({ form, set, isEdit }) {
         <Field label="Asset Tag" name="asset_tag" value={form.asset_tag} onChange={set} placeholder="Auto-generated if blank" mono />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
-        <Field label="Status" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
-        <Field label="Category" name="asset_type" value={form.asset_type} onChange={set} options={['Desktop', 'Laptop', 'Server', 'Other']} />
+        <DropdownField label="Status" value={form.status} onChange={v => set('status', v)} options={ASSET_STATUSES.map(s => ({ value: s, label: s }))} loading={false} />
+        <DropdownField label="Category" value={form.asset_type} onChange={v => set('asset_type', v)} options={ASSET_TYPES.map(t => ({ value: t, label: t }))} loading={false} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
         <Field label="Serial" name="serial" value={form.serial} onChange={set} mono />
@@ -92,8 +174,8 @@ function AssetFormFields({ form, set, isEdit }) {
 
       <SectionTitle>Hardware</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
-        <Field label="Manufacturer" name="manufacturer" value={form.manufacturer} onChange={set} />
-        <Field label="Model" name="model" value={form.model} onChange={set} />
+        <DropdownField label="Manufacturer" value={form.manufacturer} onChange={handleManufacturerChange} options={mfgOpts} loading={mfgLoading} error={mfgError} />
+        <DropdownField label="Model" value={form.model} onChange={v => set('model', v)} options={modelOpts} loading={modelsLoading} error={null} placeholder={manufacturerId ? 'Select model...' : 'Select manufacturer first'} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
         <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={set} mono />
@@ -102,10 +184,10 @@ function AssetFormFields({ form, set, isEdit }) {
 
       <SectionTitle>Assignment</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
-        <Field label="Assigned To" name="assigned_user" value={form.assigned_user} onChange={set} />
-        <Field label="Department" name="department" value={form.department} onChange={set} />
+        <DropdownField label="Assigned To" value={form.assigned_user} onChange={v => set('assigned_user', v)} options={userOpts} loading={usersLoading} error={usersError} />
+        <DropdownField label="Department" value={form.department} onChange={v => set('department', v)} options={deptOpts} loading={deptLoading} error={deptError} />
       </div>
-      <Field label="Location" name="location" value={form.location} onChange={set} />
+      <DropdownField label="Location" value={form.location} onChange={v => set('location', v)} options={locOpts} loading={locLoading} error={locError} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
         <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
         <Field label="Expected Checkin" name="expected_checkin_date" type="date" value={form.expected_checkin_date} onChange={set} />
@@ -346,7 +428,7 @@ export function CheckOutModal({ asset, onClose, onCheckout, locations = [] }) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    import('../../services/api').then(m => m.default.getUsers()).then(data => {
+    api.getUsers().then(data => {
       setUsers(Array.isArray(data) ? data : [])
     }).catch(() => {})
   }, [])
