@@ -61,7 +61,7 @@ export default function AllMaintenance() {
             <tbody>
               {filtered.map((r, i) => (
                 <tr key={r.id || i} style={{ background: i % 2 === 0 ? T.card : '#fafbfc' }}>
-                  <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: T.text }}>{r.asset_hostname || r.asset_tag || '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: T.text }}>{r.hostname || r.asset_tag || '—'}</td>
                   <td style={{ padding: '10px 12px', fontSize: 13 }}>{r.title}</td>
                   <td style={{ padding: '10px 12px', fontSize: 12, color: T.muted }}>{r.supplier || '—'}</td>
                   <td style={{ padding: '10px 12px', fontSize: 12 }}>{r.cost ? `$${r.cost}` : '—'}</td>

@@ -383,11 +383,11 @@ function TabMaintenance({ asset }) {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState({ title: '', supplier: '', scheduled_date: '', start_date: '', end_date: '', cost: '', notes: '', completed: false })
+  const [form, setForm] = useState({ title: '', supplier: '', start_date: '', end_date: '', cost: '', notes: '', completed: false })
   const [saving, setSaving] = useState(false)
 
   const resetForm = () => {
-    setForm({ title: '', supplier: '', scheduled_date: '', start_date: '', end_date: '', cost: '', notes: '', completed: false })
+    setForm({ title: '', supplier: '', start_date: '', end_date: '', cost: '', notes: '', completed: false })
     setEditingId(null)
   }
 
@@ -423,7 +423,6 @@ function TabMaintenance({ asset }) {
     setForm({
       title: r.title || '',
       supplier: r.supplier || '',
-      scheduled_date: r.scheduled_date?.slice(0, 10) || '',
       start_date: r.start_date?.slice(0, 10) || '',
       end_date: r.end_date?.slice(0, 10) || '',
       cost: r.cost || '',
