@@ -137,6 +137,7 @@ function TabOverview({ asset, isAdmin }) {
         <InfoRow label="Expected Return" value={fmtDate(asset.expected_checkin_date)} />
         <InfoRow label="Department" value={asset.department} />
         <InfoRow label="Location" value={asset.location} />
+        <InfoRow label="Component of" value={asset.parent_hostname || null} />
         <InfoRow label="Last Audited" value={asset.last_audited_at ? new Date(asset.last_audited_at).toLocaleString() : null} />
         <InfoRow label="Last Logged User" value={asset.last_logged_user} />
       </Section>

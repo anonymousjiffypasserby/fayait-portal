@@ -416,30 +416,54 @@ export function EditAssetModal({ asset, onClose, onSave }) {
 }
 
 // ── Checkout modal ────────────────────────────────────────────────────────────
+const CHECKOUT_TYPES = [
+  { key: 'user',     label: 'To User' },
+  { key: 'location', label: 'To Location' },
+  { key: 'asset',    label: 'To Asset' },
+]
+
 export function CheckOutModal({ asset, onClose, onCheckout, locations = [] }) {
+  const [checkoutType, setCheckoutType] = useState('user')
   const [form, setForm] = useState({
     assigned_to: asset?.assigned_user || '',
     location: asset?.location || '',
+    parent_asset_id: '',
     checkout_date: new Date().toISOString().slice(0, 10),
     expected_checkin_date: '',
     note: '',
   })
-  const [users, setUsers] = useState([])
+  const [users, setUsers]   = useState([])
+  const [apiLocs, setApiLocs] = useState([])
+  const [allAssets, setAllAssets] = useState([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    api.getUsers().then(data => {
-      setUsers(Array.isArray(data) ? data : [])
+    api.getUsers().then(d => setUsers(Array.isArray(d) ? d : [])).catch(() => {})
+    api.getLocations().then(d => setApiLocs(Array.isArray(d) ? d : [])).catch(() => {})
+    api.getAssets().then(d => {
+      const rows = Array.isArray(d) ? d : (d?.rows || [])
+      setAllAssets(rows.filter(a => a.id !== asset?.id))
     }).catch(() => {})
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  const locationOpts = apiLocs.length
+    ? apiLocs.map(l => l.name)
+    : [...new Set([asset?.location, ...locations].filter(Boolean))].sort()
+
+  const isValid = () => {
+    if (checkoutType === 'user')     return !!form.assigned_to
+    if (checkoutType === 'location') return !!form.location
+    if (checkoutType === 'asset')    return !!form.parent_asset_id
+    return false
+  }
+
   const submit = async () => {
-    if (!form.assigned_to) return
+    if (!isValid()) return
     setSaving(true)
     try {
-      await onCheckout(asset.id, form)
+      await onCheckout(asset.id, { ...form, checkout_type: checkoutType })
       onClose()
     } catch (e) {
       alert(e.message)
@@ -448,27 +472,71 @@ export function CheckOutModal({ asset, onClose, onCheckout, locations = [] }) {
     }
   }
 
-  const locationOpts = [...new Set([asset?.location, ...locations].filter(Boolean))].sort()
-
   return (
     <Overlay onClose={onClose}>
       <ModalHeader title={`Check Out — ${asset?.hostname}`} onClose={onClose} />
 
-      <div style={{ marginBottom: 14 }}>
-        <Label text="Assign To" required />
-        <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)} style={selectStyle}>
-          <option value="">Select user...</option>
-          {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-        </select>
+      {/* Type selector */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, border: `1px solid ${T.border}`, borderRadius: 9, overflow: 'hidden' }}>
+        {CHECKOUT_TYPES.map(ct => (
+          <button
+            key={ct.key}
+            onClick={() => setCheckoutType(ct.key)}
+            style={{
+              flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer', fontSize: 13,
+              fontFamily: T.font, fontWeight: checkoutType === ct.key ? 700 : 400,
+              background: checkoutType === ct.key ? T.navy : T.card,
+              color: checkoutType === ct.key ? '#fff' : T.text,
+            }}
+          >{ct.label}</button>
+        ))}
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <Label text="Location" />
-        <select value={form.location} onChange={e => set('location', e.target.value)} style={selectStyle}>
-          <option value="">Select location...</option>
-          {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
-        </select>
-      </div>
+      {/* To User */}
+      {checkoutType === 'user' && (
+        <>
+          <div style={{ marginBottom: 14 }}>
+            <Label text="Assign To" required />
+            <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)} style={selectStyle}>
+              <option value="">Select user...</option>
+              {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <Label text="Location" />
+            <select value={form.location} onChange={e => set('location', e.target.value)} style={selectStyle}>
+              <option value="">Select location...</option>
+              {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* To Location */}
+      {checkoutType === 'location' && (
+        <div style={{ marginBottom: 14 }}>
+          <Label text="Location" required />
+          <select value={form.location} onChange={e => set('location', e.target.value)} style={selectStyle}>
+            <option value="">Select location...</option>
+            {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* To Asset */}
+      {checkoutType === 'asset' && (
+        <div style={{ marginBottom: 14 }}>
+          <Label text="Parent Asset" required />
+          <select value={form.parent_asset_id} onChange={e => set('parent_asset_id', e.target.value)} style={selectStyle}>
+            <option value="">Select asset...</option>
+            {allAssets.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.hostname}{a.asset_tag ? ` (${a.asset_tag})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
         <Field label="Checkout Date" name="checkout_date" type="date" value={form.checkout_date} onChange={set} />
@@ -479,7 +547,7 @@ export function CheckOutModal({ asset, onClose, onCheckout, locations = [] }) {
         <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2}
           style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
-      <SaveBtn label={saving ? 'Checking Out...' : 'Check Out'} onClick={submit} disabled={saving || !form.assigned_to} color={T.blue} />
+      <SaveBtn label={saving ? 'Checking Out...' : 'Check Out'} onClick={submit} disabled={saving || !isValid()} color={T.blue} />
     </Overlay>
   )
 }

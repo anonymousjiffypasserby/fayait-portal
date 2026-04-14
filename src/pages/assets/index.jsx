@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAssets } from './useAssets'
@@ -62,11 +62,21 @@ export default function Assets() {
   useAssetSSE(setAssets)
 
   // All state lives in URL params
-  const activeView = searchParams.get('view') || 'all'
-  const search = searchParams.get('q') || ''
-  const filterType = searchParams.get('type') || ''
-  const filterOnline = searchParams.get('online') || ''
-  const layout = searchParams.get('layout') || 'table'
+  const activeView  = searchParams.get('view')    || 'all'
+  const search      = searchParams.get('q')       || ''
+  const filterType  = searchParams.get('type')    || ''
+  const filterOnline= searchParams.get('online')  || ''
+  const layout      = searchParams.get('layout')  || 'table'
+  // new filters
+  const filterStatus   = searchParams.get('status')   || ''
+  const filterMfr      = searchParams.get('mfr')      || ''
+  const filterModel    = searchParams.get('model')     || ''
+  const filterLoc      = searchParams.get('loc')       || ''
+  const filterDept     = searchParams.get('dept')      || ''
+  const filterCompany  = searchParams.get('company')   || ''
+  const filterWarranty = searchParams.get('warranty')  || ''
+  const filterAudit    = searchParams.get('audit')     || ''
+  const filterCheckedOut = searchParams.get('checkout')|| ''
 
   const setParam = (key, value) => {
     setSearchParams(prev => {
@@ -86,9 +96,57 @@ export default function Assets() {
       next.delete('q')
       next.delete('type')
       next.delete('online')
+      next.delete('status')
+      next.delete('mfr')
+      next.delete('model')
+      next.delete('loc')
+      next.delete('dept')
+      next.delete('company')
+      next.delete('warranty')
+      next.delete('audit')
+      next.delete('checkout')
       return next
     }, { replace: true })
   }
+
+  const clearFilters = () => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      ;['type','online','status','mfr','model','loc','dept','company','warranty','audit','checkout'].forEach(k => next.delete(k))
+      return next
+    }, { replace: true })
+  }
+
+  // ── Reference data for filter dropdowns ───────────────────────────────────
+  const [fMfrs, setFMfrs]       = useState([])
+  const [fModels, setFModels]   = useState([])
+  const [fLocs, setFLocs]       = useState([])
+  const [fDepts, setFDepts]     = useState([])
+  const [fCompanies, setFCompanies] = useState([])
+  const prevMfr = useRef(null)
+
+  useEffect(() => {
+    api.getManufacturers().then(d => setFMfrs(Array.isArray(d) ? d : [])).catch(() => {})
+    api.getLocations().then(d => setFLocs(Array.isArray(d) ? d : [])).catch(() => {})
+    api.getDepartments().then(d => setFDepts(Array.isArray(d) ? d : [])).catch(() => {})
+    if (user?.role === 'superadmin') {
+      api.getAdminCompanies().then(d => setFCompanies(Array.isArray(d) ? d : [])).catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (prevMfr.current === filterMfr) return
+    prevMfr.current = filterMfr
+    if (filterMfr) {
+      const mfr = fMfrs.find(m => m.name === filterMfr)
+      if (mfr) {
+        api.getModels(mfr.id).then(d => setFModels(Array.isArray(d) ? d : [])).catch(() => {})
+      }
+    } else {
+      setFModels([])
+      if (filterModel) setParam('model', '')
+    }
+  }, [filterMfr, fMfrs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selected, setSelected] = useState(new Set())
   const [openAsset, setOpenAsset] = useState(null)
@@ -131,13 +189,33 @@ export default function Assets() {
         a.mac_address?.toLowerCase().includes(q) ||
         a.asset_tag?.toLowerCase().includes(q) ||
         a.model?.toLowerCase().includes(q) ||
-        a.serial?.toLowerCase().includes(q)
+        a.serial?.toLowerCase().includes(q) ||
+        a.manufacturer?.toLowerCase().includes(q)
       )) return false
     }
 
-    if (filterType && a.asset_type !== filterType) return false
-    if (filterOnline === 'online' && !isOnline(a)) return false
-    if (filterOnline === 'offline' && isOnline(a)) return false
+    if (filterType    && a.asset_type    !== filterType)    return false
+    if (filterStatus  && a.status        !== filterStatus)  return false
+    if (filterMfr     && a.manufacturer  !== filterMfr)     return false
+    if (filterModel   && a.model         !== filterModel)    return false
+    if (filterLoc     && a.location      !== filterLoc)      return false
+    if (filterDept    && a.department    !== filterDept)     return false
+    if (filterCompany && a.company_id    !== filterCompany)  return false
+    if (filterOnline === 'online'  && !isOnline(a)) return false
+    if (filterOnline === 'offline' &&  isOnline(a)) return false
+
+    if (filterWarranty) {
+      if (!a.warranty_expires) return false
+      const exp = new Date(a.warranty_expires)
+      const soon = new Date(); soon.setDate(soon.getDate() + 30)
+      if (exp > soon) return false
+    }
+    if (filterAudit) {
+      const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000
+      const overdue = !a.last_audited_at || new Date(a.last_audited_at).getTime() < oneYearAgo
+      if (!overdue) return false
+    }
+    if (filterCheckedOut && !a.checked_out_to) return false
 
     return true
   })
@@ -206,6 +284,14 @@ export default function Assets() {
   const types = [...new Set(assets.map(a => a.asset_type).filter(Boolean))].sort()
   const locations = [...new Set(assets.map(a => a.location).filter(Boolean))].sort()
 
+  const filterSelStyle = (active) => ({
+    padding: '7px 10px', borderRadius: 9, fontSize: 13, fontFamily: T.font, cursor: 'pointer',
+    border: `1px solid ${active ? T.navy : T.border}`,
+    background: active ? '#eef1ff' : T.card,
+    color: active ? T.navy : T.text,
+    fontWeight: active ? 600 : 400,
+  })
+
   // ── Special view: Maintenances ─────────────────────────────────────────────
   if (activeView === 'maintenances') {
     return (
@@ -270,25 +356,83 @@ export default function Assets() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {/* Filters — row 1: search + type + online */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <input
-            placeholder="Search hostname, tag, serial, user, IP..."
+            placeholder="Search hostname, tag, serial, user, IP, manufacturer..."
             value={search}
             onChange={e => setParam('q', e.target.value)}
-            style={{ flex: '1 1 220px', padding: '8px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.font, outline: 'none' }}
+            style={{ flex: '1 1 260px', padding: '8px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.font, outline: 'none' }}
           />
           <select value={filterType} onChange={e => setParam('type', e.target.value)}
-            style={{ padding: '8px 10px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, background: T.card, fontFamily: T.font }}>
+            style={filterSelStyle(!!filterType)}>
             <option value="">All Types</option>
             {types.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <select value={filterOnline} onChange={e => setParam('online', e.target.value)}
-            style={{ padding: '8px 10px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, background: T.card, fontFamily: T.font }}>
+            style={filterSelStyle(!!filterOnline)}>
             <option value="">All Connectivity</option>
             <option value="online">Online</option>
             <option value="offline">Offline</option>
           </select>
+        </div>
+
+        {/* Filters — row 2: reference dropdowns + toggles */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={filterStatus} onChange={e => setParam('status', e.target.value)}
+            style={filterSelStyle(!!filterStatus)}>
+            <option value="">All Statuses</option>
+            {['Ready to Deploy','Deployed','Pending','Maintenance','Un-deployable','Archived','Lost/Stolen'].map(s =>
+              <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filterMfr} onChange={e => { setParam('mfr', e.target.value); if (!e.target.value) setParam('model', '') }}
+            style={filterSelStyle(!!filterMfr)}>
+            <option value="">All Manufacturers</option>
+            {fMfrs.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+          </select>
+          <select value={filterModel} onChange={e => setParam('model', e.target.value)}
+            style={filterSelStyle(!!filterModel)} disabled={!filterMfr}>
+            <option value="">{filterMfr ? 'All Models' : 'Select manufacturer first'}</option>
+            {fModels.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+          </select>
+          <select value={filterLoc} onChange={e => setParam('loc', e.target.value)}
+            style={filterSelStyle(!!filterLoc)}>
+            <option value="">All Locations</option>
+            {fLocs.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+          </select>
+          <select value={filterDept} onChange={e => setParam('dept', e.target.value)}
+            style={filterSelStyle(!!filterDept)}>
+            <option value="">All Departments</option>
+            {fDepts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+          </select>
+          {user?.role === 'superadmin' && (
+            <select value={filterCompany} onChange={e => setParam('company', e.target.value)}
+              style={filterSelStyle(!!filterCompany)}>
+              <option value="">All Companies</option>
+              {fCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          {/* Toggle pills */}
+          {[
+            ['warranty', '⚠ Warranty expiring'],
+            ['audit',    '✎ Due for audit'],
+            ['checkout', '↗ Checked out'],
+          ].map(([key, label]) => {
+            const active = !!searchParams.get(key)
+            return (
+              <button key={key} onClick={() => setParam(key, active ? '' : '1')}
+                style={{ padding: '7px 12px', borderRadius: 9, border: `1px solid ${active ? T.navy : T.border}`, fontSize: 12, background: active ? T.navy : T.card, color: active ? '#fff' : T.text, cursor: 'pointer', fontFamily: T.font, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap' }}>
+                {label}
+              </button>
+            )
+          })}
+          {/* Clear all */}
+          {(filterType||filterOnline||filterStatus||filterMfr||filterModel||filterLoc||filterDept||filterCompany||filterWarranty||filterAudit||filterCheckedOut) && (
+            <button onClick={clearFilters}
+              style={{ padding: '7px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 12, background: 'transparent', color: T.muted, cursor: 'pointer', fontFamily: T.font }}>
+              × Clear filters
+            </button>
+          )}
         </div>
 
         {/* Error / loading */}
