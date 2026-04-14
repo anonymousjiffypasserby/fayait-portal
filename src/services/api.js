@@ -278,12 +278,70 @@ export const api = {
 
   getLiveUrl: () => `${BASE}/api/assets/live?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
 
+  // ── Accessories ───────────────────────────────────────────────────────────────
+
+  getAccessories: (retired = false) =>
+    fetch(`${BASE}/api/accessories${retired ? '?retired=true' : ''}`, { headers: headers() }).then(handle),
+
+  getAccessory: (id) =>
+    fetch(`${BASE}/api/accessories/${id}`, { headers: headers() }).then(handle),
+
+  createAccessory: (data) =>
+    fetch(`${BASE}/api/accessories`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateAccessory: (id, data) =>
+    fetch(`${BASE}/api/accessories/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  retireAccessory: (id) =>
+    fetch(`${BASE}/api/accessories/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  restoreAccessory: (id) =>
+    fetch(`${BASE}/api/accessories/${id}/restore`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  checkoutAccessory: (id, data) =>
+    fetch(`${BASE}/api/accessories/${id}/checkout`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  checkinAccessory: (id, data) =>
+    fetch(`${BASE}/api/accessories/${id}/checkin`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  getAccessoryCheckouts: (id) =>
+    fetch(`${BASE}/api/accessories/${id}/checkouts`, { headers: headers() }).then(handle),
+
+  getAccessoryHistory: (id) =>
+    fetch(`${BASE}/api/accessories/${id}/history`, { headers: headers() }).then(handle),
+
   createAnnouncement: (data) =>
     fetch(`${BASE}/api/admin/announcements`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(data)
     }).then(handle),
+
+  // ── Consumables ───────────────────────────────────────────────────────────────
+
+  getConsumables: (retired = false) =>
+    fetch(`${BASE}/api/consumables${retired ? '?retired=true' : ''}`, { headers: headers() }).then(handle),
+
+  getConsumable: (id) =>
+    fetch(`${BASE}/api/consumables/${id}`, { headers: headers() }).then(handle),
+
+  createConsumable: (data) =>
+    fetch(`${BASE}/api/consumables`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateConsumable: (id, data) =>
+    fetch(`${BASE}/api/consumables/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  retireConsumable: (id) =>
+    fetch(`${BASE}/api/consumables/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  restoreConsumable: (id) =>
+    fetch(`${BASE}/api/consumables/${id}/restore`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  useConsumable: (id, data) =>
+    fetch(`${BASE}/api/consumables/${id}/use`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  getConsumableUses: (id) =>
+    fetch(`${BASE}/api/consumables/${id}/uses`, { headers: headers() }).then(handle),
 }
 
 export default api

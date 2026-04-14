@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
 import Assets from './pages/assets'
+import Accessories from './pages/accessories'
+import Consumables from './pages/consumables'
 import Settings from './pages/settings'
 import Layout from './components/Layout'
 
@@ -34,6 +36,8 @@ function AppRoutes() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/tickets" element={<ServiceFrame service="tickets" />} />
                 <Route path="/assets" element={<Assets />} />
+                <Route path="/accessories" element={<Accessories />} />
+                <Route path="/consumables" element={<Consumables />} />
                 <Route path="/chat" element={<ServiceFrame service="chat" />} />
                 <Route path="/files" element={<ServiceFrame service="files" />} />
                 <Route path="/projects" element={<ServiceFrame service="projects" />} />

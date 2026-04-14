@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { T, isOnline } from './shared'
 
 const VIEWS = [
@@ -22,6 +23,7 @@ const TOOL_VIEWS = [
 ]
 
 export default function Sidebar({ activeView, onViewChange, assets }) {
+  const navigate = useNavigate()
   const countFor = (view) => {
     if (view.key === 'all') return assets.length
     if (view.key === 'deleted') return null // needs separate fetch
@@ -118,6 +120,34 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
 
       <Divider label="Tools" />
       {TOOL_VIEWS.map(v => <NavItem key={v.key} view={v} />)}
+
+      <Divider label="Inventory" />
+      <div
+        onClick={() => navigate('/accessories')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+          color: T.text, fontSize: 13, userSelect: 'none',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#eef0f3' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>🔌</span>
+        <span>Accessories</span>
+      </div>
+      <div
+        onClick={() => navigate('/consumables')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+          color: T.text, fontSize: 13, userSelect: 'none',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#eef0f3' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>📦</span>
+        <span>Consumables</span>
+      </div>
     </div>
   )
 }

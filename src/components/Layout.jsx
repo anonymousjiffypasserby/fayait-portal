@@ -13,7 +13,9 @@ const SERVICES = [
     section: 'Workspace',
     items: [
       { key: 'tickets', label: 'Tickets', icon: '🎫', path: '/tickets' },
-      { key: 'assets', label: 'Assets', icon: '💻', path: '/assets' },
+      { key: 'assets',       label: 'Assets',       icon: '💻', path: '/assets' },
+      { key: 'accessories', label: 'Accessories',  icon: '🔌', path: '/accessories', alwaysVisible: true },
+      { key: 'consumables', label: 'Consumables',  icon: '📦', path: '/consumables', alwaysVisible: true },
       { key: 'chat', label: 'Chat', icon: '💬', path: '/chat' },
       { key: 'files', label: 'Files', icon: '📁', path: '/files' },
       { key: 'projects', label: 'Projects', icon: '📋', path: '/projects' },
