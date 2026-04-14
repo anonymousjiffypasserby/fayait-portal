@@ -34,6 +34,13 @@ const SERVICES = [
       { key: 'profile', label: 'Profile', icon: '👤', path: '/profile' },
     ]
   },
+  {
+    section: 'Admin',
+    adminOnly: true,
+    items: [
+      { key: 'settings', label: 'Settings', icon: '⚙', path: '/settings', alwaysVisible: true },
+    ]
+  },
 ]
 
 const ADMIN_ROLES = ['superadmin', 'admin']
@@ -57,17 +64,21 @@ export default function Layout({ children }) {
   const isAdmin = ADMIN_ROLES.includes(user?.role)
   const services = user?.services || {}
 
-  const visibleSections = SERVICES.map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      if (item.key === 'dashboard') return true
-      if (['users', 'billing', 'profile'].includes(item.key)) return true
-      const status = services[item.key]
-      if (status === 'active') return true
-      if (isAdmin) return true
-      return false
-    })
-  })).filter(section => section.items.length > 0)
+  const visibleSections = SERVICES.map(section => {
+    if (section.adminOnly && !isAdmin) return { ...section, items: [] }
+    return {
+      ...section,
+      items: section.items.filter(item => {
+        if (item.alwaysVisible) return true
+        if (item.key === 'dashboard') return true
+        if (['users', 'billing', 'profile'].includes(item.key)) return true
+        const status = services[item.key]
+        if (status === 'active') return true
+        if (isAdmin) return true
+        return false
+      })
+    }
+  }).filter(section => section.items.length > 0)
 
   return (
     <div style={{

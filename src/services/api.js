@@ -84,14 +84,74 @@ export const api = {
   getDepartments: () =>
     fetch(`${BASE}/api/departments`, { headers: headers() }).then(handle),
 
+  createDepartment: (data) =>
+    fetch(`${BASE}/api/departments`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateDepartment: (id, data) =>
+    fetch(`${BASE}/api/departments/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteDepartment: (id) =>
+    fetch(`${BASE}/api/departments/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
   getManufacturers: () =>
     fetch(`${BASE}/api/manufacturers`, { headers: headers() }).then(handle),
+
+  createManufacturer: (data) =>
+    fetch(`${BASE}/api/manufacturers`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateManufacturer: (id, data) =>
+    fetch(`${BASE}/api/manufacturers/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteManufacturer: (id) =>
+    fetch(`${BASE}/api/manufacturers/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
 
   getModels: (manufacturerId) =>
     fetch(`${BASE}/api/models${manufacturerId ? `?manufacturer_id=${manufacturerId}` : ''}`, { headers: headers() }).then(handle),
 
+  createModel: (data) =>
+    fetch(`${BASE}/api/models`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateModel: (id, data) =>
+    fetch(`${BASE}/api/models/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteModel: (id) =>
+    fetch(`${BASE}/api/models/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
   getLocations: () =>
     fetch(`${BASE}/api/locations`, { headers: headers() }).then(handle),
+
+  createLocation: (data) =>
+    fetch(`${BASE}/api/locations`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateLocation: (id, data) =>
+    fetch(`${BASE}/api/locations/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteLocation: (id) =>
+    fetch(`${BASE}/api/locations/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getSuppliers: () =>
+    fetch(`${BASE}/api/suppliers`, { headers: headers() }).then(handle),
+
+  createSupplier: (data) =>
+    fetch(`${BASE}/api/suppliers`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateSupplier: (id, data) =>
+    fetch(`${BASE}/api/suppliers/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteSupplier: (id) =>
+    fetch(`${BASE}/api/suppliers/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getCategories: (type) =>
+    fetch(`${BASE}/api/categories${type ? `?type=${type}` : ''}`, { headers: headers() }).then(handle),
+
+  createCategory: (data) =>
+    fetch(`${BASE}/api/categories`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateCategory: (id, data) =>
+    fetch(`${BASE}/api/categories/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteCategory: (id) =>
+    fetch(`${BASE}/api/categories/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
 
   // ── Assets ──────────────────────────────────────────────────────────────────
 

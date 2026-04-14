@@ -4,12 +4,21 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
 import Assets from './pages/assets'
+import Settings from './pages/settings'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return null
   return user ? children : <Navigate to="/login" />
+}
+
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" />
+  if (!['superadmin', 'admin'].includes(user.role)) return <Navigate to="/" />
+  return children
 }
 
 function AppRoutes() {
@@ -33,6 +42,7 @@ function AppRoutes() {
                 <Route path="/users" element={<ServiceFrame service="users" />} />
                 <Route path="/billing" element={<ServiceFrame service="billing" />} />
                 <Route path="/profile" element={<ServiceFrame service="profile" />} />
+                <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
               </Routes>
             </Layout>
           </PrivateRoute>
