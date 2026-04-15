@@ -20,7 +20,10 @@ const REPORT_VIEWS = [
 ]
 
 const TOOL_VIEWS = [
-  { key: 'maintenances', label: 'Maintenances', icon: '⚒' },
+  { key: 'maintenances',  label: 'Maintenances',       icon: '⚒' },
+  { key: 'quick_scan',    label: 'Quick Scan Checkin',  icon: '⌖' },
+  { key: 'bulk_checkout', label: 'Bulk Checkout',       icon: '↗' },
+  { key: 'import',        label: 'Import',              icon: '⬆' },
 ]
 
 export default function Sidebar({ activeView, onViewChange, assets }) {
@@ -29,6 +32,9 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
     if (view.key === 'all') return assets.length
     if (view.key === 'deleted') return null // needs separate fetch
     if (view.key === 'maintenances') return null
+    if (view.key === 'quick_scan') return null
+    if (view.key === 'bulk_checkout') return null
+    if (view.key === 'import') return null
     if (view.key === 'requestable') return assets.filter(a => a.requestable && !a.retired).length
     if (view.key === 'due_audit') {
       const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000

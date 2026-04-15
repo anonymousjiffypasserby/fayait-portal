@@ -9,6 +9,9 @@ import DetailPanel from './DetailPanel'
 import BulkBar from './BulkBar'
 import Sidebar from './Sidebar'
 import AllMaintenance from './AllMaintenance'
+import QuickScanCheckin from './QuickScanCheckin'
+import BulkCheckout from './BulkCheckout'
+import Import from './Import'
 import {
   ConnectModal, RenameModal, NewAssetModal, EditAssetModal,
   CheckOutModal, CheckInModal, AuditModal, ConfirmRetireModal,
@@ -47,7 +50,10 @@ const VIEW_TITLES = {
   due_audit: 'Due for Audit',
   due_checkin: 'Due for Checkin',
   deleted: 'Deleted',
-  maintenances: 'Maintenances',
+  maintenances:  'Maintenances',
+  quick_scan:    'Quick Scan Checkin',
+  bulk_checkout: 'Bulk Checkout',
+  import:        'Import Assets',
 }
 
 export default function Assets() {
@@ -297,13 +303,49 @@ export default function Assets() {
     fontWeight: active ? 600 : 400,
   })
 
-  // ── Special view: Maintenances ─────────────────────────────────────────────
+  // ── Special views ──────────────────────────────────────────────────────────
   if (activeView === 'maintenances') {
     return (
       <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
         <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
         <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <AllMaintenance />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeView === 'quick_scan') {
+    return (
+      <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
+          <QuickScanCheckin assets={assets} onCheckin={(id) => checkinAsset(id, {})} />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeView === 'bulk_checkout') {
+    return (
+      <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
+          <BulkCheckout
+            assets={assets}
+            onCheckout={(id, user) => checkoutAsset(id, { checkout_type: 'user', assigned_to: user })}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeView === 'import') {
+    return (
+      <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
+          <Import />
         </div>
       </div>
     )

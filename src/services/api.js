@@ -415,6 +415,18 @@ export const api = {
   cancelRequest: (id) =>
     fetch(`${BASE}/api/requests/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
 
+  // ── Asset CSV import ──────────────────────────────────────────────────────────
+
+  importValidate: (rows) =>
+    fetch(`${BASE}/api/assets/import/validate`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({ rows })
+    }).then(handle),
+
+  importAssets: (rows) =>
+    fetch(`${BASE}/api/assets/import`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({ rows })
+    }).then(handle),
+
   // ── Notifications ─────────────────────────────────────────────────────────────
 
   getNotifications: () =>

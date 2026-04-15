@@ -236,6 +236,12 @@ function AssetFormFields({ form, set, isEdit }) {
           style={{ ...inputStyle, resize: 'vertical' }}
         />
       </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!form.requestable} onChange={e => set('requestable', e.target.checked)} />
+          Allow users to request this asset
+        </label>
+      </div>
     </>
   )
 }
@@ -343,6 +349,7 @@ export function NewAssetModal({ onClose, onCreate }) {
     purchase_date: '', purchase_cost: '', order_number: '', supplier: '',
     warranty_months: '', warranty_expires: '', eol_date: '', notes: '',
     depreciation_method: 'Straight Line', depreciation_years: '3', salvage_value: '0',
+    requestable: false,
   })
   const [saving, setSaving] = useState(false)
 
@@ -401,6 +408,7 @@ export function EditAssetModal({ asset, onClose, onSave }) {
     salvage_value: String(asset?.salvage_value ?? 0),
     rustdesk_id: asset?.rustdesk_id || '',
     rustdesk_password: asset?.rustdesk_password || '',
+    requestable: asset?.requestable ?? false,
   })
   const [saving, setSaving] = useState(false)
 
