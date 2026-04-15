@@ -15,6 +15,7 @@ import {
   BulkAssignModal, BulkLocationModal, BulkStatusModal, QRModal,
 } from './modals'
 import { T, isOnline } from './shared'
+import RequestModal from '../requests/RequestModal'
 import api from '../../services/api'
 
 const ADMIN_ROLES = ['superadmin', 'admin']
@@ -42,6 +43,7 @@ const VIEW_TITLES = {
   archived: 'Archived',
   undeployable: 'Un-deployable',
   lost_stolen: 'Lost / Stolen',
+  requestable: 'Requestable Assets',
   due_audit: 'Due for Audit',
   due_checkin: 'Due for Checkin',
   deleted: 'Deleted',
@@ -149,8 +151,9 @@ export default function Assets() {
   }, [filterMfr, fMfrs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selected, setSelected] = useState(new Set())
-  const [openAsset, setOpenAsset] = useState(null)
-  const [modal, setModal] = useState(null)
+  const [openAsset,    setOpenAsset]    = useState(null)
+  const [modal,        setModal]        = useState(null)
+  const [requestAsset, setRequestAsset] = useState(null)
 
   const showRetired = RETIRED_VIEWS.has(activeView)
 
@@ -168,7 +171,9 @@ export default function Assets() {
   const filtered = assets.filter(a => {
     const viewStatus = STATUS_FOR_VIEW[activeView]
 
-    if (activeView === 'due_audit') {
+    if (activeView === 'requestable') {
+      if (!a.requestable || a.retired) return false
+    } else if (activeView === 'due_audit') {
       const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000
       const overdue = !a.last_audited_at || new Date(a.last_audited_at).getTime() < oneYearAgo
       if (!overdue) return false
@@ -450,6 +455,7 @@ export default function Assets() {
               onOpen={asset => setOpenAsset(asset)}
               showRestore={activeView === 'deleted'}
               onRestore={restoreAsset}
+              onRequest={(!isAdmin && activeView === 'requestable') ? setRequestAsset : null}
             />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
@@ -549,6 +555,14 @@ export default function Assets() {
       )}
       {modal === 'bulkStatus' && (
         <BulkStatusModal count={selected.size} onClose={() => setModal(null)} onConfirm={handleBulkStatus} />
+      )}
+      {requestAsset && (
+        <RequestModal
+          item={requestAsset}
+          itemType="asset"
+          onClose={() => setRequestAsset(null)}
+          onSubmit={async (data) => { await api.submitRequest(data); setRequestAsset(null) }}
+        />
       )}
     </div>
   )

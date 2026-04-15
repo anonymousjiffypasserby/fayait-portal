@@ -71,7 +71,7 @@ const DeviceIcon = ({ type }) => {
   return <span style={{ fontSize: 15, marginRight: 7 }}>{icons[type] || '💻'}</span>
 }
 
-export default function AssetTable({ assets, selected, onSelect, onSelectAll, onOpen, showRestore, onRestore }) {
+export default function AssetTable({ assets, selected, onSelect, onSelectAll, onOpen, showRestore, onRestore, onRequest }) {
   const [sort, setSort] = useState({ key: 'hostname', dir: 1 })
 
   const sorted = [...assets].sort((a, b) => {
@@ -172,6 +172,14 @@ export default function AssetTable({ assets, selected, onSelect, onSelectAll, on
                       style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', background: T.green, cursor: 'pointer', color: '#fff', fontWeight: 600 }}
                     >
                       Restore
+                    </button>
+                  )}
+                  {onRequest && asset.requestable && (
+                    <button
+                      onClick={() => onRequest(asset)}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', background: '#378ADD', cursor: 'pointer', color: '#fff', fontWeight: 600 }}
+                    >
+                      Request
                     </button>
                   )}
                 </div>

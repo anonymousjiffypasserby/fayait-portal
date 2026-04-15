@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import NotificationBell from './NotificationBell'
 
 const SERVICES = [
   {
@@ -18,6 +19,7 @@ const SERVICES = [
       { key: 'consumables', label: 'Consumables',  icon: '📦', path: '/consumables', alwaysVisible: true },
       { key: 'components',  label: 'Components',   icon: '🔩', path: '/components',  alwaysVisible: true },
       { key: 'kits',        label: 'Kits',          icon: '🗃', path: '/kits',         alwaysVisible: true },
+      { key: 'requests',    label: 'Requests',      icon: '📋', path: '/requests',     alwaysVisible: true },
       { key: 'chat', label: 'Chat', icon: '💬', path: '/chat' },
       { key: 'files', label: 'Files', icon: '📁', path: '/files' },
       { key: 'projects', label: 'Projects', icon: '📋', path: '/projects' },
@@ -190,9 +192,14 @@ export default function Layout({ children }) {
         {/* Footer */}
         <div style={{
           borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: '12px 16px', flexShrink: 0,
+          padding: '8px 16px', flexShrink: 0,
           overflow: 'hidden', whiteSpace: 'nowrap',
         }}>
+          {/* Notification bell row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: hovered ? 'flex-start' : 'center', marginBottom: 6 }}>
+            <NotificationBell hovered={hovered} />
+            {hovered && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>Notifications</span>}
+          </div>
           {hovered ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>

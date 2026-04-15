@@ -1,26 +1,19 @@
 import { useState } from 'react'
-import { T, CON_STATUS_COLORS, isLowStock, isOutOfStock, fmtDate } from './shared'
+import { T, ACC_STATUS_COLORS, isLowStock, availableQty, fmtDate } from './shared'
 
 const COLS = [
   { key: 'name',              label: 'Name',         sortable: true },
   { key: 'category_name',     label: 'Category',     sortable: true },
   { key: 'manufacturer_name', label: 'Manufacturer', sortable: true },
-  { key: 'quantity',          label: 'Qty',          sortable: true },
+  { key: '_qty',              label: 'Qty Available',sortable: false },
+  { key: 'qty_checked_out',   label: 'Qty Out',      sortable: true },
   { key: 'location_name',     label: 'Location',     sortable: true },
   { key: 'status',            label: 'Status',       sortable: true },
 ]
 
-const StatusBadge = ({ con }) => {
-  if (isOutOfStock(con)) {
-    return (
-      <span style={{
-        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
-        background: T.red + '18', color: T.red, border: `1px solid ${T.red}30`, whiteSpace: 'nowrap',
-      }}>Out of Stock</span>
-    )
-  }
-  const status = con.status || 'Available'
-  const color = CON_STATUS_COLORS[status] || T.muted
+const StatusBadge = ({ status }) => {
+  if (!status) return <span style={{ color: T.muted, fontSize: 11 }}>—</span>
+  const color = ACC_STATUS_COLORS[status] || T.muted
   return (
     <span style={{
       fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
@@ -29,39 +22,36 @@ const StatusBadge = ({ con }) => {
   )
 }
 
-const QtyCell = ({ con }) => {
-  const low = isLowStock(con)
-  const out = isOutOfStock(con)
+const QtyCell = ({ acc }) => {
+  const avail = availableQty(acc)
+  const low = isLowStock(acc)
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontWeight: 600, color: out ? T.red : low ? T.yellow : T.text, fontSize: 13 }}>
-        {con.quantity || 0}
-      </span>
-      {out && (
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: T.red + '22', color: T.red, border: `1px solid ${T.red}44` }}>
-          Out
-        </span>
-      )}
-      {!out && low && (
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: T.yellow + '22', color: T.yellow, border: `1px solid ${T.yellow}44` }}>
-          Low
-        </span>
+      <span style={{ fontWeight: 600, color: low ? T.yellow : T.text, fontSize: 13 }}>{avail}</span>
+      {low && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+          background: T.yellow + '22', color: T.yellow, border: `1px solid ${T.yellow}44`,
+        }}>Low</span>
       )}
     </span>
   )
 }
 
-export default function ConsumableTable({ consumables, selected, onSelect, onSelectAll, onOpen, showRestore, onRestore, onRequest }) {
+export default function AccessoryTable({ accessories, selected, onSelect, onSelectAll, onOpen, showRestore, onRestore, onRequest }) {
   const [sort, setSort] = useState({ key: 'name', dir: 1 })
 
-  const sorted = [...consumables].sort((a, b) => {
+  const sorted = [...accessories].sort((a, b) => {
     const va = a[sort.key] ?? ''
     const vb = b[sort.key] ?? ''
     return sort.dir * (va < vb ? -1 : va > vb ? 1 : 0)
   })
 
-  const toggleSort = (key) => setSort(s => s.key === key ? { key, dir: s.dir * -1 } : { key, dir: 1 })
-  const allChecked = consumables.length > 0 && consumables.every(c => selected.has(c.id))
+  const toggleSort = (key) => {
+    setSort(s => s.key === key ? { key, dir: s.dir * -1 } : { key, dir: 1 })
+  }
+
+  const allChecked = accessories.length > 0 && accessories.every(a => selected.has(a.id))
 
   const thStyle = (col) => ({
     padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700,
@@ -77,7 +67,8 @@ export default function ConsumableTable({ consumables, selected, onSelect, onSel
         <thead>
           <tr>
             <th style={{ ...thStyle({ sortable: false }), width: 40 }}>
-              <input type="checkbox" checked={allChecked} onChange={e => onSelectAll(e.target.checked)} style={{ cursor: 'pointer' }} />
+              <input type="checkbox" checked={allChecked} onChange={e => onSelectAll(e.target.checked)}
+                style={{ cursor: 'pointer' }} />
             </th>
             {COLS.map(col => (
               <th key={col.key} style={thStyle(col)} onClick={() => col.sortable && toggleSort(col.key)}>
@@ -94,50 +85,53 @@ export default function ConsumableTable({ consumables, selected, onSelect, onSel
           {sorted.length === 0 && (
             <tr>
               <td colSpan={COLS.length + 2} style={{ padding: '40px 0', textAlign: 'center', color: T.muted, fontSize: 13 }}>
-                No consumables found
+                No accessories found
               </td>
             </tr>
           )}
-          {sorted.map(con => (
+          {sorted.map(acc => (
             <tr
-              key={con.id}
-              onClick={() => onOpen(con)}
+              key={acc.id}
+              onClick={() => onOpen(acc)}
               style={{
                 cursor: 'pointer', borderBottom: `1px solid ${T.border}`,
-                background: selected.has(con.id) ? '#f0f4ff' : '#fff',
+                background: selected.has(acc.id) ? '#f0f4ff' : '#fff',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => { if (!selected.has(con.id)) e.currentTarget.style.background = '#fafbfc' }}
-              onMouseLeave={e => { if (!selected.has(con.id)) e.currentTarget.style.background = '#fff' }}
+              onMouseEnter={e => { if (!selected.has(acc.id)) e.currentTarget.style.background = '#fafbfc' }}
+              onMouseLeave={e => { if (!selected.has(acc.id)) e.currentTarget.style.background = '#fff' }}
             >
               <td style={{ padding: '10px 14px' }} onClick={e => e.stopPropagation()}>
-                <input type="checkbox" checked={selected.has(con.id)}
-                  onChange={e => onSelect(con.id, e.target.checked)} style={{ cursor: 'pointer' }} />
+                <input type="checkbox" checked={selected.has(acc.id)}
+                  onChange={e => onSelect(acc.id, e.target.checked)} style={{ cursor: 'pointer' }} />
               </td>
               <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: T.text }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>📦</span>
-                  <span>{con.name}</span>
-                  {con.requestable && (
-                    <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: '#e8f4fd', color: T.blue, fontWeight: 700 }}>REQ</span>
+                  <span style={{ fontSize: 16 }}>🔌</span>
+                  <span>{acc.name}</span>
+                  {acc.requestable && (
+                    <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: '#e8f4fd', color: T.blue, fontWeight: 700 }}>
+                      REQ
+                    </span>
                   )}
                 </div>
               </td>
-              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{con.category_name || '—'}</td>
-              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{con.manufacturer_name || '—'}</td>
-              <td style={{ padding: '10px 14px' }}><QtyCell con={con} /></td>
-              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{con.location_name || '—'}</td>
-              <td style={{ padding: '10px 14px' }}><StatusBadge con={con} /></td>
+              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{acc.category_name || '—'}</td>
+              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{acc.manufacturer_name || '—'}</td>
+              <td style={{ padding: '10px 14px' }}><QtyCell acc={acc} /></td>
+              <td style={{ padding: '10px 14px', fontSize: 13, color: T.text }}>{acc.qty_checked_out || 0}</td>
+              <td style={{ padding: '10px 14px', fontSize: 13, color: T.muted }}>{acc.location_name || '—'}</td>
+              <td style={{ padding: '10px 14px' }}><StatusBadge status={acc.status} /></td>
               <td style={{ padding: '10px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                   {showRestore && (
-                    <button onClick={() => onRestore(con.id)} style={{
+                    <button onClick={() => onRestore(acc.id)} style={{
                       fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
                       background: T.card, cursor: 'pointer', color: T.navy, fontWeight: 600,
                     }}>Restore</button>
                   )}
-                  {onRequest && con.requestable && (
-                    <button onClick={() => onRequest(con)} style={{
+                  {onRequest && acc.requestable && (
+                    <button onClick={() => onRequest(acc)} style={{
                       fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none',
                       background: '#378ADD', cursor: 'pointer', color: '#fff', fontWeight: 600,
                     }}>Request</button>

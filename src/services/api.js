@@ -397,6 +397,37 @@ export const api = {
 
   checkinKit: (id, data) =>
     fetch(`${BASE}/api/kits/${id}/checkin`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  // ── Requests ──────────────────────────────────────────────────────────────────
+
+  getRequests: () =>
+    fetch(`${BASE}/api/requests`, { headers: headers() }).then(handle),
+
+  submitRequest: (data) =>
+    fetch(`${BASE}/api/requests`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  approveRequest: (id, data) =>
+    fetch(`${BASE}/api/requests/${id}/approve`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  denyRequest: (id, data) =>
+    fetch(`${BASE}/api/requests/${id}/deny`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  cancelRequest: (id) =>
+    fetch(`${BASE}/api/requests/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  // ── Notifications ─────────────────────────────────────────────────────────────
+
+  getNotifications: () =>
+    fetch(`${BASE}/api/notifications`, { headers: headers() }).then(handle),
+
+  getNotificationCount: () =>
+    fetch(`${BASE}/api/notifications/unread-count`, { headers: headers() }).then(handle),
+
+  markNotificationRead: (id) =>
+    fetch(`${BASE}/api/notifications/${id}/read`, { method: 'PUT', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  markAllNotificationsRead: () =>
+    fetch(`${BASE}/api/notifications/read-all`, { method: 'PUT', headers: headers(), body: JSON.stringify({}) }).then(handle),
 }
 
 export default api

@@ -8,6 +8,7 @@ import Accessories from './pages/accessories'
 import Consumables from './pages/consumables'
 import Components from './pages/components'
 import Kits from './pages/kits'
+import Requests from './pages/requests'
 import Settings from './pages/settings'
 import Layout from './components/Layout'
 
@@ -42,6 +43,7 @@ function AppRoutes() {
                 <Route path="/consumables" element={<Consumables />} />
                 <Route path="/components" element={<Components />} />
                 <Route path="/kits" element={<Kits />} />
+                <Route path="/requests" element={<Requests />} />
                 <Route path="/chat" element={<ServiceFrame service="chat" />} />
                 <Route path="/files" element={<ServiceFrame service="files" />} />
                 <Route path="/projects" element={<ServiceFrame service="projects" />} />

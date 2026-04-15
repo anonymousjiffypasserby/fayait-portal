@@ -13,9 +13,10 @@ const VIEWS = [
 ]
 
 const REPORT_VIEWS = [
-  { key: 'due_audit', label: 'Due for Audit', icon: '✎' },
+  { key: 'requestable', label: 'Requestable', icon: '✋' },
+  { key: 'due_audit',   label: 'Due for Audit',   icon: '✎' },
   { key: 'due_checkin', label: 'Due for Checkin', icon: '↩' },
-  { key: 'deleted', label: 'Deleted', icon: '⊘' },
+  { key: 'deleted',     label: 'Deleted',         icon: '⊘' },
 ]
 
 const TOOL_VIEWS = [
@@ -28,6 +29,7 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
     if (view.key === 'all') return assets.length
     if (view.key === 'deleted') return null // needs separate fetch
     if (view.key === 'maintenances') return null
+    if (view.key === 'requestable') return assets.filter(a => a.requestable && !a.retired).length
     if (view.key === 'due_audit') {
       const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000
       return assets.filter(a => !a.last_audited_at || new Date(a.last_audited_at).getTime() < oneYearAgo).length
