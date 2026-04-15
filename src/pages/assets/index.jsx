@@ -12,6 +12,11 @@ import AllMaintenance from './AllMaintenance'
 import QuickScanCheckin from './QuickScanCheckin'
 import BulkCheckout from './BulkCheckout'
 import Import from './Import'
+import Accessories from '../accessories'
+import Consumables from '../consumables'
+import Components from '../components'
+import Kits from '../kits'
+import Requests from '../requests'
 import {
   ConnectModal, RenameModal, NewAssetModal, EditAssetModal,
   CheckOutModal, CheckInModal, AuditModal, ConfirmRetireModal,
@@ -53,6 +58,7 @@ const VIEW_TITLES = {
   maintenances:  'Maintenances',
   quick_scan:    'Quick Scan Checkin',
   bulk_checkout: 'Bulk Checkout',
+  bulk_audit:    'Bulk Audit',
   import:        'Import Assets',
 }
 
@@ -302,6 +308,23 @@ export default function Assets() {
     color: active ? T.navy : T.text,
     fontWeight: active ? 600 : 400,
   })
+
+  // ── Module overrides (stay at /assets, render sub-module full-screen) ──────
+  const activeModule = searchParams.get('module')
+  if (activeModule === 'accessories') return <Accessories />
+  if (activeModule === 'consumables') return <Consumables />
+  if (activeModule === 'components')  return <Components />
+  if (activeModule === 'kits')        return <Kits />
+  if (activeModule === 'requests')    return <Requests />
+  if (activeModule === 'licenses') return (
+    <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
+      <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+      <div style={{ flex: 1, padding: 40 }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: T.navy }}>Licenses</h2>
+        <p style={{ fontSize: 13, color: T.muted }}>Coming soon.</p>
+      </div>
+    </div>
+  )
 
   // ── Special views ──────────────────────────────────────────────────────────
   if (activeView === 'maintenances') {
