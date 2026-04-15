@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { T, fmtAgo, fmtDate, healthScore, isOnline, STATUS_COLORS } from './shared'
+import { T, fmtAgo, fmtDate, healthScore, isOnline, STATUS_COLORS, calcDepreciation, DEPRECIATION_METHODS } from './shared'
 import api from '../../services/api'
 
 const TABS = ['Overview', 'Hardware', 'Software', 'Network', 'History', 'Maintenance', 'Files']
@@ -72,8 +72,207 @@ const StatusBadge = ({ status }) => {
   )
 }
 
+// ── Depreciation chart (pure SVG) ────────────────────────────────────────────
+function DepreciationChart({ asset, depSettings }) {
+  const W = 380, H = 90, PAD = { t: 8, r: 8, b: 20, l: 48 }
+  const iW = W - PAD.l - PAD.r
+  const iH = H - PAD.t - PAD.b
+
+  const synth = { ...asset, ...depSettings }
+  const base  = calcDepreciation(synth)
+  if (!base) return null
+
+  const { cost, salvage, life } = base
+  const STEPS = 60
+  const points = []
+
+  for (let i = 0; i <= STEPS; i++) {
+    const yr = (life * i) / STEPS
+    const val = calcDepreciation({ ...synth, _override_years: yr })
+    if (!val) continue
+    // use override
+    const ms   = yr * 365.25 * 24 * 60 * 60 * 1000
+    const fake  = { ...synth, purchase_date: new Date(Date.now() - ms).toISOString() }
+    const snap  = calcDepreciation(fake)
+    if (!snap) continue
+    const x = PAD.l + (yr / life) * iW
+    const y = PAD.t + (1 - (snap.current_value - salvage) / (cost - salvage || 1)) * iH
+    points.push([x, y])
+  }
+
+  const todayYr  = base.years_owned
+  const todayPct = Math.min(1, todayYr / life)
+  const todayX   = PAD.l + todayPct * iW
+  const todaySnap = calcDepreciation(synth)
+  const todayY   = todaySnap
+    ? PAD.t + (1 - (todaySnap.current_value - salvage) / (cost - salvage || 1)) * iH
+    : PAD.t
+
+  const polyline = points.map(p => p.join(',')).join(' ')
+  const valPct   = todaySnap ? (todaySnap.current_value - salvage) / (cost - salvage || 1) : 1
+  const dotColor = valPct > 0.66 ? T.green : valPct > 0.33 ? T.yellow : T.red
+
+  return (
+    <svg width={W} height={H} style={{ display: 'block', overflow: 'visible' }}>
+      {/* Grid lines */}
+      {[0, 0.5, 1].map(f => (
+        <line key={f}
+          x1={PAD.l} x2={PAD.l + iW}
+          y1={PAD.t + f * iH} y2={PAD.t + f * iH}
+          stroke={T.border} strokeWidth={1} />
+      ))}
+      {/* Area fill */}
+      <polygon
+        points={`${PAD.l},${PAD.t + iH} ${polyline} ${PAD.l + iW},${PAD.t + iH}`}
+        fill={T.blue + '12'} />
+      {/* Curve */}
+      <polyline points={polyline} fill="none" stroke={T.blue} strokeWidth={2} strokeLinejoin="round" />
+      {/* Today marker */}
+      {todayPct < 1 && (
+        <line x1={todayX} x2={todayX} y1={PAD.t} y2={PAD.t + iH}
+          stroke={dotColor} strokeWidth={1.5} strokeDasharray="3,2" />
+      )}
+      {/* Today dot */}
+      <circle cx={todayX} cy={todayY} r={4} fill={dotColor} stroke="#fff" strokeWidth={1.5} />
+      {/* Y axis labels */}
+      <text x={PAD.l - 4} y={PAD.t + 4} textAnchor="end" fontSize={9} fill={T.muted}>${cost.toLocaleString()}</text>
+      <text x={PAD.l - 4} y={PAD.t + iH + 4} textAnchor="end" fontSize={9} fill={T.muted}>${salvage.toLocaleString()}</text>
+      {/* X axis labels */}
+      <text x={PAD.l} y={H - 2} textAnchor="start" fontSize={9} fill={T.muted}>Purchase</text>
+      <text x={PAD.l + iW} y={H - 2} textAnchor="end" fontSize={9} fill={T.muted}>{life}yr</text>
+    </svg>
+  )
+}
+
+// ── Depreciation section ──────────────────────────────────────────────────────
+function DepreciationSection({ asset, onAssetUpdate }) {
+  const [method,  setMethod]  = useState(asset.depreciation_method  || 'Straight Line')
+  const [years,   setYears]   = useState(String(asset.depreciation_years  ?? 3))
+  const [salvage, setSalvage] = useState(String(asset.salvage_value  ?? 0))
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+
+  // Sync when asset prop changes (e.g. after save propagates back)
+  useEffect(() => {
+    setMethod(asset.depreciation_method || 'Straight Line')
+    setYears(String(asset.depreciation_years ?? 3))
+    setSalvage(String(asset.salvage_value ?? 0))
+  }, [asset.depreciation_method, asset.depreciation_years, asset.salvage_value])
+
+  const depSettings = {
+    depreciation_method: method,
+    depreciation_years:  parseInt(years) || 3,
+    salvage_value:       parseFloat(salvage) || 0,
+  }
+  const dep = calcDepreciation({ ...asset, ...depSettings })
+  if (!dep) return null
+
+  const { current_value, depreciation_per_year, fully_depreciated, cost } = dep
+  const pctRemaining = (current_value - dep.salvage) / (cost - dep.salvage || 1)
+  const valColor = fully_depreciated ? T.muted : pctRemaining > 0.66 ? T.green : pctRemaining > 0.33 ? T.yellow : T.red
+
+  const isDirty = method  !== (asset.depreciation_method  || 'Straight Line') ||
+                  years   !== String(asset.depreciation_years  ?? 3) ||
+                  salvage !== String(asset.salvage_value  ?? 0)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onAssetUpdate(asset.id, {
+        depreciation_method: method,
+        depreciation_years:  parseInt(years) || 3,
+        salvage_value:       parseFloat(salvage) || 0,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inpSt = {
+    padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.border}`,
+    fontSize: 12, fontFamily: T.font, outline: 'none', background: '#fff',
+  }
+
+  return (
+    <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
+      {/* Controls row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ flex: '2 1 140px' }}>
+          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Method</div>
+          <select value={method} onChange={e => setMethod(e.target.value)}
+            style={{ ...inpSt, width: '100%', cursor: 'pointer', background: '#fff' }}>
+            {DEPRECIATION_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: '1 1 60px' }}>
+          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Life (yrs)</div>
+          <input type="number" min="1" max="50" value={years}
+            onChange={e => setYears(e.target.value)}
+            style={{ ...inpSt, width: '100%', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ flex: '1 1 70px' }}>
+          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Salvage ($)</div>
+          <input type="number" min="0" step="0.01" value={salvage}
+            onChange={e => setSalvage(e.target.value)}
+            style={{ ...inpSt, width: '100%', boxSizing: 'border-box' }} />
+        </div>
+        {onAssetUpdate && isDirty && (
+          <button onClick={handleSave} disabled={saving} style={{
+            padding: '5px 12px', borderRadius: 6, border: 'none',
+            background: T.navy, color: '#fff', fontSize: 11, fontWeight: 700,
+            cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+            fontFamily: T.font, alignSelf: 'flex-end', flexShrink: 0,
+          }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}</button>
+        )}
+      </div>
+
+      {/* Current value display */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <div style={{ flex: 1, background: '#fff', borderRadius: 8, padding: '10px 14px', border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Current Value</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20, fontWeight: 800, color: valColor }}>
+              ${current_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            {fully_depreciated && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: '#e8eaed', color: T.muted }}>
+                Fully Depreciated
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>
+            ${depreciation_per_year.toLocaleString(undefined, { maximumFractionDigits: 2 })}/yr · {' '}
+            {fully_depreciated
+              ? 'expired'
+              : `${Math.max(0, dep.life - dep.years_owned).toFixed(1)} yrs remaining`
+            }
+          </div>
+        </div>
+        <div style={{ flex: 1, background: '#fff', borderRadius: 8, padding: '10px 14px', border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>% Remaining</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: valColor }}>
+            {(pctRemaining * 100).toFixed(0)}%
+          </div>
+          <div style={{ height: 4, background: '#f0f2f5', borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+            <div style={{ width: `${Math.max(0, pctRemaining * 100)}%`, height: '100%', background: valColor, borderRadius: 2, transition: 'width 0.3s' }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ overflowX: 'auto' }}>
+        <DepreciationChart asset={asset} depSettings={depSettings} />
+      </div>
+    </div>
+  )
+}
+
 // ── Tab: Overview ────────────────────────────────────────────────────────────
-function TabOverview({ asset, isAdmin }) {
+function TabOverview({ asset, isAdmin, onAssetUpdate }) {
   const on = isOnline(asset)
   const { score, issues } = healthScore(asset)
   const healthColor = score >= 80 ? T.green : score >= 60 ? T.yellow : T.red
@@ -161,6 +360,12 @@ function TabOverview({ asset, isAdmin }) {
         <InfoRow label="Warranty Expires" value={fmtDate(asset.warranty_expires)} />
         <InfoRow label="EOL Date" value={fmtDate(asset.eol_date)} />
       </Section>
+
+      {asset.purchase_cost && asset.purchase_date && (
+        <Section title="Depreciation">
+          <DepreciationSection asset={asset} onAssetUpdate={onAssetUpdate} />
+        </Section>
+      )}
 
       {isAdmin && (
         <Section title="Admin Info">
@@ -718,7 +923,7 @@ function TabFiles({ asset }) {
 
 // ── Main detail panel ────────────────────────────────────────────────────────
 export default function DetailPanel({
-  asset, onClose, onEdit, onConnect, onRetire, onCheckout, onCheckin, onClone, onAudit, onRename, onQR, isAdmin
+  asset, onClose, onEdit, onConnect, onRetire, onCheckout, onCheckin, onClone, onAudit, onRename, onQR, isAdmin, onAssetUpdate
 }) {
   const [tab, setTab] = useState('Overview')
   const [cmdLoading, setCmdLoading] = useState(false)
@@ -763,7 +968,7 @@ export default function DetailPanel({
 
   const tabContent = () => {
     switch (tab) {
-      case 'Overview': return <TabOverview asset={asset} isAdmin={isAdmin} />
+      case 'Overview': return <TabOverview asset={asset} isAdmin={isAdmin} onAssetUpdate={onAssetUpdate} />
       case 'Hardware': return <TabHardware asset={asset} />
       case 'Software': return <TabSoftware asset={asset} />
       case 'Network': return <TabNetwork asset={asset} />

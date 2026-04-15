@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
-import { T, STATUS_OPTIONS } from './shared'
+import { T, STATUS_OPTIONS, DEPRECIATION_METHODS } from './shared'
 import api from '../../services/api'
 
 const Overlay = ({ children, onClose }) => (
@@ -208,6 +208,14 @@ function AssetFormFields({ form, set, isEdit }) {
       </div>
       <Field label="EOL Date" name="eol_date" type="date" value={form.eol_date} onChange={set} />
 
+      <SectionTitle>Depreciation</SectionTitle>
+      <Field label="Method" name="depreciation_method" value={form.depreciation_method} onChange={set}
+        options={DEPRECIATION_METHODS} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
+        <Field label="Useful Life (years)" name="depreciation_years" type="number" value={form.depreciation_years} onChange={set} />
+        <Field label="Salvage Value ($)" name="salvage_value" type="number" value={form.salvage_value} onChange={set} />
+      </div>
+
       {isEdit && (
         <>
           <SectionTitle>Remote Access</SectionTitle>
@@ -334,6 +342,7 @@ export function NewAssetModal({ onClose, onCreate }) {
     assigned_user: '', department: '', location: '', checkout_date: '', expected_checkin_date: '',
     purchase_date: '', purchase_cost: '', order_number: '', supplier: '',
     warranty_months: '', warranty_expires: '', eol_date: '', notes: '',
+    depreciation_method: 'Straight Line', depreciation_years: '3', salvage_value: '0',
   })
   const [saving, setSaving] = useState(false)
 
@@ -387,6 +396,9 @@ export function EditAssetModal({ asset, onClose, onSave }) {
     warranty_expires: asset?.warranty_expires?.slice(0, 10) || '',
     eol_date: asset?.eol_date?.slice(0, 10) || '',
     notes: asset?.notes || '',
+    depreciation_method: asset?.depreciation_method || 'Straight Line',
+    depreciation_years: String(asset?.depreciation_years ?? 3),
+    salvage_value: String(asset?.salvage_value ?? 0),
     rustdesk_id: asset?.rustdesk_id || '',
     rustdesk_password: asset?.rustdesk_password || '',
   })

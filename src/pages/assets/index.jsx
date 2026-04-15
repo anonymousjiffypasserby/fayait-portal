@@ -477,6 +477,7 @@ export default function Assets() {
         <DetailPanel
           asset={openAsset}
           isAdmin={isAdmin}
+          onAssetUpdate={updateAsset}
           onClose={() => setOpenAsset(null)}
           onEdit={() => setModal('edit')}
           onConnect={() => setModal('connect')}
