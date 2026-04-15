@@ -342,6 +342,38 @@ export const api = {
 
   getConsumableUses: (id) =>
     fetch(`${BASE}/api/consumables/${id}/uses`, { headers: headers() }).then(handle),
+
+  // ── Components ────────────────────────────────────────────────────────────────
+
+  getComponents: (retired = false) =>
+    fetch(`${BASE}/api/components${retired ? '?retired=true' : ''}`, { headers: headers() }).then(handle),
+
+  getComponent: (id) =>
+    fetch(`${BASE}/api/components/${id}`, { headers: headers() }).then(handle),
+
+  createComponent: (data) =>
+    fetch(`${BASE}/api/components`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateComponent: (id, data) =>
+    fetch(`${BASE}/api/components/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  retireComponent: (id) =>
+    fetch(`${BASE}/api/components/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  restoreComponent: (id) =>
+    fetch(`${BASE}/api/components/${id}/restore`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  installComponent: (id, data) =>
+    fetch(`${BASE}/api/components/${id}/install`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  uninstallComponent: (id, componentAssetId) =>
+    fetch(`${BASE}/api/components/${id}/uninstall`, { method: 'POST', headers: headers(), body: JSON.stringify({ component_asset_id: componentAssetId }) }).then(handle),
+
+  getComponentAssets: (id) =>
+    fetch(`${BASE}/api/components/${id}/assets`, { headers: headers() }).then(handle),
+
+  getAssetComponents: (assetId) =>
+    fetch(`${BASE}/api/assets/${assetId}/components`, { headers: headers() }).then(handle),
 }
 
 export default api

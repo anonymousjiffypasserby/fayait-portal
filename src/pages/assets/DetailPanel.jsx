@@ -181,6 +181,42 @@ function TabOverview({ asset, isAdmin }) {
 }
 
 // ── Tab: Hardware ────────────────────────────────────────────────────────────
+function InstalledComponents({ asset }) {
+  const [components, setComponents] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.getAssetComponents(asset.id)
+      .then(d => setComponents(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [asset.id])
+
+  if (loading) return <div style={{ fontSize: 11, color: T.muted, padding: '4px 0' }}>Loading…</div>
+  if (components.length === 0) return <div style={{ fontSize: 11, color: T.muted, padding: '4px 0' }}>No components installed</div>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {components.map(c => (
+        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#f8f9fa', borderRadius: 8, border: `1px solid ${T.border}` }}>
+          <span style={{ fontSize: 16 }}>🔩</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{c.component_name}</div>
+            <div style={{ fontSize: 10, color: T.muted }}>
+              {c.category_name && `${c.category_name} · `}
+              Qty: {c.quantity}
+              {c.component_serial && ` · S/N: ${c.component_serial}`}
+            </div>
+          </div>
+          {c.installed_by_name && (
+            <div style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>by {c.installed_by_name}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TabHardware({ asset }) {
   return (
     <div>
@@ -232,6 +268,9 @@ function TabHardware({ asset }) {
           <InfoRow label="Pending Updates" value={`${asset.pending_updates} update${asset.pending_updates !== 1 ? 's' : ''}`} />
         )}
         <InfoRow label="Last Update" value={asset.last_update} />
+      </Section>
+      <Section title="Installed Components">
+        <InstalledComponents asset={asset} />
       </Section>
     </div>
   )

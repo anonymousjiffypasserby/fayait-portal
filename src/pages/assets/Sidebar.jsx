@@ -148,6 +148,19 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
         <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>📦</span>
         <span>Consumables</span>
       </div>
+      <div
+        onClick={() => navigate('/components')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+          color: T.text, fontSize: 13, userSelect: 'none',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#eef0f3' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>🔩</span>
+        <span>Components</span>
+      </div>
     </div>
   )
 }
