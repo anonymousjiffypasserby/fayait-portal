@@ -15,7 +15,7 @@ const VIEW_FILTER = {
   available:  k => !isCheckedOut(k),
 }
 
-export default function Kits() {
+export default function Kits({ hideSidebar = false }) {
   const { user } = useAuth()
   const isAdmin  = ADMIN_ROLES.includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -135,7 +135,7 @@ export default function Kits() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: T.bg, fontFamily: T.font }}>
-      <Sidebar activeView={activeView} onViewChange={setView} kits={kits} />
+      {!hideSidebar && <Sidebar activeView={activeView} onViewChange={setView} kits={kits} />}
 
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',

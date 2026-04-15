@@ -17,6 +17,7 @@ import Consumables from '../consumables'
 import Components from '../components'
 import Kits from '../kits'
 import Requests from '../requests'
+import Reports from './Reports'
 import {
   ConnectModal, RenameModal, NewAssetModal, EditAssetModal,
   CheckOutModal, CheckInModal, AuditModal, ConfirmRetireModal,
@@ -309,20 +310,32 @@ export default function Assets() {
     fontWeight: active ? 600 : 400,
   })
 
-  // ── Module overrides (stay at /assets, render sub-module full-screen) ──────
+  // ── Module overrides (stay at /assets, keep sidebar, render module content) ─
   const activeModule = searchParams.get('module')
-  if (activeModule === 'accessories') return <Accessories />
-  if (activeModule === 'consumables') return <Consumables />
-  if (activeModule === 'components')  return <Components />
-  if (activeModule === 'kits')        return <Kits />
-  if (activeModule === 'requests')    return <Requests />
-  if (activeModule === 'licenses') return (
+
+  const withSidebar = (content) => (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
       <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
-      <div style={{ flex: 1, padding: 40 }}>
-        <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: T.navy }}>Licenses</h2>
-        <p style={{ fontSize: 13, color: T.muted }}>Coming soon.</p>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        {content}
       </div>
+    </div>
+  )
+
+  if (activeModule === 'accessories') return withSidebar(<Accessories hideSidebar />)
+  if (activeModule === 'consumables') return withSidebar(<Consumables hideSidebar />)
+  if (activeModule === 'components')  return withSidebar(<Components  hideSidebar />)
+  if (activeModule === 'kits')        return withSidebar(<Kits        hideSidebar />)
+  if (activeModule === 'requests')    return withSidebar(<Requests />)
+  if (activeModule === 'reports')     return withSidebar(
+    <div style={{ padding: 24 }}>
+      <Reports assets={assets} />
+    </div>
+  )
+  if (activeModule === 'licenses') return withSidebar(
+    <div style={{ padding: 40 }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: T.navy }}>Licenses</h2>
+      <p style={{ fontSize: 13, color: T.muted }}>Coming soon.</p>
     </div>
   )
 

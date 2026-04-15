@@ -82,6 +82,8 @@ export default function Layout({ children }) {
   }).filter(section => section.items.length > 0)
 
   return (
+    <>
+    <style>{`.faya-nav::-webkit-scrollbar{display:none}`}</style>
     <div style={{
       display: 'flex',
       height: '100vh',
@@ -137,7 +139,7 @@ export default function Layout({ children }) {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
+        <nav className="faya-nav" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {visibleSections.map((section) => (
             <div key={section.section}>
               {hovered && (
@@ -230,5 +232,6 @@ export default function Layout({ children }) {
         {children}
       </main>
     </div>
+    </>
   )
 }

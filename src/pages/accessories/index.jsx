@@ -19,7 +19,7 @@ const VIEW_FILTER = {
   retired:     () => true, // fetched separately with ?retired=true
 }
 
-export default function Accessories() {
+export default function Accessories({ hideSidebar = false }) {
   const { user } = useAuth()
   const isAdmin = ADMIN_ROLES.includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -165,7 +165,7 @@ export default function Accessories() {
 
   return (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-      <Sidebar activeView={activeView} onViewChange={setView} accessories={accessories} />
+      {!hideSidebar && <Sidebar activeView={activeView} onViewChange={setView} accessories={accessories} />}
 
       <div style={{ flex: 1, padding: 24, paddingBottom: 80, minWidth: 0, overflow: 'hidden' }}>
         {/* Header */}

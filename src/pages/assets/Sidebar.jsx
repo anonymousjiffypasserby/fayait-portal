@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { T, isOnline } from './shared'
 
-// ── View groups (rendered inside assets, keyed by activeView) ─────────────────
+// ── View groups ───────────────────────────────────────────────────────────────
 
 const ASSET_VIEWS = [
   { key: 'all',          label: 'List All',        icon: '≡' },
@@ -30,21 +31,53 @@ const MANAGE_VIEWS = [
   { key: 'deleted',      label: 'Deleted',         icon: '⊘',  type: 'view' },
 ]
 
-// ── Module items (render sub-module component at /assets?module=X) ────────────
+// ── Inventory modules with their sub-views ────────────────────────────────────
 
 const INVENTORY_MODULES = [
-  { key: 'accessories', label: 'Accessories',    icon: '🔌' },
-  { key: 'consumables', label: 'Consumables',    icon: '📦' },
-  { key: 'components',  label: 'Components',     icon: '🔩' },
-  { key: 'kits',        label: 'Predefined Kits', icon: '🗃' },
-  { key: 'licenses',    label: 'Licenses',       icon: '🔑' },
-]
-
-// ── External links ────────────────────────────────────────────────────────────
-
-const LINKS = [
-  { key: 'reports',  label: 'Reports',  icon: '📊', path: '/reports' },
-  { key: 'settings', label: 'Settings', icon: '⚙',  path: '/settings' },
+  {
+    key: 'accessories', label: 'Accessories', icon: '🔌',
+    views: [
+      { key: 'all',        label: 'All' },
+      { key: 'available',  label: 'Available' },
+      { key: 'checkedout', label: 'Checked Out' },
+      { key: 'requestable',label: 'Requestable' },
+      { key: 'lowstock',   label: 'Low Stock' },
+      { key: 'retired',    label: 'Retired' },
+    ],
+  },
+  {
+    key: 'consumables', label: 'Consumables', icon: '📦',
+    views: [
+      { key: 'all',        label: 'All' },
+      { key: 'available',  label: 'Available' },
+      { key: 'outofstock', label: 'Out of Stock' },
+      { key: 'lowstock',   label: 'Low Stock' },
+      { key: 'requestable',label: 'Requestable' },
+      { key: 'retired',    label: 'Retired' },
+    ],
+  },
+  {
+    key: 'components', label: 'Components', icon: '🔩',
+    views: [
+      { key: 'all',       label: 'All' },
+      { key: 'available', label: 'Available' },
+      { key: 'installed', label: 'Installed' },
+      { key: 'lowstock',  label: 'Low Stock' },
+      { key: 'retired',   label: 'Retired' },
+    ],
+  },
+  {
+    key: 'kits', label: 'Predefined Kits', icon: '🗃',
+    views: [
+      { key: 'all',        label: 'All' },
+      { key: 'available',  label: 'Available' },
+      { key: 'checkedout', label: 'Checked Out' },
+    ],
+  },
+  {
+    key: 'licenses', label: 'Licenses', icon: '🔑',
+    views: [],
+  },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,7 +85,11 @@ const LINKS = [
 export default function Sidebar({ activeView, onViewChange, assets }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeModule = searchParams.get('module')
+  const activeModule  = searchParams.get('module')
+  const activeSubView = searchParams.get('view') || 'all'
+
+  // Track which inventory accordion is expanded (default: expand active module)
+  const [expanded, setExpanded] = useState(activeModule || null)
 
   // ── Badge counts ────────────────────────────────────────────────────────────
   const countFor = (view) => {
@@ -115,21 +152,44 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
     </div>
   )
 
+  // ── Module navigation helpers ───────────────────────────────────────────────
   const goModule = (key) => setSearchParams({ module: key })
+
+  const goModuleView = (moduleKey, viewKey) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('module', moduleKey)
+      if (viewKey === 'all') next.delete('view'); else next.set('view', viewKey)
+      return next
+    })
+  }
+
+  const toggleModule = (key) => {
+    if (expanded === key) {
+      setExpanded(null)
+    } else {
+      setExpanded(key)
+      goModule(key)
+    }
+  }
 
   const onlineCount  = assets.filter(isOnline).length
   const offlineCount = assets.length - onlineCount
 
   return (
-    <div style={{
+    <div className="assets-sidebar" style={{
       width: 210, flexShrink: 0,
       borderRight: `1px solid ${T.border}`,
       padding: '12px 8px 24px',
       background: '#fafbfc',
       minHeight: 'calc(100vh - 56px)',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
       boxSizing: 'border-box',
     }}>
+      <style>{`.assets-sidebar::-webkit-scrollbar{display:none}`}</style>
+
       {/* Online / Offline mini stats */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, padding: '0 2px' }}>
         <div style={{ flex: 1, background: '#fff', borderRadius: 8, padding: '8px 10px', border: `1px solid ${T.border}` }}>
@@ -146,7 +206,7 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
       <Divider label="Assets" />
       {ASSET_VIEWS.map(v => (
         <NavItem key={v.key} view={v}
-          active={activeView === v.key}
+          active={!activeModule && activeView === v.key}
           onClick={() => onViewChange(v.key)}
         />
       ))}
@@ -155,43 +215,101 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
       <Divider label="Actions" />
       {ACTION_VIEWS.map(v => (
         <NavItem key={v.key} view={v}
-          active={activeView === v.key}
+          active={!activeModule && activeView === v.key}
           onClick={() => onViewChange(v.key)}
         />
       ))}
 
-      {/* ── OTHER INVENTORY ── */}
+      {/* ── OTHER INVENTORY (accordion) ── */}
       <Divider label="Other Inventory" />
-      {INVENTORY_MODULES.map(m => (
-        <NavItem key={m.key} view={m}
-          active={activeModule === m.key}
-          onClick={() => goModule(m.key)}
-        />
-      ))}
+      {INVENTORY_MODULES.map(m => {
+        const isOpen = expanded === m.key
+        const isActive = activeModule === m.key
+
+        return (
+          <div key={m.key}>
+            {/* Module header row */}
+            <div
+              onClick={() => toggleModule(m.key)}
+              style={{
+                ...itemStyle(isActive && !searchParams.get('view')),
+                justifyContent: 'space-between',
+              }}
+              {...hoverHandlers(isActive && !searchParams.get('view'))}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>{m.icon}</span>
+                <span>{m.label}</span>
+              </span>
+              <span style={{
+                fontSize: 10, color: isActive ? '#fff' : T.muted,
+                transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                transition: 'transform 0.15s',
+                display: 'inline-block',
+              }}>▶</span>
+            </div>
+
+            {/* Sub-views (expanded) */}
+            {isOpen && m.views.length > 0 && (
+              <div style={{ marginLeft: 12, marginBottom: 2 }}>
+                {m.views.map(sv => {
+                  const subActive = isActive && activeSubView === sv.key
+                  return (
+                    <div
+                      key={sv.key}
+                      onClick={() => goModuleView(m.key, sv.key)}
+                      style={{
+                        ...itemStyle(subActive),
+                        fontSize: 12,
+                        padding: '6px 10px',
+                      }}
+                      {...hoverHandlers(subActive)}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: subActive ? '#fff' : T.muted }}>–</span>
+                        <span>{sv.label}</span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {isOpen && m.views.length === 0 && (
+              <div style={{ marginLeft: 24, marginBottom: 6, fontSize: 11, color: T.muted, fontStyle: 'italic' }}>
+                Coming soon
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       {/* ── MANAGE ── */}
       <Divider label="Manage" />
       {MANAGE_VIEWS.map(v => (
         <NavItem key={v.key} view={v}
-          active={v.type === 'module' ? activeModule === v.key : activeView === v.key}
+          active={v.type === 'module' ? activeModule === v.key : (!activeModule && activeView === v.key)}
           onClick={() => v.type === 'module' ? goModule(v.key) : onViewChange(v.key)}
         />
       ))}
 
       {/* ── LINKS ── */}
       <Divider label="Links" />
-      {LINKS.map(l => (
-        <div key={l.key}
-          onClick={() => navigate(l.path)}
-          style={itemStyle(false)}
-          {...hoverHandlers(false)}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>{l.icon}</span>
-            <span>{l.label}</span>
-          </span>
-        </div>
-      ))}
+      <NavItem
+        view={{ key: 'reports', label: 'Reports', icon: '📊' }}
+        active={activeModule === 'reports'}
+        onClick={() => goModule('reports')}
+      />
+      <div
+        onClick={() => navigate('/settings')}
+        style={itemStyle(false)}
+        {...hoverHandlers(false)}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 13, width: 16, textAlign: 'center', opacity: 0.75 }}>⚙</span>
+          <span>Settings</span>
+        </span>
+      </div>
     </div>
   )
 }

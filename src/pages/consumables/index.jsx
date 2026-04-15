@@ -24,7 +24,7 @@ const VIEW_TITLES = {
   lowstock: 'Low Stock', requestable: 'Requestable', retired: 'Retired',
 }
 
-export default function Consumables() {
+export default function Consumables({ hideSidebar = false }) {
   const { user } = useAuth()
   const isAdmin = ADMIN_ROLES.includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -150,7 +150,7 @@ export default function Consumables() {
 
   return (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-      <Sidebar activeView={activeView} onViewChange={setView} consumables={consumables} />
+      {!hideSidebar && <Sidebar activeView={activeView} onViewChange={setView} consumables={consumables} />}
 
       <div style={{ flex: 1, padding: 24, paddingBottom: 80, minWidth: 0, overflow: 'hidden' }}>
         {/* Header */}

@@ -22,7 +22,7 @@ const VIEW_TITLES = {
   lowstock: 'Low Stock', retired: 'Retired',
 }
 
-export default function Components() {
+export default function Components({ hideSidebar = false }) {
   const { user } = useAuth()
   const isAdmin = ADMIN_ROLES.includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -151,7 +151,7 @@ export default function Components() {
 
   return (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-      <Sidebar activeView={activeView} onViewChange={setView} components={components} />
+      {!hideSidebar && <Sidebar activeView={activeView} onViewChange={setView} components={components} />}
 
       <div style={{ flex: 1, padding: 24, paddingBottom: 80, minWidth: 0, overflow: 'hidden' }}>
         {/* Header */}
