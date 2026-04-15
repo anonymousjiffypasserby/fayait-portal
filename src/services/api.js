@@ -374,6 +374,29 @@ export const api = {
 
   getAssetComponents: (assetId) =>
     fetch(`${BASE}/api/assets/${assetId}/components`, { headers: headers() }).then(handle),
+
+  // ── Kits ──────────────────────────────────────────────────────────────────────
+
+  getKits: () =>
+    fetch(`${BASE}/api/kits`, { headers: headers() }).then(handle),
+
+  getKit: (id) =>
+    fetch(`${BASE}/api/kits/${id}`, { headers: headers() }).then(handle),
+
+  createKit: (data) =>
+    fetch(`${BASE}/api/kits`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateKit: (id, data) =>
+    fetch(`${BASE}/api/kits/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteKit: (id) =>
+    fetch(`${BASE}/api/kits/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  checkoutKit: (id, data) =>
+    fetch(`${BASE}/api/kits/${id}/checkout`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  checkinKit: (id, data) =>
+    fetch(`${BASE}/api/kits/${id}/checkin`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
 }
 
 export default api
