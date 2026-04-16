@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import NotificationBell from './NotificationBell'
+import ServiceFrame from '../pages/ServiceFrame'
+
+const IFRAME_SERVICES = [
+  { key: 'tickets',  path: '/tickets'  },
+  { key: 'chat',     path: '/chat'     },
+  { key: 'grafana',  path: '/grafana'  },
+  { key: 'files',    path: '/files'    },
+  { key: 'projects', path: '/projects' },
+  { key: 'status',   path: '/status'   },
+]
 
 const SERVICES = [
   {
@@ -255,6 +265,7 @@ export default function Layout({ children }) {
         flexDirection: 'column',
         background: '#f0f2f5',
         height: '100vh',
+        position: 'relative',
       }}>
         {isMobile && (
           <button
@@ -268,6 +279,25 @@ export default function Layout({ children }) {
             }}
           >☰</button>
         )}
+
+        {/* Persistent iframe services — mounted once, shown/hidden by path */}
+        {IFRAME_SERVICES.map(({ key, path }) => {
+          if (services[key] !== 'active') return null
+          const visible = location.pathname === path || location.pathname.startsWith(path + '/')
+          return (
+            <div
+              key={key}
+              style={{
+                position: 'absolute', inset: 0,
+                display: visible ? 'flex' : 'none',
+                zIndex: 50,
+              }}
+            >
+              <ServiceFrame service={key} />
+            </div>
+          )
+        })}
+
         {children}
       </main>
     </div>

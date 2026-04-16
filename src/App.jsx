@@ -34,19 +34,15 @@ function AppRoutes() {
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/tickets" element={<ServiceFrame service="tickets" />} />
-                <Route path="/assets" element={<Assets />} />
-                <Route path="/chat" element={<ServiceFrame service="chat" />} />
-                <Route path="/files" element={<ServiceFrame service="files" />} />
-                <Route path="/projects" element={<ServiceFrame service="projects" />} />
-                <Route path="/status" element={<ServiceFrame service="status" />} />
-                <Route path="/grafana" element={<ServiceFrame service="grafana" />} />
+                <Route path="/assets/*" element={<Assets />} />
                 <Route path="/users" element={<ServiceFrame service="users" />} />
                 <Route path="/billing" element={<ServiceFrame service="billing" />} />
                 <Route path="/profile" element={<ServiceFrame service="profile" />} />
                 <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                 <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
                 <Route path="/notifications" element={<Notifications />} />
+                {/* iframe services (/tickets /chat /grafana /files /projects /status)
+                    are rendered persistently in Layout — no routes needed here */}
               </Routes>
             </Layout>
           </PrivateRoute>
