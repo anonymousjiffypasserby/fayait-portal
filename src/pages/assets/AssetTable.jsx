@@ -10,6 +10,7 @@ const COLS = [
   { key: '_ram', label: 'RAM', sortable: false },
   { key: '_health', label: 'Health', sortable: false },
   { key: 'last_seen', label: 'Last Seen', sortable: true },
+  { key: '_updates', label: 'Updates', sortable: false },
 ]
 
 const OnlineDot = ({ asset }) => {
@@ -66,12 +67,31 @@ const HealthBadge = ({ asset }) => {
   )
 }
 
+const UpdatesBadge = ({ asset, onOpenSoftware }) => {
+  const count = parseInt(asset.pending_updates) || 0
+  const bg    = count === 0 ? '#e5e7eb' : count <= 5 ? '#fef9c3' : '#fee2e2'
+  const color = count === 0 ? '#6b7280' : count <= 5 ? '#854d0e' : '#991b1b'
+  return (
+    <span
+      onClick={count > 0 ? e => { e.stopPropagation(); onOpenSoftware(asset) } : undefined}
+      style={{
+        display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+        fontSize: 11, fontWeight: 700, background: bg, color,
+        cursor: count > 0 ? 'pointer' : 'default',
+        userSelect: 'none',
+      }}
+    >
+      {count}
+    </span>
+  )
+}
+
 const DeviceIcon = ({ type }) => {
   const icons = { Laptop: '💻', Desktop: '🖥️', Server: '🖧' }
   return <span style={{ fontSize: 15, marginRight: 7 }}>{icons[type] || '💻'}</span>
 }
 
-export default function AssetTable({ assets, selected, onSelect, onSelectAll, onOpen, showRestore, onRestore, onRequest }) {
+export default function AssetTable({ assets, selected, onSelect, onSelectAll, onOpen, onOpenTab, showRestore, onRestore, onRequest }) {
   const [sort, setSort] = useState({ key: 'hostname', dir: 1 })
 
   const sorted = [...assets].sort((a, b) => {
@@ -158,6 +178,9 @@ export default function AssetTable({ assets, selected, onSelect, onSelectAll, on
               <td style={{ padding: '10px 10px', fontSize: 11, color: T.muted, whiteSpace: 'nowrap' }}>
                 {asset.last_seen ? fmtAgo(Date.now() - new Date(asset.last_seen).getTime()) : 'never'}
               </td>
+              <td style={{ padding: '10px 10px' }}>
+                <UpdatesBadge asset={asset} onOpenSoftware={a => onOpenTab?.(a, 'Software')} />
+              </td>
               <td style={{ padding: '10px 10px' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', gap: 5 }}>
                   <button
@@ -188,7 +211,7 @@ export default function AssetTable({ assets, selected, onSelect, onSelectAll, on
           ))}
           {assets.length === 0 && (
             <tr>
-              <td colSpan={12} style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>No assets found</td>
+              <td colSpan={13} style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>No assets found</td>
             </tr>
           )}
         </tbody>

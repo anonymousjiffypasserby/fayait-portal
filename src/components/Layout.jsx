@@ -40,6 +40,7 @@ const SERVICES = [
     adminOnly: true,
     items: [
       { key: 'settings', label: 'Settings', icon: '⚙', path: '/settings', alwaysVisible: true },
+      { key: 'reports',  label: 'Reports',  icon: '📈', path: '/reports',  alwaysVisible: true },
     ]
   },
 ]

@@ -15,7 +15,7 @@ const TYPE_BADGE = {
   license:     { bg: '#ffe4e6', color: '#9f1239' },
 }
 
-const EMPTY = { name: '', type: 'asset', notes: '' }
+const EMPTY = { name: '', type: 'asset', notes: '', min_quantity: 0, notify_low_stock: false }
 
 export default function CategoriesTab({ showToast }) {
   const [rows, setRows]       = useState([])
@@ -37,7 +37,7 @@ export default function CategoriesTab({ showToast }) {
 
   const openAdd  = () => { setForm(EMPTY); setModal('add') }
   const openEdit = (row) => {
-    setForm({ name: row.name, type: row.type || 'asset', notes: row.notes || '' })
+    setForm({ name: row.name, type: row.type || 'asset', notes: row.notes || '', min_quantity: row.min_quantity ?? 0, notify_low_stock: row.notify_low_stock ?? false })
     setModal(row)
   }
   const closeModal = () => { setModal(null); setSaving(false) }
@@ -85,11 +85,11 @@ export default function CategoriesTab({ showToast }) {
       <PageHeader title="Categories" onAdd={openAdd} addLabel="Add Category" />
 
       <Table
-        columns={['Name', 'Type', 'Notes']}
+        columns={['Name', 'Type', 'Notes', 'Min Qty']}
         empty={!loading && !fetchErr && rows.length === 0 ? 'No categories yet — add one above.' : null}
       >
-        {loading && <LoadingRow cols={3} />}
-        {fetchErr && <ErrorRow cols={3} message={fetchErr} />}
+        {loading && <LoadingRow cols={4} />}
+        {fetchErr && <ErrorRow cols={4} message={fetchErr} />}
         {!loading && rows.map(row => {
           const badge = TYPE_BADGE[row.type] || { bg: '#f3f4f6', color: '#374151' }
           return (
@@ -103,6 +103,7 @@ export default function CategoriesTab({ showToast }) {
                 }}>{row.type}</span>
               </td>
               <Td muted={!row.notes}>{row.notes || '—'}</Td>
+              <Td>{row.min_quantity ?? 0}</Td>
               <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
             </tr>
           )
@@ -123,6 +124,12 @@ export default function CategoriesTab({ showToast }) {
           </Field>
           <Field label="Notes">
             <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }} value={form.notes} onChange={set('notes')} />
+          </Field>
+          <Field label="Minimum stock quantity">
+            <input style={inputStyle} type="number" min={0} value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: parseInt(e.target.value) || 0 }))} />
+          </Field>
+          <Field label="Notify when low stock">
+            <input type="checkbox" checked={form.notify_low_stock} onChange={e => setForm(f => ({ ...f, notify_low_stock: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
           </Field>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
             <button onClick={closeModal} style={btnStyle('ghost')}>Cancel</button>

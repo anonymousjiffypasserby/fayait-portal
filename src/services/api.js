@@ -440,6 +440,18 @@ export const api = {
 
   markAllNotificationsRead: () =>
     fetch(`${BASE}/api/notifications/read-all`, { method: 'PUT', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  deleteNotification: (id) =>
+    fetch(`${BASE}/api/notifications/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getNotificationsLiveUrl: () =>
+    `${BASE}/api/notifications/live?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+
+  getTicketCount: () =>
+    fetch(`${BASE}/api/tickets/count`, { headers: headers() }).then(handle),
+
+  getActivity: (limit = 10) =>
+    fetch(`${BASE}/api/activity?limit=${limit}`, { headers: headers() }).then(handle),
 }
 
 export default api

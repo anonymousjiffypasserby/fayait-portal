@@ -92,6 +92,7 @@ export default function Assets() {
   const filterWarranty = searchParams.get('warranty')  || ''
   const filterAudit    = searchParams.get('audit')     || ''
   const filterCheckedOut = searchParams.get('checkout')|| ''
+  const filterUpdates    = searchParams.get('updates')   || ''
 
   const setParam = (key, value) => {
     setSearchParams(prev => {
@@ -120,6 +121,7 @@ export default function Assets() {
       next.delete('warranty')
       next.delete('audit')
       next.delete('checkout')
+      next.delete('updates')
       return next
     }, { replace: true })
   }
@@ -127,7 +129,7 @@ export default function Assets() {
   const clearFilters = () => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      ;['type','online','status','mfr','model','loc','dept','company','warranty','audit','checkout'].forEach(k => next.delete(k))
+      ;['type','online','status','mfr','model','loc','dept','company','warranty','audit','checkout','updates'].forEach(k => next.delete(k))
       return next
     }, { replace: true })
   }
@@ -165,6 +167,7 @@ export default function Assets() {
 
   const [selected, setSelected] = useState(new Set())
   const [openAsset,    setOpenAsset]    = useState(null)
+  const [initialTab,   setInitialTab]   = useState(null)
   const [modal,        setModal]        = useState(null)
   const [requestAsset, setRequestAsset] = useState(null)
 
@@ -234,6 +237,7 @@ export default function Assets() {
       if (!overdue) return false
     }
     if (filterCheckedOut && !a.checked_out_to) return false
+    if (filterUpdates   && !(parseInt(a.pending_updates) > 0)) return false
 
     return true
   })
@@ -500,6 +504,7 @@ export default function Assets() {
             ['warranty', '⚠ Warranty expiring'],
             ['audit',    '✎ Due for audit'],
             ['checkout', '↗ Checked out'],
+            ['updates',  '🔄 Has pending updates'],
           ].map(([key, label]) => {
             const active = !!searchParams.get(key)
             return (
@@ -510,7 +515,7 @@ export default function Assets() {
             )
           })}
           {/* Clear all */}
-          {(filterType||filterOnline||filterStatus||filterMfr||filterModel||filterLoc||filterDept||filterCompany||filterWarranty||filterAudit||filterCheckedOut) && (
+          {(filterType||filterOnline||filterStatus||filterMfr||filterModel||filterLoc||filterDept||filterCompany||filterWarranty||filterAudit||filterCheckedOut||filterUpdates) && (
             <button onClick={clearFilters}
               style={{ padding: '7px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 12, background: 'transparent', color: T.muted, cursor: 'pointer', fontFamily: T.font }}>
               × Clear filters
@@ -530,7 +535,8 @@ export default function Assets() {
               selected={selected}
               onSelect={toggleSelect}
               onSelectAll={selectAll}
-              onOpen={asset => setOpenAsset(asset)}
+              onOpen={asset => { setInitialTab(null); setOpenAsset(asset) }}
+              onOpenTab={(asset, tab) => { setInitialTab(tab); setOpenAsset(asset) }}
               showRestore={activeView === 'deleted'}
               onRestore={restoreAsset}
               onRequest={(!isAdmin && activeView === 'requestable') ? setRequestAsset : null}
@@ -561,8 +567,9 @@ export default function Assets() {
         <DetailPanel
           asset={openAsset}
           isAdmin={isAdmin}
+          initialTab={initialTab}
           onAssetUpdate={updateAsset}
-          onClose={() => setOpenAsset(null)}
+          onClose={() => { setOpenAsset(null); setInitialTab(null) }}
           onEdit={() => setModal('edit')}
           onConnect={() => setModal('connect')}
           onRetire={() => setModal('retire')}

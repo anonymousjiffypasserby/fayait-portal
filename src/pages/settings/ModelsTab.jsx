@@ -5,7 +5,7 @@ import {
   PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
 } from './shared'
 
-const EMPTY = { name: '', manufacturer_id: '', category: '', eol_date: '', notes: '' }
+const EMPTY = { name: '', manufacturer_id: '', category: '', eol_date: '', notes: '', min_quantity: 0, notify_low_stock: false }
 
 export default function ModelsTab({ showToast }) {
   const [rows, setRows]             = useState([])
@@ -38,11 +38,13 @@ export default function ModelsTab({ showToast }) {
   const openAdd  = () => { setForm(EMPTY); setModal('add') }
   const openEdit = (row) => {
     setForm({
-      name:            row.name || '',
-      manufacturer_id: row.manufacturer_id || '',
-      category:        row.category || '',
-      eol_date:        row.eol_date ? row.eol_date.slice(0, 10) : '',
-      notes:           row.notes || '',
+      name:             row.name || '',
+      manufacturer_id:  row.manufacturer_id || '',
+      category:         row.category || '',
+      eol_date:         row.eol_date ? row.eol_date.slice(0, 10) : '',
+      notes:            row.notes || '',
+      min_quantity:     row.min_quantity ?? 0,
+      notify_low_stock: row.notify_low_stock ?? false,
     })
     setModal(row)
   }
@@ -55,10 +57,12 @@ export default function ModelsTab({ showToast }) {
     try {
       const payload = {
         ...form,
-        manufacturer_id: form.manufacturer_id || null,
-        category: form.category || null,
-        eol_date: form.eol_date || null,
-        notes: form.notes || null,
+        manufacturer_id:  form.manufacturer_id || null,
+        category:         form.category || null,
+        eol_date:         form.eol_date || null,
+        notes:            form.notes || null,
+        min_quantity:     form.min_quantity || 0,
+        notify_low_stock: form.notify_low_stock || false,
       }
       if (modal === 'add') {
         const created = await api.createModel(payload)
@@ -98,17 +102,18 @@ export default function ModelsTab({ showToast }) {
       <PageHeader title="Models" onAdd={openAdd} addLabel="Add Model" />
 
       <Table
-        columns={['Name', 'Manufacturer', 'Category', 'EOL Date']}
+        columns={['Name', 'Manufacturer', 'Category', 'EOL Date', 'Min Qty']}
         empty={!loading && !fetchErr && rows.length === 0 ? 'No models yet — add one above.' : null}
       >
-        {loading && <LoadingRow cols={4} />}
-        {fetchErr && <ErrorRow cols={4} message={fetchErr} />}
+        {loading && <LoadingRow cols={5} />}
+        {fetchErr && <ErrorRow cols={5} message={fetchErr} />}
         {!loading && rows.map(row => (
           <tr key={row.id}>
             <Td>{row.name}</Td>
             <Td muted={!row.manufacturer_id}>{mfrName(row.manufacturer_id)}</Td>
             <Td muted={!row.category}>{row.category || '—'}</Td>
             <Td muted={!row.eol_date}>{row.eol_date ? row.eol_date.slice(0, 10) : '—'}</Td>
+            <Td>{row.min_quantity ?? 0}</Td>
             <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
           </tr>
         ))}
@@ -136,6 +141,12 @@ export default function ModelsTab({ showToast }) {
           </Field>
           <Field label="Notes">
             <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }} value={form.notes} onChange={set('notes')} />
+          </Field>
+          <Field label="Minimum stock quantity">
+            <input style={inputStyle} type="number" min={0} value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: parseInt(e.target.value) || 0 }))} />
+          </Field>
+          <Field label="Notify when low stock">
+            <input type="checkbox" checked={form.notify_low_stock} onChange={e => setForm(f => ({ ...f, notify_low_stock: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
           </Field>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
             <button onClick={closeModal} style={btnStyle('ghost')}>Cancel</button>

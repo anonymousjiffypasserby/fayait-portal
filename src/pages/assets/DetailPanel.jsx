@@ -482,42 +482,86 @@ function TabHardware({ asset }) {
 }
 
 // ── Tab: Software ────────────────────────────────────────────────────────────
-function TabSoftware({ asset }) {
-  const [search, setSearch] = useState('')
+function TabSoftware({ asset, pendingUpdatesRef }) {
+  const [search, setSearch]         = useState('')
+  const [updatesOpen, setUpdatesOpen] = useState(true)
   const sw = asset.installed_software
 
-  if (!sw || !Array.isArray(sw) || sw.length === 0) {
-    return <div style={{ color: T.muted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No software data yet. Agent will report on next 60-min scan.</div>
-  }
+  const updateCount  = parseInt(asset.pending_updates) || 0
+  const updateList   = Array.isArray(asset.pending_updates_detail) ? asset.pending_updates_detail : []
+  const updateColor  = updateCount === 0 ? T.green : updateCount <= 5 ? '#b45309' : T.red
+  const updateBg     = updateCount === 0 ? '#f0fdf4' : updateCount <= 5 ? '#fefce8' : '#fef2f2'
+  const updateBorder = updateCount === 0 ? '#86efac' : updateCount <= 5 ? '#fcd34d' : '#fca5a5'
 
-  const filtered = search
-    ? sw.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.publisher?.toLowerCase().includes(search.toLowerCase()))
-    : sw
+  const lastScan = asset.last_seen
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, color: T.muted }}>{sw.length} installed apps</span>
-        {asset.last_scanned_at && <span style={{ fontSize: 10, color: T.muted }}>Scanned {fmtAgo(Date.now() - new Date(asset.last_scanned_at).getTime())}</span>}
-      </div>
-      <input
-        placeholder="Search software..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.font, outline: 'none', marginBottom: 10, boxSizing: 'border-box' }}
-      />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {filtered.map((s, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: i % 2 === 0 ? '#f8f9fa' : T.card, borderRadius: 4 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{s.name}</div>
-              {s.publisher && <div style={{ fontSize: 10, color: T.muted }}>{s.publisher}</div>}
+      {/* ── Pending updates section ── */}
+      <div ref={pendingUpdatesRef} style={{ marginBottom: 18, background: updateBg, border: `1px solid ${updateBorder}`, borderRadius: 10, overflow: 'hidden' }}>
+        <button
+          onClick={() => setUpdatesOpen(o => !o)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.font }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: updateColor }}>{updateCount}</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: updateColor }}>
+                {updateCount === 0 ? 'Up to date' : `${updateCount} pending update${updateCount !== 1 ? 's' : ''}`}
+              </div>
+              {lastScan && (
+                <div style={{ fontSize: 10, color: T.muted }}>Last scan {fmtAgo(Date.now() - new Date(lastScan).getTime())}</div>
+              )}
             </div>
-            {s.version && <div style={{ fontSize: 11, color: T.muted, fontFamily: 'monospace', alignSelf: 'center', marginLeft: 8, whiteSpace: 'nowrap' }}>{s.version}</div>}
           </div>
-        ))}
-        {filtered.length === 0 && <div style={{ color: T.muted, fontSize: 12, padding: 20, textAlign: 'center' }}>No results</div>}
+          <span style={{ fontSize: 12, color: T.muted }}>{updatesOpen ? '▲' : '▼'}</span>
+        </button>
+        {updatesOpen && updateList.length > 0 && (
+          <div style={{ borderTop: `1px solid ${updateBorder}`, maxHeight: 220, overflowY: 'auto' }}>
+            {updateList.map((u, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 14px', borderBottom: i < updateList.length - 1 ? `1px solid ${updateBorder}` : 'none', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: 12, color: T.text, flex: 1, paddingRight: 8 }}>{u.title}</div>
+                {u.kb && <div style={{ fontSize: 10, fontFamily: 'monospace', color: T.muted, flexShrink: 0 }}>{u.kb}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {updatesOpen && updateList.length === 0 && updateCount > 0 && (
+          <div style={{ padding: '8px 14px', borderTop: `1px solid ${updateBorder}`, fontSize: 12, color: T.muted }}>Update names will appear on next agent scan.</div>
+        )}
       </div>
+
+      {/* ── Installed software ── */}
+      {(!sw || !Array.isArray(sw) || sw.length === 0) ? (
+        <div style={{ color: T.muted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No software data yet. Agent will report on next 60-min scan.</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 11, color: T.muted }}>{sw.length} installed apps</span>
+            {asset.last_scanned_at && <span style={{ fontSize: 10, color: T.muted }}>Scanned {fmtAgo(Date.now() - new Date(asset.last_scanned_at).getTime())}</span>}
+          </div>
+          <input
+            placeholder="Search software..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.font, outline: 'none', marginBottom: 10, boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {(search ? sw.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.publisher?.toLowerCase().includes(search.toLowerCase())) : sw).map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: i % 2 === 0 ? '#f8f9fa' : T.card, borderRadius: 4 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{s.name}</div>
+                  {s.publisher && <div style={{ fontSize: 10, color: T.muted }}>{s.publisher}</div>}
+                </div>
+                {s.version && <div style={{ fontSize: 11, color: T.muted, fontFamily: 'monospace', alignSelf: 'center', marginLeft: 8, whiteSpace: 'nowrap' }}>{s.version}</div>}
+              </div>
+            ))}
+            {search && sw.filter(s => s.name?.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+              <div style={{ color: T.muted, fontSize: 12, padding: 20, textAlign: 'center' }}>No results</div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -923,11 +967,33 @@ function TabFiles({ asset }) {
 
 // ── Main detail panel ────────────────────────────────────────────────────────
 export default function DetailPanel({
-  asset, onClose, onEdit, onConnect, onRetire, onCheckout, onCheckin, onClone, onAudit, onRename, onQR, isAdmin, onAssetUpdate
+  asset, onClose, onEdit, onConnect, onRetire, onCheckout, onCheckin, onClone, onAudit, onRename, onQR, isAdmin, onAssetUpdate, initialTab
 }) {
-  const [tab, setTab] = useState('Overview')
-  const [cmdLoading, setCmdLoading] = useState(false)
-  const [cmdMsg, setCmdMsg] = useState(null)
+  const [tab, setTab]                   = useState(initialTab || 'Overview')
+  const [cmdLoading, setCmdLoading]     = useState(false)
+  const [cmdMsg, setCmdMsg]             = useState(null)
+  const [winUpdateCmdId, setWinUpdateCmdId] = useState(null)
+  const [winUpdateConfirm, setWinUpdateConfirm] = useState(false)
+  const pendingUpdatesRef               = useRef(null)
+
+  // Sync tab when asset or initialTab changes (e.g. badge click opens different asset)
+  useEffect(() => {
+    setTab(initialTab || 'Overview')
+  }, [asset?.id, initialTab])
+
+  // Clear winUpdate pending state when SSE reports completion
+  useEffect(() => {
+    if (winUpdateCmdId && asset?.last_command_status?.id === winUpdateCmdId) {
+      setWinUpdateCmdId(null)
+    }
+  }, [asset?.last_command_status, winUpdateCmdId])
+
+  // Scroll to pending updates when Software tab opens via badge click
+  useEffect(() => {
+    if (tab === 'Software' && pendingUpdatesRef.current) {
+      setTimeout(() => pendingUpdatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    }
+  }, [tab])
 
   if (!asset) return null
 
@@ -939,10 +1005,26 @@ export default function DetailPanel({
     try {
       const res = await api.sendAssetCommand(asset.id, command, payload)
       setCmdMsg({ ok: true, text: res.message || 'Command queued.' })
+      return res
     } catch (e) {
       setCmdMsg({ ok: false, text: e.message })
     } finally {
       setCmdLoading(false)
+      setTimeout(() => setCmdMsg(null), 4000)
+    }
+  }
+
+  const handleRunWindowsUpdate = async () => {
+    setWinUpdateConfirm(false)
+    try {
+      const res = await api.sendAssetCommand(asset.id, 'windows_update', {
+        command: 'Install-Module PSWindowsUpdate -Force -Scope CurrentUser; Get-WindowsUpdate -Install -AcceptAll -AutoReboot',
+      })
+      if (res?.id) setWinUpdateCmdId(res.id)
+      setCmdMsg({ ok: true, text: 'Windows Update command queued. Device will install updates and may reboot.' })
+      setTimeout(() => setCmdMsg(null), 6000)
+    } catch (e) {
+      setCmdMsg({ ok: false, text: e.message })
       setTimeout(() => setCmdMsg(null), 4000)
     }
   }
@@ -970,7 +1052,7 @@ export default function DetailPanel({
     switch (tab) {
       case 'Overview': return <TabOverview asset={asset} isAdmin={isAdmin} onAssetUpdate={onAssetUpdate} />
       case 'Hardware': return <TabHardware asset={asset} />
-      case 'Software': return <TabSoftware asset={asset} />
+      case 'Software': return <TabSoftware asset={asset} pendingUpdatesRef={pendingUpdatesRef} />
       case 'Network': return <TabNetwork asset={asset} />
       case 'History': return <TabHistory asset={asset} />
       case 'Maintenance': return <TabMaintenance asset={asset} />
@@ -1016,6 +1098,15 @@ export default function DetailPanel({
         {isAdmin && (
           <ActionBtn label="Rename PC" onClick={() => onRename(asset)} title="Send rename command to agent" />
         )}
+        {isAdmin && on && (
+          <ActionBtn
+            label={winUpdateCmdId ? 'Pending…' : 'Run Windows Update'}
+            onClick={() => !winUpdateCmdId && setWinUpdateConfirm(true)}
+            color={winUpdateCmdId ? T.muted : '#7c3aed'}
+            disabled={!!winUpdateCmdId}
+            title="Install all pending Windows updates"
+          />
+        )}
         {asset.snipe_id && (
           <ActionBtn label="Snipe-IT ↗" onClick={() => window.open(`https://snipe.fayait.com/hardware/${asset.snipe_id}`, '_blank')} />
         )}
@@ -1044,6 +1135,22 @@ export default function DetailPanel({
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
         {tabContent()}
       </div>
+
+      {/* Windows Update confirmation modal */}
+      {winUpdateConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: 380, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', fontFamily: T.font }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 10 }}>Run Windows Update</div>
+            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6, marginBottom: 20 }}>
+              This will install all pending Windows updates on <strong>{asset.hostname}</strong>. The device may reboot automatically.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setWinUpdateConfirm(false)} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, fontSize: 13, cursor: 'pointer', fontFamily: T.font }}>Cancel</button>
+              <button onClick={handleRunWindowsUpdate} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#7c3aed', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: T.font }}>Run Update</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

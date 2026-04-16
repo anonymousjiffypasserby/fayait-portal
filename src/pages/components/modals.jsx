@@ -62,6 +62,7 @@ const EMPTY_FORM = {
   name: '', category_id: '', manufacturer_id: '', serial: '',
   location_id: '', status: 'Available', quantity: '1', min_quantity: '0',
   purchase_date: '', purchase_cost: '', supplier_id: '', order_number: '', notes: '',
+  notify_low_stock: false,
 }
 
 export function ComponentFormModal({ component, onClose, onSave }) {
@@ -80,6 +81,7 @@ export function ComponentFormModal({ component, onClose, onSave }) {
     supplier_id:     component.supplier_id || '',
     order_number:    component.order_number || '',
     notes:           component.notes || '',
+    notify_low_stock: component.notify_low_stock || false,
   } : { ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
 
@@ -154,6 +156,13 @@ export function ComponentFormModal({ component, onClose, onSave }) {
           <Label text="Min Quantity (alert)" />
           <input style={inputStyle} type="number" min="0" {...inp('min_quantity')} />
         </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.notify_low_stock} onChange={e => set('notify_low_stock', e.target.checked)} />
+          Notify when stock falls below minimum
+        </label>
       </div>
 
       <Section title="Purchase Info" />

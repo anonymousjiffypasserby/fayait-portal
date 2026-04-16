@@ -62,7 +62,7 @@ const EMPTY_FORM = {
   name: '', category_id: '', manufacturer_id: '', model_number: '', serial: '',
   location_id: '', status: 'Available', quantity: '1', min_quantity: '0',
   purchase_date: '', purchase_cost: '', supplier_id: '', order_number: '',
-  warranty_expires: '', notes: '', requestable: false,
+  warranty_expires: '', notes: '', requestable: false, notify_low_stock: false,
 }
 
 export function AccessoryFormModal({ accessory, onClose, onSave }) {
@@ -84,6 +84,7 @@ export function AccessoryFormModal({ accessory, onClose, onSave }) {
     warranty_expires:accessory.warranty_expires?.slice(0, 10) || '',
     notes:           accessory.notes || '',
     requestable:     accessory.requestable || false,
+    notify_low_stock: accessory.notify_low_stock || false,
   } : { ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
 
@@ -174,6 +175,12 @@ export function AccessoryFormModal({ accessory, onClose, onSave }) {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.requestable} onChange={e => set('requestable', e.target.checked)} />
           Allow users to request this accessory
+        </label>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.notify_low_stock} onChange={e => set('notify_low_stock', e.target.checked)} />
+          Notify when stock falls below minimum
         </label>
       </div>
 
