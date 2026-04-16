@@ -1,5 +1,9 @@
 import { useAuth } from '../context/AuthContext'
 
+const SERVICE_MOBILE_URLS = {
+  tickets: 'https://zammad.fayait.com/mobile',
+}
+
 const SERVICE_URLS = {
   tickets: 'https://zammad.fayait.com',
   assets: 'https://snipe.fayait.com',
@@ -52,7 +56,8 @@ const ADMIN_ROLES = ['superadmin', 'admin']
 
 export default function ServiceFrame({ service }) {
   const { user } = useAuth()
-  const url = SERVICE_URLS[service]
+  const isMobile = window.innerWidth < 768
+  const url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
   const services = user?.services || {}
   const isActive = services[service] === 'active'
   const isAdmin = ADMIN_ROLES.includes(user?.role)
