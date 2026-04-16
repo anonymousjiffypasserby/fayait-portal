@@ -102,10 +102,11 @@ export function PageHeader({ title, onAdd, addLabel }) {
 
 export function Table({ columns, children, empty }) {
   return (
-    <div style={{ padding: '0 28px 28px' }}>
+    <div style={{ padding: '0 28px 28px', overflowX: 'auto' }}>
       <div style={{
         background: '#fff', borderRadius: 10,
         border: '1px solid #e5e7eb', overflow: 'hidden',
+        minWidth: 400,
       }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>

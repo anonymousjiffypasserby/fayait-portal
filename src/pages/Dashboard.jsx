@@ -460,7 +460,7 @@ function LocationsWidget({ locationMap }) {
             {visible.map(([loc, count], i) => (
               <div
                 key={loc}
-                onClick={() => navigate(`/assets?location=${encodeURIComponent(loc)}`)}
+                onClick={() => navigate(`/assets?loc=${encodeURIComponent(loc)}`)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '6px 0', cursor: 'pointer',
@@ -676,6 +676,8 @@ export default function Dashboard() {
   const [alerts,     setAlerts]     = useState([])
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [loading,    setLoading]    = useState(true)
+  const [categoryMap, setCategoryMap] = useState({})
+  const [locationMap, setLocationMap] = useState({})
 
   const esAlertRef = useRef(null)
 
@@ -725,6 +727,19 @@ export default function Dashboard() {
     return () => es.close()
   }, [])
 
+  // ── Category / Location maps from API ──
+  useEffect(() => {
+    api.getAssetsByCategory()
+      .then(data => setCategoryMap(Object.fromEntries((data.rows || []).map(r => [r.category, parseInt(r.count)]))))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    api.getAssetsByLocation()
+      .then(data => setLocationMap(Object.fromEntries((data.rows || []).map(r => [r.location, parseInt(r.count)]))))
+      .catch(() => {})
+  }, [])
+
   // ── Derived data ──
   const total        = assets.length
   const onlineCount  = assets.filter(a => a.online).length
@@ -733,18 +748,6 @@ export default function Dashboard() {
   const statusMap = assets.reduce((acc, a) => {
     const s = a.status || 'Unknown'
     acc[s] = (acc[s] || 0) + 1
-    return acc
-  }, {})
-
-  const categoryMap = assets.reduce((acc, a) => {
-    const c = a.asset_type || '(Other)'
-    acc[c] = (acc[c] || 0) + 1
-    return acc
-  }, {})
-
-  const locationMap = assets.reduce((acc, a) => {
-    const l = a.location || '(No Location)'
-    acc[l] = (acc[l] || 0) + 1
     return acc
   }, {})
 
@@ -799,7 +802,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14, marginBottom: 20 }}>
         {stats.map((stat, i) => (
           <div
             key={i}
@@ -855,7 +858,7 @@ export default function Dashboard() {
       )}
 
       {/* Widget grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
 
         {/* Row 1: Asset Summary — full width */}
         <AssetSummaryWidget statusMap={statusMap} total={total} />

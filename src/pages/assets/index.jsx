@@ -170,6 +170,14 @@ export default function Assets() {
   const [initialTab,   setInitialTab]   = useState(null)
   const [modal,        setModal]        = useState(null)
   const [requestAsset, setRequestAsset] = useState(null)
+  const [sidebarOpen,  setSidebarOpen]  = useState(false)
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 768)
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const showRetired = RETIRED_VIEWS.has(activeView)
 
@@ -317,9 +325,23 @@ export default function Assets() {
   // ── Module overrides (stay at /assets, keep sidebar, render module content) ─
   const activeModule = searchParams.get('module')
 
+  const MobileMenuBtn = () => isMobile ? (
+    <button
+      onClick={() => setSidebarOpen(true)}
+      style={{
+        background: 'none', border: `1px solid ${T.border}`, borderRadius: 7,
+        padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: T.navy,
+        marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6,
+      }}
+    >
+      <span>☰</span>
+      <span style={{ fontSize: 12, fontWeight: 600 }}>Filters</span>
+    </button>
+  ) : null
+
   const withSidebar = (content) => (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-      <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+      <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         {content}
       </div>
@@ -347,7 +369,7 @@ export default function Assets() {
   if (activeView === 'maintenances') {
     return (
       <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <AllMaintenance />
         </div>
@@ -358,7 +380,7 @@ export default function Assets() {
   if (activeView === 'quick_scan') {
     return (
       <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <QuickScanCheckin assets={assets} onCheckin={(id) => checkinAsset(id, {})} />
         </div>
@@ -369,7 +391,7 @@ export default function Assets() {
   if (activeView === 'bulk_checkout') {
     return (
       <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <BulkCheckout
             assets={assets}
@@ -383,7 +405,7 @@ export default function Assets() {
   if (activeView === 'import') {
     return (
       <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+        <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <div style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <Import />
         </div>
@@ -393,9 +415,10 @@ export default function Assets() {
 
   return (
     <div style={{ display: 'flex', fontFamily: T.font, minHeight: '100%' }}>
-      <Sidebar activeView={activeView} onViewChange={setView} assets={assets} />
+      <Sidebar activeView={activeView} onViewChange={setView} assets={assets} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
 
       <div style={{ flex: 1, padding: 24, paddingBottom: 80, minWidth: 0, overflow: 'hidden' }}>
+        <MobileMenuBtn />
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { T, isOnline } from './shared'
 
@@ -82,7 +82,7 @@ const INVENTORY_MODULES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function Sidebar({ activeView, onViewChange, assets }) {
+export default function Sidebar({ activeView, onViewChange, assets, mobileOpen, onMobileClose }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeModule  = searchParams.get('module')
@@ -176,7 +176,23 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
   const onlineCount  = assets.filter(isOnline).length
   const offlineCount = assets.length - onlineCount
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  if (isMobile && !mobileOpen) return null
+
   return (
+    <>
+    {isMobile && (
+      <div
+        onClick={onMobileClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 899 }}
+      />
+    )}
     <div className="assets-sidebar" style={{
       width: 210, flexShrink: 0,
       borderRight: `1px solid ${T.border}`,
@@ -187,6 +203,10 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
       scrollbarWidth: 'none',
       msOverflowStyle: 'none',
       boxSizing: 'border-box',
+      ...(isMobile ? {
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        zIndex: 900, minHeight: '100vh', boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
+      } : {}),
     }}>
       <style>{`.assets-sidebar::-webkit-scrollbar{display:none}`}</style>
 
@@ -311,5 +331,6 @@ export default function Sidebar({ activeView, onViewChange, assets }) {
         </span>
       </div>
     </div>
+    </>
   )
 }

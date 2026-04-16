@@ -1064,7 +1064,7 @@ export default function DetailPanel({
   return (
     <div style={{
       position: 'fixed', top: 0, right: 0, bottom: 0,
-      width: 540, background: T.card,
+      width: 'min(540px, 100vw)', background: T.card,
       boxShadow: '-4px 0 30px rgba(0,0,0,0.12)',
       display: 'flex', flexDirection: 'column',
       zIndex: 495, fontFamily: T.font,

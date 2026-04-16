@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import NotificationBell from './NotificationBell'
@@ -52,6 +52,14 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [hovered, setHovered] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -93,24 +101,36 @@ export default function Layout({ children }) {
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
       position: 'relative',
     }}>
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 999,
+          }}
+        />
+      )}
+
       {/* Sidebar - overlays content */}
       <aside
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={() => !isMobile && setHovered(true)}
+        onMouseLeave={() => !isMobile && setHovered(false)}
         style={{
-          position: 'absolute',
+          position: isMobile ? 'fixed' : 'absolute',
           top: 0,
-          left: 0,
+          left: isMobile && !mobileOpen ? -220 : 0,
           bottom: 0,
-          width: hovered ? 220 : 60,
+          width: isMobile ? 220 : hovered ? 220 : 60,
           background: '#0b0f1a',
           borderRight: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'width 0.2s ease',
+          transition: isMobile ? 'left 0.2s ease' : 'width 0.2s ease',
           overflow: 'hidden',
-          zIndex: 100,
-          boxShadow: hovered ? '4px 0 24px rgba(0,0,0,0.4)' : 'none',
+          zIndex: isMobile ? 1000 : 100,
+          boxShadow: (hovered || mobileOpen) ? '4px 0 24px rgba(0,0,0,0.4)' : 'none',
         }}
       >
         {/* Logo */}
@@ -131,11 +151,17 @@ export default function Layout({ children }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0,
           }}>F</div>
-          {hovered && (
-            <div style={{ marginLeft: 10 }}>
+          {(hovered || isMobile) && (
+            <div style={{ marginLeft: 10, flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>Faya IT</div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{user?.company}</div>
             </div>
+          )}
+          {isMobile && (
+            <button
+              onClick={() => setMobileOpen(false)}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 18, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }}
+            >✕</button>
           )}
         </div>
 
@@ -143,7 +169,7 @@ export default function Layout({ children }) {
         <nav className="faya-nav" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {visibleSections.map((section) => (
             <div key={section.section}>
-              {hovered && (
+              {(hovered || isMobile) && (
                 <div style={{
                   fontSize: 9, color: 'rgba(255,255,255,0.2)',
                   letterSpacing: 1.5, textTransform: 'uppercase',
@@ -159,7 +185,7 @@ export default function Layout({ children }) {
                 return (
                   <button
                     key={item.key}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => { navigate(item.path); if (isMobile) setMobileOpen(false) }}
                     title={!hovered ? item.label : undefined}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
@@ -173,10 +199,10 @@ export default function Layout({ children }) {
                     }}
                   >
                     <span style={{ fontSize: 16, flexShrink: 0, width: 20, textAlign: 'center' }}>{item.icon}</span>
-                    {hovered && (
+                    {(hovered || isMobile) && (
                       <span style={{ flex: 1 }}>{item.label}</span>
                     )}
-                    {hovered && locked && (
+                    {(hovered || isMobile) && locked && (
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>🔒</span>
                     )}
                   </button>
@@ -194,11 +220,11 @@ export default function Layout({ children }) {
           overflow: 'hidden', whiteSpace: 'nowrap',
         }}>
           {/* Notification bell row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: hovered ? 'flex-start' : 'center', marginBottom: 6 }}>
-            <NotificationBell hovered={hovered} />
-            {hovered && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>Notifications</span>}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: (hovered || isMobile) ? 'flex-start' : 'center', marginBottom: 6 }}>
+            <NotificationBell hovered={hovered || isMobile} />
+            {(hovered || isMobile) && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>Notifications</span>}
           </div>
-          {hovered ? (
+          {(hovered || isMobile) ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{user?.name}</div>
@@ -223,13 +249,25 @@ export default function Layout({ children }) {
       {/* Main - full width, sidebar overlays it */}
       <main style={{
         flex: 1,
-        marginLeft: 60,
+        marginLeft: isMobile ? 0 : 60,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         background: '#f0f2f5',
         height: '100vh',
       }}>
+        {isMobile && (
+          <button
+            onClick={() => setMobileOpen(true)}
+            style={{
+              position: 'fixed', top: 10, left: 10, zIndex: 998,
+              background: '#0b0f1a', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 20, width: 40, height: 40,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}
+          >☰</button>
+        )}
         {children}
       </main>
     </div>

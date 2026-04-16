@@ -11,7 +11,7 @@ const Overlay = ({ children, onClose }) => (
     <div onClick={e => e.stopPropagation()} style={{
       background: T.card, borderRadius: 14, padding: 24, width: 480,
       boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: T.font,
-      maxHeight: '90vh', overflowY: 'auto',
+      maxHeight: '90vh', overflowY: 'auto', maxWidth: '90vw', boxSizing: 'border-box',
     }}>
       {children}
     </div>

@@ -451,7 +451,13 @@ export const api = {
     fetch(`${BASE}/api/tickets/count`, { headers: headers() }).then(handle),
 
   getActivity: (limit = 10) =>
-    fetch(`${BASE}/api/activity?limit=${limit}`, { headers: headers() }).then(handle),
+    fetch(`${BASE}/api/audit-log?limit=${limit}`, { headers: headers() }).then(handle),
+
+  getAssetsByCategory: () =>
+    fetch(`${BASE}/api/reports/assets/by-category`, { headers: headers() }).then(handle),
+
+  getAssetsByLocation: () =>
+    fetch(`${BASE}/api/reports/assets/by-location`, { headers: headers() }).then(handle),
 }
 
 export default api

@@ -152,8 +152,8 @@ export default function NotificationBell({ hovered }) {
 
       {open && (
         <div style={{
-          position: 'fixed', left: 68, bottom: 60,
-          width: 320, maxHeight: 420,
+          position: 'fixed', right: 8, left: 'auto', bottom: 60,
+          width: 320, maxWidth: 'calc(100vw - 16px)', maxHeight: 420,
           background: T.card, borderRadius: 12,
           border: `1px solid ${T.border}`,
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
