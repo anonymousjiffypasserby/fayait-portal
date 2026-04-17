@@ -48,6 +48,20 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  deactivateUser: (id) =>
+    fetch(`${BASE}/api/users/${id}/deactivate`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({})
+    }).then(handle),
+
+  activateUser: (id) =>
+    fetch(`${BASE}/api/users/${id}/activate`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({})
+    }).then(handle),
+
   updateProfile: (data) =>
     fetch(`${BASE}/api/users/profile/me`, {
       method: 'PUT',

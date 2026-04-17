@@ -126,7 +126,7 @@ export default function Users() {
           </thead>
           <tbody>
             {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}
+              <tr key={u.id} style={{ borderBottom: '0.5px solid rgba(0,0,0,0.05)', opacity: u.active === false ? 0.5 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <td style={{ padding: '12px 16px' }}>
@@ -167,13 +167,42 @@ export default function Users() {
                 </td>
                 <td style={{ padding: '12px 16px' }}>
                   {isAdmin && (
-                    <button onClick={() => openEdit(u)} style={{
-                      background: 'none', border: '0.5px solid rgba(0,0,0,0.15)',
-                      borderRadius: 6, padding: '4px 10px', fontSize: 11,
-                      cursor: 'pointer', color: '#5F5E5A'
-                    }}>
-                      {t('edit')}
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => openEdit(u)} style={{
+                        background: 'none', border: '0.5px solid rgba(0,0,0,0.15)',
+                        borderRadius: 6, padding: '4px 10px', fontSize: 11,
+                        cursor: 'pointer', color: '#5F5E5A'
+                      }}>
+                        {t('edit')}
+                      </button>
+                      {u.active !== false ? (
+                        <button onClick={async () => {
+                          try {
+                            await api.deactivateUser(u.id)
+                            fetchUsers()
+                          } catch (err) { setError(err.message) }
+                        }} style={{
+                          background: 'none', border: '0.5px solid rgba(163,45,45,0.4)',
+                          borderRadius: 6, padding: '4px 10px', fontSize: 11,
+                          cursor: 'pointer', color: '#A32D2D'
+                        }}>
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button onClick={async () => {
+                          try {
+                            await api.activateUser(u.id)
+                            fetchUsers()
+                          } catch (err) { setError(err.message) }
+                        }} style={{
+                          background: 'none', border: '0.5px solid rgba(59,109,17,0.4)',
+                          borderRadius: 6, padding: '4px 10px', fontSize: 11,
+                          cursor: 'pointer', color: '#3B6D11'
+                        }}>
+                          Activate
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
               </tr>

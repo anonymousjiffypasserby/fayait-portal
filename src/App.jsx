@@ -7,6 +7,7 @@ import Assets from './pages/assets'
 import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
+import Users from './pages/Users'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -35,7 +36,7 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/assets/*" element={<Assets />} />
-                <Route path="/users" element={<ServiceFrame service="users" />} />
+                <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
                 <Route path="/billing" element={<ServiceFrame service="billing" />} />
                 <Route path="/profile" element={<ServiceFrame service="profile" />} />
                 <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
