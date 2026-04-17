@@ -1,6 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { T, STATUSES, PRIORITIES, STATUS_COLORS, PRIORITY_COLORS, fmtDate } from './shared'
 import api from '../../services/api'
+
+const fmtSize = (bytes) => {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / 1048576).toFixed(1)}MB`
+}
+
+const fileIcon = (filename) => {
+  const ext = (filename || '').split('.').pop().toLowerCase()
+  if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return '🖼'
+  if (['pdf'].includes(ext)) return '📄'
+  if (['doc','docx'].includes(ext)) return '📝'
+  if (['xls','xlsx','csv'].includes(ext)) return '📊'
+  if (['zip','tar','gz'].includes(ext)) return '📦'
+  return '📎'
+}
 
 const input = {
   width: '100%', padding: '8px 12px', borderRadius: 7,
@@ -19,9 +36,21 @@ export default function TaskModal({ task, projectId, users, onClose, onSaved }) 
     due_date:    task?.due_date ? task.due_date.slice(0, 10) : '',
     subtasks:    task?.subtasks || [],
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [newSubtask, setNewSubtask] = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState('')
+  const [newSubtask, setNewSubtask]   = useState('')
+  const [attachments, setAttachments] = useState([])
+  const [uploading, setUploading]     = useState(false)
+  const [attachError, setAttachError] = useState('')
+  const fileRef = useRef(null)
+
+  useEffect(() => {
+    if (task?.id) {
+      api.getTaskAttachments(projectId, task.id)
+        .then(data => setAttachments(Array.isArray(data) ? data : (data.attachments || [])))
+        .catch(() => {})
+    }
+  }, [task?.id, projectId])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -39,6 +68,34 @@ export default function TaskModal({ task, projectId, users, onClose, onSaved }) 
 
   const removeSubtask = (idx) => {
     set('subtasks', form.subtasks.filter((_, i) => i !== idx))
+  }
+
+  const handleUpload = async (files) => {
+    if (!files?.length || !task?.id) return
+    setUploading(true); setAttachError('')
+    try {
+      for (const file of files) {
+        const fd = new FormData()
+        fd.append('file', file)
+        await api.uploadTaskAttachment(projectId, task.id, fd)
+      }
+      const data = await api.getTaskAttachments(projectId, task.id)
+      setAttachments(Array.isArray(data) ? data : (data.attachments || []))
+    } catch (err) {
+      setAttachError(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDeleteAttachment = async (attachmentId) => {
+    if (!window.confirm('Delete this attachment?')) return
+    try {
+      await api.deleteTaskAttachment(projectId, task.id, attachmentId)
+      setAttachments(prev => prev.filter(a => a.id !== attachmentId))
+    } catch (err) {
+      setAttachError(err.message)
+    }
   }
 
   const handleSave = async () => {
@@ -189,6 +246,76 @@ export default function TaskModal({ task, projectId, users, onClose, onSaved }) 
               </button>
             </div>
           </div>
+
+          {/* Attachments — existing tasks only */}
+          {task?.id && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={label}>Attachments{attachments.length > 0 && ` (${attachments.length})`}</span>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  style={{
+                    fontSize: 11, padding: '3px 10px', borderRadius: 5,
+                    border: `1px solid rgba(0,0,0,0.12)`, background: '#f8fafc',
+                    color: T.navy, cursor: uploading ? 'wait' : 'pointer', fontFamily: T.font,
+                  }}
+                >
+                  {uploading ? 'Uploading…' : '+ Attach'}
+                </button>
+                <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
+                  onChange={e => handleUpload(e.target.files)} />
+              </div>
+
+              {attachError && (
+                <div style={{ background: '#fef2f2', color: T.red, fontSize: 11, padding: '6px 10px', borderRadius: 5, marginBottom: 8 }}>
+                  {attachError}
+                </div>
+              )}
+
+              {attachments.length === 0 ? (
+                <div style={{
+                  border: `1px dashed rgba(0,0,0,0.1)`, borderRadius: 7,
+                  padding: '12px', textAlign: 'center', fontSize: 12, color: T.muted,
+                  cursor: 'pointer',
+                }} onClick={() => fileRef.current?.click()}>
+                  No attachments — click to upload
+                </div>
+              ) : (
+                <div style={{ border: `1px solid rgba(0,0,0,0.08)`, borderRadius: 8, overflow: 'hidden' }}>
+                  {attachments.map((a, idx) => (
+                    <div key={a.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 12px',
+                      borderBottom: idx < attachments.length - 1 ? `1px solid rgba(0,0,0,0.06)` : 'none',
+                      background: idx % 2 === 0 ? '#fafafa' : '#fff',
+                    }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>{fileIcon(a.filename)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: T.navy, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.filename}
+                        </div>
+                        {a.filesize && <div style={{ fontSize: 10, color: T.muted }}>{fmtSize(a.filesize)}</div>}
+                      </div>
+                      <a
+                        href={api.getTaskAttachmentDownloadUrl(projectId, task.id, a.id)}
+                        download={a.filename}
+                        style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', flexShrink: 0 }}
+                      >
+                        ↓
+                      </a>
+                      <button
+                        onClick={() => handleDeleteAttachment(a.id)}
+                        style={{ background: 'none', border: 'none', fontSize: 13, color: T.muted, cursor: 'pointer', flexShrink: 0 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{error}</div>}
 

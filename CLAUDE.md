@@ -27,5 +27,13 @@ The assets API returns flat DB records (not Snipe-IT nested objects). Component 
 - Test user: John / Acme Corp (subdomain: acme)
 - Test device: DESKTOP-6HSJ452 (Lenovo, i5-1235U, 16GB)
 
+## Business Model
+The portal is a SaaS product sold to companies.
+Each module (Assets, Projects, Tickets, People etc.)
+is for the CLIENT COMPANY to use internally.
+Faya IT is the provider — not a participant in
+client workflows. The admin panel is for provisioning
+and billing only, not for viewing client data.
+
 ## Deploy
 git add . && git commit -m "message" && git push origin main

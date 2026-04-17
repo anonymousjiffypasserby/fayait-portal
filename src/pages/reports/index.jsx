@@ -4,6 +4,7 @@ import AssetReports from './AssetReports'
 import FinancialReports from './FinancialReports'
 import MonitoringReports from './MonitoringReports'
 import CustomReport from './CustomReport'
+import ProjectReports from './ProjectReports'
 
 const NAV = [
   {
@@ -39,6 +40,16 @@ const NAV = [
     ],
   },
   {
+    section: 'Projects',
+    items: [
+      { key: 'proj-overview', label: 'Overview' },
+      { key: 'proj-by-dept',  label: 'By Department' },
+      { key: 'proj-by-user',  label: 'By User' },
+      { key: 'proj-overdue',  label: 'Overdue' },
+      { key: 'proj-activity', label: 'Activity' },
+    ],
+  },
+  {
     section: 'Custom',
     items: [
       { key: 'custom', label: 'Custom Report Builder' },
@@ -49,6 +60,7 @@ const NAV = [
 const ASSET_VIEWS     = new Set(['inventory','by-status','by-location','by-department','by-category','warranty-expiring','audit-due','checkout-history','never-checked-in','age'])
 const FINANCIAL_VIEWS = new Set(['depreciation','purchase-cost','maintenance-costs'])
 const MONITORING_VIEWS= new Set(['alert-history','offline-history','software-inventory','pending-updates'])
+const PROJECTS_VIEWS  = new Set(['proj-overview','proj-by-dept','proj-by-user','proj-overdue','proj-activity'])
 
 export default function Reports() {
   const [view, setView] = useState('inventory')
@@ -127,6 +139,7 @@ export default function Reports() {
         {ASSET_VIEWS.has(view)      && <AssetReports view={view} />}
         {FINANCIAL_VIEWS.has(view)  && <FinancialReports view={view} />}
         {MONITORING_VIEWS.has(view) && <MonitoringReports view={view} />}
+        {PROJECTS_VIEWS.has(view)   && <ProjectReports view={view} />}
         {view === 'custom'          && <CustomReport />}
       </div>
     </div>

@@ -9,6 +9,7 @@ import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
 import Users from './pages/users'
+import Admin from './pages/admin'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -42,6 +43,7 @@ function AppRoutes() {
                 <Route path="/profile" element={<ServiceFrame service="profile" />} />
                 <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                 <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+                <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/projects/*" element={<PrivateRoute><Projects /></PrivateRoute>} />
                 {/* iframe services (/tickets /chat /grafana /files /status)

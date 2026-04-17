@@ -48,8 +48,9 @@ const SERVICES = [
     section: 'Admin',
     adminOnly: true,
     items: [
-      { key: 'settings', label: 'Settings', icon: '⚙', path: '/settings', alwaysVisible: true },
-      { key: 'reports',  label: 'Reports',  icon: '📈', path: '/reports',  alwaysVisible: true },
+      { key: 'settings',  label: 'Settings',  icon: '⚙', path: '/settings', alwaysVisible: true },
+      { key: 'reports',   label: 'Reports',   icon: '📈', path: '/reports',  alwaysVisible: true },
+      { key: 'admin',     label: 'Companies', icon: '🏢', path: '/admin',    alwaysVisible: true, superadminOnly: true },
     ]
   },
 ]
@@ -88,6 +89,7 @@ export default function Layout({ children }) {
     return {
       ...section,
       items: section.items.filter(item => {
+        if (item.superadminOnly && user?.role !== 'superadmin') return false
         if (item.alwaysVisible) return true
         if (item.key === 'dashboard') return true
         if (['users', 'billing', 'profile'].includes(item.key)) return true

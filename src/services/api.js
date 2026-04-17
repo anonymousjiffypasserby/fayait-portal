@@ -89,6 +89,16 @@ export const api = {
   getAdminCompanies: () =>
     fetch(`${BASE}/api/admin/companies`, { headers: headers() }).then(handle),
 
+  getAdminCompany: (id) =>
+    fetch(`${BASE}/api/admin/companies/${id}`, { headers: headers() }).then(handle),
+
+  setCompanyService: (id, service, status) =>
+    fetch(`${BASE}/api/admin/companies/${id}/services`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify({ service, status }),
+    }).then(handle),
+
   createCompany: (data) =>
     fetch(`${BASE}/api/admin/companies`, {
       method: 'POST',
@@ -552,6 +562,22 @@ export const api = {
 
   getProjectAttachmentDownloadUrl: (projectId, attachmentId) =>
     `${BASE}/api/projects/${projectId}/attachments/${attachmentId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+
+  getTaskAttachments: (projectId, taskId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments`, { headers: headers() }).then(handle),
+
+  uploadTaskAttachment: (projectId, taskId, formData) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments`, {
+      method: 'POST',
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+      body: formData,
+    }).then(handle),
+
+  deleteTaskAttachment: (projectId, taskId, attachmentId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getTaskAttachmentDownloadUrl: (projectId, taskId, attachmentId) =>
+    `${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
 
   getProjectActivity: (projectId) =>
     fetch(`${BASE}/api/projects/${projectId}/activity`, { headers: headers() }).then(handle),
