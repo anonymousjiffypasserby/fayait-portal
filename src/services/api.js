@@ -489,6 +489,72 @@ export const api = {
 
   getAssetsByLocation: () =>
     fetch(`${BASE}/api/reports/assets/by-location`, { headers: headers() }).then(handle),
+
+  // ── Projects ──────────────────────────────────────────────────────────────────
+
+  getProjects: (query = '') =>
+    fetch(`${BASE}/api/projects${query}`, { headers: headers() }).then(handle),
+
+  getProject: (id) =>
+    fetch(`${BASE}/api/projects/${id}`, { headers: headers() }).then(handle),
+
+  createProject: (data) =>
+    fetch(`${BASE}/api/projects`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateProject: (id, data) =>
+    fetch(`${BASE}/api/projects/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteProject: (id) =>
+    fetch(`${BASE}/api/projects/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  followProject: (id) =>
+    fetch(`${BASE}/api/projects/${id}/follow`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  unfollowProject: (id) =>
+    fetch(`${BASE}/api/projects/${id}/follow`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  signoffProject: (id) =>
+    fetch(`${BASE}/api/projects/${id}/signoff`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }).then(handle),
+
+  getMyTasks: () =>
+    fetch(`${BASE}/api/projects/my-tasks`, { headers: headers() }).then(handle),
+
+  getProjectTasks: (projectId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks`, { headers: headers() }).then(handle),
+
+  createTask: (projectId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateTask: (projectId, taskId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteTask: (projectId, taskId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  reorderTasks: (projectId, orderedIds) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/reorder`, { method: 'PUT', headers: headers(), body: JSON.stringify({ ordered_ids: orderedIds }) }).then(handle),
+
+  getProjectComments: (projectId) =>
+    fetch(`${BASE}/api/projects/${projectId}/comments`, { headers: headers() }).then(handle),
+
+  createComment: (projectId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/comments`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  uploadProjectAttachment: (projectId, formData) =>
+    fetch(`${BASE}/api/projects/${projectId}/attachments`, {
+      method: 'POST',
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+      body: formData,
+    }).then(handle),
+
+  deleteProjectAttachment: (projectId, attachmentId) =>
+    fetch(`${BASE}/api/projects/${projectId}/attachments/${attachmentId}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getProjectAttachmentDownloadUrl: (projectId, attachmentId) =>
+    `${BASE}/api/projects/${projectId}/attachments/${attachmentId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+
+  getProjectActivity: (projectId) =>
+    fetch(`${BASE}/api/projects/${projectId}/activity`, { headers: headers() }).then(handle),
 }
 
 export default api

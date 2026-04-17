@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
 import Assets from './pages/assets'
+import Projects from './pages/projects'
 import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
@@ -42,7 +43,8 @@ function AppRoutes() {
                 <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                 <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
                 <Route path="/notifications" element={<Notifications />} />
-                {/* iframe services (/tickets /chat /grafana /files /projects /status)
+                <Route path="/projects/*" element={<PrivateRoute><Projects /></PrivateRoute>} />
+                {/* iframe services (/tickets /chat /grafana /files /status)
                     are rendered persistently in Layout — no routes needed here */}
               </Routes>
             </Layout>

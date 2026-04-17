@@ -9,7 +9,6 @@ const IFRAME_SERVICES = [
   { key: 'chat',     path: '/chat'     },
   { key: 'grafana',  path: '/grafana'  },
   { key: 'files',    path: '/files'    },
-  { key: 'projects', path: '/projects' },
   { key: 'status',   path: '/status'   },
 ]
 

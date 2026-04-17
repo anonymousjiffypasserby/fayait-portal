@@ -663,6 +663,125 @@ function AlertsWidget({ alerts, loading }) {
   )
 }
 
+// ── My Projects Widget ────────────────────────────────────────────────────────
+const PROJECT_STATUS_COLORS = {
+  todo:        { color: '#64748b', bg: '#f1f5f9', label: 'To Do'       },
+  in_progress: { color: '#2563eb', bg: '#eff6ff', label: 'In Progress' },
+  review:      { color: '#d97706', bg: '#fffbeb', label: 'Review'      },
+  done:        { color: '#16a34a', bg: '#f0fdf4', label: 'Done'        },
+}
+
+function MyProjectsWidget() {
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [min, toggle]           = useWidget('my-projects')
+  const navigate                = useNavigate()
+
+  useEffect(() => {
+    if (min) return
+    api.getProjects('?assigned_to=me&limit=5')
+      .then(data => setProjects((data.rows || data || []).slice(0, 5)))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [min])
+
+  const fmtShort = (d) => {
+    if (!d) return null
+    const dt = new Date(d)
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  return (
+    <WidgetCard
+      title="My Projects"
+      icon="📋"
+      badge={projects.length || null}
+      badgeColor="#6366f1"
+      minimized={min}
+      onToggle={toggle}
+      action={
+        <button
+          onClick={e => { e.stopPropagation(); navigate('/projects') }}
+          style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: T.font }}
+        >
+          View all →
+        </button>
+      }
+    >
+      {loading ? (
+        <div style={{ padding: '16px 20px', fontSize: 12, color: T.muted }}>Loading…</div>
+      ) : projects.length === 0 ? (
+        <div style={{ padding: '16px 20px', fontSize: 12, color: T.muted }}>
+          No active projects.{' '}
+          <span
+            onClick={() => navigate('/projects')}
+            style={{ color: '#6366f1', cursor: 'pointer', fontWeight: 600 }}
+          >
+            Create one →
+          </span>
+        </div>
+      ) : (
+        <div>
+          {projects.map((p, idx) => {
+            const sc = PROJECT_STATUS_COLORS[p.status] || PROJECT_STATUS_COLORS.todo
+            const due = fmtShort(p.due_date)
+            const overdue = p.due_date && p.status !== 'done' && new Date(p.due_date) < new Date()
+            return (
+              <div
+                key={p.id}
+                onClick={() => navigate('/projects')}
+                style={{
+                  padding: '10px 18px',
+                  borderBottom: idx < projects.length - 1 ? `1px solid ${T.border}` : 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#f8f9fc' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <div style={{ width: 3, height: 32, borderRadius: 2, background: p.cover_color || '#6366f1', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.navy, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.title}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+                        background: sc.bg, color: sc.color,
+                      }}>
+                        {sc.label}
+                      </span>
+                      {due && (
+                        <span style={{ fontSize: 10, color: overdue ? T.red : T.muted, fontWeight: overdue ? 600 : 400 }}>
+                          {overdue ? '⚠ ' : ''}{due}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: T.navy }}>{p.progress || 0}%</div>
+                    <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, marginTop: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${p.progress || 0}%`, height: '100%', background: '#6366f1', borderRadius: 2 }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <div style={{ padding: '8px 18px', borderTop: `1px solid ${T.border}`, textAlign: 'center' }}>
+            <button
+              onClick={() => navigate('/projects')}
+              style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: T.font }}
+            >
+              View all projects →
+            </button>
+          </div>
+        </div>
+      )}
+    </WidgetCard>
+  )
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
@@ -879,6 +998,11 @@ export default function Dashboard() {
         {/* Row 4 */}
         <PeopleWidget users={users} />
         <AlertsWidget alerts={alerts} loading={alertsLoading} />
+
+        {/* Row 5 — Projects (only if service active) */}
+        {services.projects === 'active' && (
+          <MyProjectsWidget />
+        )}
 
       </div>
     </div>
