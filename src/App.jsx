@@ -7,7 +7,7 @@ import Assets from './pages/assets'
 import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
-import Users from './pages/Users'
+import Users from './pages/users'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {

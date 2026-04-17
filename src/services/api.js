@@ -48,6 +48,9 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  getUser: (id) =>
+    fetch(`${BASE}/api/users/${id}`, { headers: headers() }).then(handle),
+
   deactivateUser: (id) =>
     fetch(`${BASE}/api/users/${id}/deactivate`, {
       method: 'POST',
@@ -60,6 +63,20 @@ export const api = {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({})
+    }).then(handle),
+
+  resetPassword: (id) =>
+    fetch(`${BASE}/api/users/${id}/reset-password`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({})
+    }).then(handle),
+
+  retryProvisioning: (id, tempPassword) =>
+    fetch(`${BASE}/api/users/${id}/provision/retry`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ tempPassword })
     }).then(handle),
 
   updateProfile: (data) =>
