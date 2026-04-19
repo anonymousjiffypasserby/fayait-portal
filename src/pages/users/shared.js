@@ -38,12 +38,14 @@ export const PROVISION_SERVICE_MAP = {
   chat:    'matrix',
   assets:  'snipe',
   tickets: 'zammad',
+  hr:      'hr',
 }
 
 export const PROVISION_LABELS = {
   matrix: 'Matrix',
   snipe:  'Snipe-IT',
   zammad: 'Zammad',
+  hr:     'HR',
 }
 
 export const STATUS_COLORS = {

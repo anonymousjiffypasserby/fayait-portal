@@ -782,6 +782,96 @@ function MyProjectsWidget() {
   )
 }
 
+// ── HR Summary Widget ─────────────────────────────────────────────────────────
+const HR_BASE = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
+const hrGet = (path) => fetch(`${HR_BASE}/api/hr${path}`, {
+  headers: { Authorization: `Bearer ${localStorage.getItem('faya_token') || ''}` }
+}).then(r => r.json()).catch(() => null)
+
+function HRWidget() {
+  const [min, toggle]   = useWidget('hr-summary')
+  const navigate        = useNavigate()
+  const { user }        = useAuth()
+  const [data, setData] = useState({ pendingLeave: null, pendingTs: null, schedulePublished: null, clockedIn: null })
+
+  useEffect(() => {
+    if (!['admin','superadmin'].includes(user?.role)) return
+    Promise.allSettled([
+      hrGet('/leave/requests?status=pending'),
+      hrGet('/timesheets?status=submitted'),
+      hrGet(`/schedules?week_start=${isoMonday(new Date().toISOString().slice(0, 10))}`),
+      hrGet('/clocked-in-count'),
+    ]).then(([lr, ts, sched, clocked]) => {
+      const pendingLeave = lr.value ? (Array.isArray(lr.value) ? lr.value.length : (lr.value?.total || 0)) : 0
+      const pendingTs    = ts.value ? (Array.isArray(ts.value) ? ts.value.length : (ts.value?.total || 0)) : 0
+      const schedulePublished = sched.value?.published ?? null
+      const clockedIn = clocked.value?.count ?? null
+      setData({ pendingLeave, pendingTs, schedulePublished, clockedIn })
+    })
+  }, [user])
+
+  const isoMonday = (d) => {
+    const dt = new Date(d + 'T00:00:00Z')
+    const day = dt.getUTCDay()
+    dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day))
+    return dt.toISOString().slice(0, 10)
+  }
+
+  const isAdmin = ['admin','superadmin'].includes(user?.role)
+
+  return (
+    <WidgetCard title="HR" icon="👔" minimized={min} onToggle={toggle}
+      action={
+        <button onClick={() => navigate('/hr')} style={{
+          fontSize: 11, background: 'none', border: 'none', color: '#ff6b35',
+          cursor: 'pointer', fontWeight: 600, fontFamily: T.font,
+        }}>
+          Open HR →
+        </button>
+      }
+    >
+      <div style={{ padding: '14px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+        {isAdmin && (
+          <>
+            <HRStat label="Pending Leave" value={data.pendingLeave} icon="🌴" onClick={() => navigate('/hr')} alert={data.pendingLeave > 0} />
+            <HRStat label="Pending Timesheets" value={data.pendingTs} icon="⏱" onClick={() => navigate('/hr')} alert={data.pendingTs > 0} />
+            <HRStat
+              label="This Week Schedule"
+              value={data.schedulePublished === null ? '—' : data.schedulePublished ? 'Published' : 'Unpublished'}
+              icon="📅"
+              onClick={() => navigate('/hr')}
+              alert={data.schedulePublished === false}
+            />
+            <HRStat label="Clocked In" value={data.clockedIn ?? '—'} icon="🟢" onClick={() => navigate('/hr')} />
+          </>
+        )}
+        {!isAdmin && (
+          <HRStat label="My Leave" value="View" icon="🌴" onClick={() => navigate('/hr')} />
+        )}
+      </div>
+    </WidgetCard>
+  )
+}
+
+function HRStat({ label, value, icon, onClick, alert }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: alert ? '#fff8f5' : '#f8f9fa', borderRadius: 8, padding: '12px 14px',
+        border: `1px solid ${alert ? '#fed7aa' : 'rgba(0,0,0,0.06)'}`,
+        cursor: 'pointer', textAlign: 'center',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = alert ? '#fff0e6' : '#f0f2f5' }}
+      onMouseLeave={e => { e.currentTarget.style.background = alert ? '#fff8f5' : '#f8f9fa' }}
+    >
+      <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: alert ? T.orange : T.navy }}>{value ?? '…'}</div>
+      <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{label}</div>
+    </div>
+  )
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
@@ -1002,6 +1092,11 @@ export default function Dashboard() {
         {/* Row 5 — Projects (only if service active) */}
         {services.projects === 'active' && (
           <MyProjectsWidget />
+        )}
+
+        {/* Row 6 — HR summary (only if service active) */}
+        {services.hr === 'active' && (
+          <HRWidget />
         )}
 
       </div>

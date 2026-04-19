@@ -16,14 +16,42 @@ const SEVERITY_ICON = {
 }
 
 const resourceUrl = (type, id) => {
-  if (!type || !id) return null
+  if (!type) return null
   switch (type) {
+    // Asset types
     case 'asset':       return `/assets?open=${id}`
     case 'accessory':   return `/assets?module=accessories`
     case 'consumable':  return `/assets?module=consumables`
     case 'component':   return `/assets?module=components`
     case 'request':     return `/assets?module=requests`
-    default:            return null
+    // HR types
+    case 'leave':
+    case 'leave_reminder':
+    case 'leave_requested':
+    case 'leave_approved':
+    case 'leave_denied':
+    case 'timesheet':
+    case 'timesheet_submitted':
+    case 'timesheet_approved':
+    case 'timesheet_rejected':
+    case 'payslip_ready':
+    case 'shift_swap_requested':
+    case 'shift_swap_approved':
+    case 'schedule_published':
+    case 'schedule_reminder':
+    case 'goal_set':
+    case 'review_completed':
+    case 'review_due':
+    case 'contract_expiring':
+    case 'document_expiring':
+    case 'employee':
+    case 'goal':
+    case 'review':
+    case 'document':
+    case 'schedule':
+      return '/hr'
+    default:
+      return null
   }
 }
 

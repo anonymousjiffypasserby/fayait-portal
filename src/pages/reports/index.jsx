@@ -5,6 +5,7 @@ import FinancialReports from './FinancialReports'
 import MonitoringReports from './MonitoringReports'
 import CustomReport from './CustomReport'
 import ProjectReports from './ProjectReports'
+import HRReports from './HRReports'
 
 const NAV = [
   {
@@ -50,6 +51,18 @@ const NAV = [
     ],
   },
   {
+    section: 'HR',
+    items: [
+      { key: 'hr-payroll',   label: 'Payroll Summary' },
+      { key: 'hr-hours',     label: 'Hours Worked' },
+      { key: 'hr-leave-bal', label: 'Leave Balances' },
+      { key: 'hr-leave-use', label: 'Leave Usage' },
+      { key: 'hr-overtime',  label: 'Overtime' },
+      { key: 'hr-headcount', label: 'Headcount' },
+      { key: 'hr-schedule',  label: 'Schedule Coverage' },
+    ],
+  },
+  {
     section: 'Custom',
     items: [
       { key: 'custom', label: 'Custom Report Builder' },
@@ -61,6 +74,7 @@ const ASSET_VIEWS     = new Set(['inventory','by-status','by-location','by-depar
 const FINANCIAL_VIEWS = new Set(['depreciation','purchase-cost','maintenance-costs'])
 const MONITORING_VIEWS= new Set(['alert-history','offline-history','software-inventory','pending-updates'])
 const PROJECTS_VIEWS  = new Set(['proj-overview','proj-by-dept','proj-by-user','proj-overdue','proj-activity'])
+const HR_VIEWS        = new Set(['hr-payroll','hr-hours','hr-leave-bal','hr-leave-use','hr-overtime','hr-headcount','hr-schedule'])
 
 export default function Reports() {
   const [view, setView] = useState('inventory')
@@ -140,6 +154,7 @@ export default function Reports() {
         {FINANCIAL_VIEWS.has(view)  && <FinancialReports view={view} />}
         {MONITORING_VIEWS.has(view) && <MonitoringReports view={view} />}
         {PROJECTS_VIEWS.has(view)   && <ProjectReports view={view} />}
+        {HR_VIEWS.has(view)         && <HRReports view={view} />}
         {view === 'custom'          && <CustomReport />}
       </div>
     </div>

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import ServiceFrame from './pages/ServiceFrame'
 import Assets from './pages/assets'
 import Projects from './pages/projects'
+import HR from './pages/hr'
 import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
@@ -16,6 +17,14 @@ function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return null
   return user ? children : <Navigate to="/login" />
+}
+
+function HRRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" />
+  if (user.services?.hr !== 'active') return <Navigate to="/" />
+  return children
 }
 
 function AdminRoute({ children }) {
@@ -46,6 +55,7 @@ function AppRoutes() {
                 <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/projects/*" element={<PrivateRoute><Projects /></PrivateRoute>} />
+                <Route path="/hr/*" element={<HRRoute><HR /></HRRoute>} />
                 {/* iframe services (/tickets /chat /grafana /files /status)
                     are rendered persistently in Layout — no routes needed here */}
               </Routes>
