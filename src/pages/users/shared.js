@@ -9,6 +9,17 @@ export const T = {
 }
 
 export const ADMIN_ROLES = ['admin', 'superadmin']
+export const DEPT_HEAD_ROLES = ['dept_head', 'manager', 'admin', 'superadmin']
+export const ALL_MANAGED_ROLES = ['staff', 'dept_head', 'admin', 'superadmin']
+
+export const ROLE_LABELS = {
+  staff:      'User',
+  dept_head:  'Dept Head',
+  admin:      'Admin',
+  superadmin: 'Super Admin',
+}
+
+export const CONTRACT_TYPES = ['Full Time', 'Part Time', 'Freelance']
 
 // Map service key → display label
 export const SERVICE_LABELS = {

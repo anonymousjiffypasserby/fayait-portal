@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import LocationsTab from './LocationsTab'
-import DepartmentsTab from './DepartmentsTab'
 import ManufacturersTab from './ManufacturersTab'
 import ModelsTab from './ModelsTab'
 import SuppliersTab from './SuppliersTab'
@@ -10,7 +9,6 @@ import CategoriesTab from './CategoriesTab'
 
 const TABS = [
   { key: 'locations',     label: 'Locations' },
-  { key: 'departments',   label: 'Departments' },
   { key: 'manufacturers', label: 'Manufacturers' },
   { key: 'models',        label: 'Models' },
   { key: 'suppliers',     label: 'Suppliers' },
@@ -19,7 +17,6 @@ const TABS = [
 
 const TAB_COMPONENTS = {
   locations:     LocationsTab,
-  departments:   DepartmentsTab,
   manufacturers: ManufacturersTab,
   models:        ModelsTab,
   suppliers:     SuppliersTab,

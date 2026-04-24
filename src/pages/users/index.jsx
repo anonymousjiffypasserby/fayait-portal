@@ -1,200 +1,247 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import Sidebar from './Sidebar'
 import UsersTable from './UsersTable'
 import AddUserModal from './AddUserModal'
 import EditUserModal from './EditUserModal'
 import ResultModal from './ResultModal'
-import { T, ADMIN_ROLES, getStatus } from './shared'
+import MyProfile from './views/MyProfile'
+import DepartmentsView from './views/DepartmentsView'
+import OrgChart from './views/OrgChart'
+import JobFunctionsView from './views/JobFunctionsView'
+import RolesPermissions from './views/RolesPermissions'
+import ImportUsers from './views/ImportUsers'
+import ActivityLog from './views/ActivityLog'
+import { T, ADMIN_ROLES, DEPT_HEAD_ROLES, getStatus } from './shared'
 
-const NAV = [
-  { key: 'all',      label: 'All Users' },
-  { key: 'active',   label: 'Active' },
-  { key: 'inactive', label: 'Inactive' },
-  { key: 'invited',  label: 'Invited' },
-  { key: 'admins',   label: 'Admins' },
-]
+const PEOPLE_VIEWS = new Set(['all', 'active', 'inactive', 'invited', 'deptHeads', 'admins'])
 
-function filterUsers(users, tab) {
-  switch (tab) {
-    case 'active':   return users.filter(u => getStatus(u) === 'active')
-    case 'inactive': return users.filter(u => getStatus(u) === 'inactive')
-    case 'invited':  return users.filter(u => getStatus(u) === 'invited')
-    case 'admins':   return users.filter(u => ['admin', 'superadmin'].includes(u.role))
-    default:         return users
+const PEOPLE_TITLES = {
+  all: 'All Users', active: 'Active', inactive: 'Inactive',
+  invited: 'Invited', deptHeads: 'Dept Heads', admins: 'Admins',
+}
+
+function filterUsers(users, view) {
+  switch (view) {
+    case 'active':    return users.filter(u => getStatus(u) === 'active')
+    case 'inactive':  return users.filter(u => getStatus(u) === 'inactive')
+    case 'invited':   return users.filter(u => getStatus(u) === 'invited')
+    case 'deptHeads': return users.filter(u => u.role === 'dept_head')
+    case 'admins':    return users.filter(u => ADMIN_ROLES.includes(u.role))
+    default:          return users
   }
 }
 
-function StatCard({ label, value, accent }) {
-  return (
-    <div style={{
-      background: '#fff', borderRadius: 10, border: `1px solid ${T.border}`,
-      padding: '14px 20px', minWidth: 100,
-    }}>
-      <div style={{ fontSize: 22, fontWeight: 700, color: accent || T.navy }}>{value}</div>
-      <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{label}</div>
-    </div>
-  )
-}
-
 export default function Users() {
-  const { user: me } = useAuth()
+  const { user: authMe } = useAuth()
+  const isAdmin       = ADMIN_ROLES.includes(authMe?.role)
+  const canManage     = DEPT_HEAD_ROLES.includes(authMe?.role)
 
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [tab, setTab] = useState('all')
-  const [selected, setSelected] = useState(new Set())
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
-
-  const [showAdd, setShowAdd] = useState(false)
-  const [editUser, setEditUser] = useState(null)
-  const [resultData, setResultData] = useState(null) // { userId, tempPassword, provisioningStatus }
-  const [toast, setToast] = useState(null)
-
+  const [view, setView]                   = useState(canManage ? 'all' : 'myprofile')
+  const [users, setUsers]                 = useState([])
+  const [myProfile, setMyProfile]         = useState(null)
+  const [companyConfig, setCompanyConfig] = useState(null)
+  const [loading, setLoading]             = useState(true)
+  const [selected, setSelected]           = useState(new Set())
+  const [showAdd, setShowAdd]             = useState(false)
+  const [editUser, setEditUser]           = useState(null)
+  const [resultData, setResultData]       = useState(null)
+  const [toast, setToast]                 = useState(null)
   const [activeServices, setActiveServices] = useState(new Set())
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth <= 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-
-  useEffect(() => {
-    if (me?.services) {
-      setActiveServices(new Set(
-        Object.entries(me.services)
-          .filter(([, v]) => v === 'active')
-          .map(([k]) => k)
-      ))
-    }
-  }, [me])
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
   }
 
-  const fetchUsers = useCallback(async () => {
+  // ── Data fetching ────────────────────────────────────────────────────────────
+
+  const fetchUsers = async () => {
     try {
       const data = await api.getUsers()
-      setUsers(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchUsers() }, [fetchUsers])
-
-  if (!ADMIN_ROLES.includes(me?.role)) return <Navigate to="/" replace />
-
-  const filtered = filterUsers(users, tab)
-
-  const handleSelect = (id, checked) => {
-    setSelected(s => {
-      const next = new Set(s)
-      checked ? next.add(id) : next.delete(id)
-      return next
-    })
-  }
-
-  const handleSelectAll = (checked) => {
-    setSelected(checked ? new Set(filtered.map(u => u.id)) : new Set())
-  }
-
-  const handleToggleActive = async (u) => {
-    try {
-      if (u.active !== false) {
-        await api.deactivateUser(u.id)
-      } else {
-        await api.activateUser(u.id)
-      }
-      fetchUsers()
-      showToast(`${u.name} ${u.active !== false ? 'deactivated' : 'activated'}`)
+      setUsers(Array.isArray(data) ? data : [])
+      const self = Array.isArray(data) ? data.find(u => u.id === authMe?.id) : null
+      if (self) setMyProfile(self)
     } catch (err) {
       showToast(err.message, 'error')
     }
+  }
+
+  const fetchMyProfile = async () => {
+    try {
+      const data = await api.getUser(authMe?.id)
+      setMyProfile(data)
+    } catch {}
+  }
+
+  const fetchConfig = async () => {
+    try {
+      const data = await api.getCompanyConfig()
+      setCompanyConfig(data)
+      if (data?.services) {
+        setActiveServices(new Set(
+          Object.entries(data.services)
+            .filter(([, s]) => s?.status === 'active')
+            .map(([k]) => k)
+        ))
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true)
+      await Promise.all([
+        canManage ? fetchUsers() : fetchMyProfile(),
+        fetchConfig(),
+      ])
+      setLoading(false)
+    }
+    init()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── User management handlers ─────────────────────────────────────────────────
+
+  const handleViewChange = (v) => { setView(v); setSelected(new Set()) }
+
+  const handleSelect    = (id, checked) => setSelected(s => { const n = new Set(s); checked ? n.add(id) : n.delete(id); return n })
+  const handleSelectAll = (checked)     => setSelected(checked ? new Set(filterUsers(users, view).map(u => u.id)) : new Set())
+
+  const handleToggleActive = async (u) => {
+    try {
+      u.active !== false ? await api.deactivateUser(u.id) : await api.activateUser(u.id)
+      fetchUsers()
+      showToast(`${u.name} ${u.active !== false ? 'deactivated' : 'activated'}`)
+    } catch (err) { showToast(err.message, 'error') }
   }
 
   const handleResetPassword = async (u) => {
     if (!window.confirm(`Reset password for ${u.name}?`)) return
     try {
       const result = await api.resetPassword(u.id)
-      setResultData({
-        userId: u.id,
-        tempPassword: result.tempPassword,
-        provisioningStatus: u.provisioning_status || {},
-        hideProvisioning: true,
-      })
-    } catch (err) {
-      showToast(err.message, 'error')
-    }
+      setResultData({ userId: u.id, tempPassword: result.tempPassword, provisioningStatus: u.provisioning_status || {}, hideProvisioning: true })
+    } catch (err) { showToast(err.message, 'error') }
   }
 
   const handleBulkDeactivate = async () => {
-    const targets = [...selected]
-    for (const id of targets) {
-      try { await api.deactivateUser(id) } catch {}
-    }
-    setSelected(new Set())
-    fetchUsers()
-    showToast(`${targets.length} users deactivated`)
+    const ids = [...selected]
+    for (const id of ids) { try { await api.deactivateUser(id) } catch {} }
+    setSelected(new Set()); fetchUsers(); showToast(`${ids.length} users deactivated`)
   }
 
   const handleBulkActivate = async () => {
-    const targets = [...selected]
-    for (const id of targets) {
-      try { await api.activateUser(id) } catch {}
-    }
-    setSelected(new Set())
-    fetchUsers()
-    showToast(`${targets.length} users activated`)
+    const ids = [...selected]
+    for (const id of ids) { try { await api.activateUser(id) } catch {} }
+    setSelected(new Set()); fetchUsers(); showToast(`${ids.length} users activated`)
   }
 
   const handleBulkResetPassword = async () => {
-    const targets = filtered.filter(u => selected.has(u.id))
+    const targets = filterUsers(users, view).filter(u => selected.has(u.id))
     const rows = []
     for (const u of targets) {
-      try {
-        const r = await api.resetPassword(u.id)
-        rows.push(`${u.name},${u.email},${r.tempPassword}`)
-      } catch {}
+      try { const r = await api.resetPassword(u.id); rows.push(`${u.name},${u.email},${r.tempPassword}`) } catch {}
     }
-    const csv = ['Name,Email,TempPassword', ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
+    const blob = new Blob([['Name,Email,TempPassword', ...rows].join('\n')], { type: 'text/csv' })
     const a = document.createElement('a')
-    a.href = url
-    a.download = 'reset_passwords.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-    setSelected(new Set())
-    showToast(`Passwords reset for ${rows.length} users`)
+    a.href = URL.createObjectURL(blob); a.download = 'reset_passwords.csv'; a.click()
+    URL.revokeObjectURL(a.href)
+    setSelected(new Set()); showToast(`Passwords reset for ${rows.length} users`)
   }
 
   const handleCreated = (result) => {
-    setShowAdd(false)
-    fetchUsers()
-    setResultData({
-      userId: result.user?.id || result.id,
-      tempPassword: result.tempPassword,
-      provisioningStatus: result.provisioningStatus || {},
-    })
+    setShowAdd(false); fetchUsers()
+    setResultData({ userId: result.user?.id || result.id, tempPassword: result.tempPassword, provisioningStatus: result.provisioningStatus || {} })
   }
 
-  const stats = {
-    total:    users.length,
-    active:   users.filter(u => getStatus(u) === 'active').length,
-    inactive: users.filter(u => getStatus(u) === 'inactive').length,
-    invited:  users.filter(u => getStatus(u) === 'invited').length,
-    admins:   users.filter(u => ['admin', 'superadmin'].includes(u.role)).length,
+  // ── Counts for sidebar badges ─────────────────────────────────────────────────
+
+  const counts = {
+    all:       users.length,
+    active:    users.filter(u => getStatus(u) === 'active').length,
+    inactive:  users.filter(u => getStatus(u) === 'inactive').length,
+    invited:   users.filter(u => getStatus(u) === 'invited').length,
+    deptHeads: users.filter(u => u.role === 'dept_head').length,
+    admins:    users.filter(u => ADMIN_ROLES.includes(u.role)).length,
+  }
+
+  // ── View renderer ────────────────────────────────────────────────────────────
+
+  const renderContent = () => {
+    if (view === 'myprofile') {
+      if (loading && !myProfile) {
+        return <div style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>Loading…</div>
+      }
+      return (
+        <MyProfile
+          me={myProfile || authMe}
+          onUpdated={canManage ? fetchUsers : fetchMyProfile}
+        />
+      )
+    }
+
+    if (PEOPLE_VIEWS.has(view)) {
+      const base = filterUsers(users, view)
+      const filtered = authMe?.role === 'dept_head'
+        ? base.filter(u => u.department === authMe.department)
+        : base
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 12px', flexShrink: 0 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 600, color: T.navy, margin: 0 }}>
+              {PEOPLE_TITLES[view]}
+            </h1>
+            {isAdmin && (
+              <button
+                onClick={() => setShowAdd(true)}
+                style={{ background: T.orange, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: T.font }}
+              >
+                + Add User
+              </button>
+            )}
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', margin: '0 24px 24px', background: '#fff', borderRadius: 10, border: `1px solid ${T.border}` }}>
+            {loading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>Loading…</div>
+            ) : (
+              <UsersTable
+                users={filtered}
+                selected={selected}
+                onSelect={handleSelect}
+                onSelectAll={handleSelectAll}
+                onEdit={u => setEditUser(u)}
+                onToggleActive={handleToggleActive}
+                onResetPassword={handleResetPassword}
+                onBulkDeactivate={handleBulkDeactivate}
+                onBulkActivate={handleBulkActivate}
+                onBulkResetPassword={handleBulkResetPassword}
+              />
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    switch (view) {
+      case 'departments':
+        return <DepartmentsView showToast={showToast} />
+      case 'orgchart':
+        return <OrgChart me={authMe} companyConfig={companyConfig} onConfigUpdate={fetchConfig} />
+      case 'jobfunctions':
+        return <JobFunctionsView showToast={showToast} />
+      case 'roles':
+        return <RolesPermissions />
+      case 'import':
+        return <ImportUsers showToast={showToast} />
+      case 'activitylog':
+        return <ActivityLog me={authMe} />
+      default:
+        return null
+    }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100%', overflow: 'hidden', fontFamily: T.font }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', fontFamily: T.font }}>
       {toast && (
         <div style={{
           position: 'fixed', top: 20, right: 24, zIndex: 9999,
@@ -206,94 +253,10 @@ export default function Users() {
         </div>
       )}
 
-      {/* Sub-nav */}
-      {isMobile ? (
-        <div style={{ padding: '12px 16px', background: '#fff', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
-          <select
-            value={tab}
-            onChange={e => { setTab(e.target.value); setSelected(new Set()) }}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, background: '#fff', fontFamily: T.font }}
-          >
-            {NAV.map(n => <option key={n.key} value={n.key}>{n.label}</option>)}
-          </select>
-        </div>
-      ) : (
-        <aside style={{ width: 200, flexShrink: 0, background: '#fff', borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', paddingTop: 24 }}>
-          <div style={{ padding: '0 20px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, textTransform: 'uppercase' }}>
-            People
-          </div>
-          {NAV.map(n => (
-            <button
-              key={n.key}
-              onClick={() => { setTab(n.key); setSelected(new Set()) }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%', textAlign: 'left',
-                padding: '9px 20px', border: 'none',
-                background: tab === n.key ? '#fff7f4' : 'transparent',
-                borderLeft: tab === n.key ? `3px solid ${T.orange}` : '3px solid transparent',
-                color: tab === n.key ? T.orange : '#374151',
-                fontSize: 13, fontWeight: tab === n.key ? 600 : 400, cursor: 'pointer',
-              }}
-            >
-              <span>{n.label}</span>
-              <span style={{ fontSize: 11, color: tab === n.key ? T.orange : T.muted, background: tab === n.key ? '#ffe8dc' : '#f3f4f6', borderRadius: 10, padding: '1px 6px' }}>
-                {filterUsers(users, n.key).length}
-              </span>
-            </button>
-          ))}
-        </aside>
-      )}
+      <Sidebar view={view} setView={handleViewChange} userRole={authMe?.role} counts={counts} />
 
-      {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', background: T.bg, display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px 0', flexWrap: 'wrap', gap: 12,
-        }}>
-          <h1 style={{ fontSize: 18, fontWeight: 600, color: T.navy, margin: 0 }}>People</h1>
-          <button
-            onClick={() => setShowAdd(true)}
-            style={{
-              background: T.orange, color: '#fff', border: 'none',
-              borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            }}
-          >
-            + Add User
-          </button>
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display: 'flex', gap: 12, padding: '16px 24px', flexWrap: 'wrap' }}>
-          <StatCard label="Total" value={stats.total} />
-          <StatCard label="Active" value={stats.active} accent="#3B6D11" />
-          <StatCard label="Inactive" value={stats.inactive} accent="#A32D2D" />
-          <StatCard label="Invited" value={stats.invited} accent="#92400E" />
-          <StatCard label="Admins" value={stats.admins} accent="#4338CA" />
-        </div>
-
-        {/* Table card */}
-        <div style={{ margin: '0 24px 24px', background: '#fff', borderRadius: 10, border: `1px solid ${T.border}`, overflow: 'hidden', flex: 1 }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>Loading…</div>
-          ) : error ? (
-            <div style={{ padding: 24, color: '#A32D2D', fontSize: 13 }}>{error}</div>
-          ) : (
-            <UsersTable
-              users={filtered}
-              selected={selected}
-              onSelect={handleSelect}
-              onSelectAll={handleSelectAll}
-              onEdit={u => setEditUser(u)}
-              onToggleActive={handleToggleActive}
-              onResetPassword={handleResetPassword}
-              onBulkDeactivate={handleBulkDeactivate}
-              onBulkActivate={handleBulkActivate}
-              onBulkResetPassword={handleBulkResetPassword}
-            />
-          )}
-        </div>
+      <div style={{ flex: 1, overflow: 'auto', background: T.bg }}>
+        {renderContent()}
       </div>
 
       {showAdd && (
@@ -303,7 +266,6 @@ export default function Users() {
           onCreated={handleCreated}
         />
       )}
-
       {editUser && (
         <EditUserModal
           user={editUser}
@@ -312,7 +274,6 @@ export default function Users() {
           onSaved={() => { setEditUser(null); fetchUsers(); showToast('User updated') }}
         />
       )}
-
       {resultData && (
         <ResultModal
           userId={resultData.userId}

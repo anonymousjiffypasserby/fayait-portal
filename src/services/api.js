@@ -86,6 +86,23 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handle),
 
+  importUsers: (rows) =>
+    fetch(`${BASE}/api/users/import`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ rows })
+    }).then(handle),
+
+  getUserActivity: (id) =>
+    fetch(`${BASE}/api/users/${id}/activity`, { headers: headers() }).then(handle),
+
+  updateCompanySettings: (data) =>
+    fetch(`${BASE}/api/companies/settings`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify(data)
+    }).then(handle),
+
   getAdminCompanies: () =>
     fetch(`${BASE}/api/admin/companies`, { headers: headers() }).then(handle),
 

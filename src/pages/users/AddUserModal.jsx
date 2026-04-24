@@ -95,6 +95,7 @@ export default function AddUserModal({ activeServices, onClose, onCreated }) {
               <label style={label}>Role</label>
               <select style={{ ...input }} value={form.role} onChange={e => set('role', e.target.value)}>
                 <option value="staff">User</option>
+                <option value="dept_head">Dept Head</option>
                 <option value="admin">Admin</option>
               </select>
             </div>

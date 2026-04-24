@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { hrApi } from '../hr/shared'
 import ProvisioningBadge from './ProvisioningBadge'
-import { T, SERVICE_LABELS, SERVICE_ACCESS_LEVELS, PROVISION_SERVICE_MAP, btn } from './shared'
+import { T, SERVICE_LABELS, SERVICE_ACCESS_LEVELS, PROVISION_SERVICE_MAP, CONTRACT_TYPES, btn } from './shared'
 
 const label = { fontSize: 12, color: T.muted, display: 'block', marginBottom: 5, fontWeight: 500 }
 const input = {
@@ -12,10 +13,21 @@ const input = {
 
 export default function EditUserModal({ user, activeServices, onClose, onSaved }) {
   const [departments, setDepartments] = useState([])
+  const [allUsers, setAllUsers] = useState([])
+  const [jobFunctions, setJobFunctions] = useState([])
+
   const [form, setForm] = useState({
-    name: user.name || '',
-    role: user.role || 'staff',
-    department: user.department || '',
+    name:            user.name || '',
+    role:            user.role || 'staff',
+    department:      user.department || '',
+    job_title:       user.job_title || '',
+    manager_id:      user.manager_id || '',
+    employee_number: user.employee_number || '',
+    phone:           user.phone || '',
+    contract_type:   user.contract_type || '',
+    start_date:      user.start_date ? user.start_date.slice(0, 10) : '',
+    end_date:        user.end_date ? user.end_date.slice(0, 10) : '',
+    job_function_id: user.job_function_id || '',
     access: Object.fromEntries(
       [...activeServices].map(s => [
         s,
@@ -23,6 +35,7 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
       ])
     ),
   })
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [retrying, setRetrying] = useState({})
@@ -31,7 +44,15 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
   const [showRetryPw, setShowRetryPw] = useState(false)
 
   useEffect(() => {
-    api.getDepartments().then(setDepartments).catch(() => {})
+    Promise.all([
+      api.getDepartments(),
+      api.getUsers(),
+      hrApi.getJobFunctions(),
+    ]).then(([d, u, jf]) => {
+      setDepartments(d)
+      setAllUsers(u.filter(u => u.id !== user.id))
+      setJobFunctions(Array.isArray(jf) ? jf : [])
+    }).catch(() => {})
   }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -43,7 +64,20 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
     setError('')
     try {
       const access = Object.entries(form.access).map(([service, level]) => ({ service, level }))
-      await api.updateUser(user.id, { name: form.name, role: form.role, department: form.department || null, access })
+      await api.updateUser(user.id, {
+        name:            form.name,
+        role:            form.role,
+        department:      form.department || null,
+        job_title:       form.job_title || null,
+        manager_id:      form.manager_id || null,
+        employee_number: form.employee_number || null,
+        phone:           form.phone || null,
+        contract_type:   form.contract_type || null,
+        start_date:      form.start_date || null,
+        end_date:        form.end_date || null,
+        job_function_id: form.job_function_id || null,
+        access,
+      })
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -70,13 +104,10 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
-      }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
     >
       <div onClick={e => e.stopPropagation()} style={{
-        background: '#fff', borderRadius: 12, width: 540, maxWidth: '95vw',
+        background: '#fff', borderRadius: 12, width: 580, maxWidth: '95vw',
         maxHeight: '92vh', overflow: 'auto',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
       }}>
@@ -90,6 +121,8 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
         </div>
 
         <div style={{ padding: '20px 24px' }}>
+
+          {/* Basic */}
           <div style={{ marginBottom: 14 }}>
             <label style={label}>Full Name</label>
             <input style={input} value={form.name} onChange={e => set('name', e.target.value)} />
@@ -100,6 +133,7 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
               <label style={label}>Role</label>
               <select style={{ ...input }} value={form.role} onChange={e => set('role', e.target.value)}>
                 <option value="staff">User</option>
+                <option value="dept_head">Dept Head</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -112,6 +146,62 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
             </div>
           </div>
 
+          {/* HR fields */}
+          <div style={{ marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, textTransform: 'uppercase' }}>Employment</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={label}>Job Title</label>
+              <input style={input} value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder="e.g. Software Engineer" />
+            </div>
+            <div>
+              <label style={label}>Manager</label>
+              <select style={{ ...input }} value={form.manager_id} onChange={e => set('manager_id', e.target.value)}>
+                <option value="">— None —</option>
+                {allUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={label}>Employee Number</label>
+              <input style={input} value={form.employee_number} onChange={e => set('employee_number', e.target.value)} placeholder="EMP-001" />
+            </div>
+            <div>
+              <label style={label}>Phone</label>
+              <input style={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+597 000 0000" />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={label}>Contract Type</label>
+              <select style={{ ...input }} value={form.contract_type} onChange={e => set('contract_type', e.target.value)}>
+                <option value="">— None —</option>
+                {CONTRACT_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={label}>Job Function</label>
+              <select style={{ ...input }} value={form.job_function_id} onChange={e => set('job_function_id', e.target.value)}>
+                <option value="">— None —</option>
+                {jobFunctions.map(jf => <option key={jf.id} value={jf.id}>{jf.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={label}>Start Date</label>
+              <input style={input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
+            </div>
+            <div>
+              <label style={label}>End Date (optional)</label>
+              <input style={input} type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Service access */}
           {activeServices.size > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ ...label, marginBottom: 8 }}>Service Access</div>
@@ -152,6 +242,7 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
             </div>
           )}
 
+          {/* Provisioning */}
           {Object.keys(provStatus).length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ ...label, marginBottom: 8 }}>Provisioning Status</div>
@@ -165,11 +256,7 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
                   }}>
                     <ProvisioningBadge service={svc} status={status} />
                     {status === 'failed' && (
-                      <button
-                        onClick={() => handleRetry(svc)}
-                        disabled={retrying[svc]}
-                        style={{ ...btn('ghost'), fontSize: 11 }}
-                      >
+                      <button onClick={() => handleRetry(svc)} disabled={retrying[svc]} style={{ ...btn('ghost'), fontSize: 11 }}>
                         {retrying[svc] ? 'Retrying…' : 'Retry'}
                       </button>
                     )}
@@ -177,27 +264,21 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
                 ))}
               </div>
 
-              {hasFailed && (
+              {hasFailed && showRetryPw && (
                 <div style={{ marginTop: 10 }}>
-                  {showRetryPw ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="password"
-                        placeholder="User's current password (for provisioning)"
-                        value={retryPw}
-                        onChange={e => setRetryPw(e.target.value)}
-                        style={{ ...input, marginBottom: 0 }}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowRetryPw(true)}
-                      style={{ ...btn('ghost'), fontSize: 11, marginTop: 4 }}
-                    >
-                      Retry all failed — enter password first
-                    </button>
-                  )}
+                  <input
+                    type="password"
+                    placeholder="User's current password (for provisioning)"
+                    value={retryPw}
+                    onChange={e => setRetryPw(e.target.value)}
+                    style={{ ...input, marginBottom: 0 }}
+                  />
                 </div>
+              )}
+              {hasFailed && !showRetryPw && (
+                <button onClick={() => setShowRetryPw(true)} style={{ ...btn('ghost'), fontSize: 11, marginTop: 6 }}>
+                  Retry all failed — enter password first
+                </button>
               )}
             </div>
           )}
@@ -210,11 +291,7 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={btn('ghost')}>Cancel</button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ ...btn('primary'), padding: '7px 20px', fontSize: 13, opacity: saving ? 0.7 : 1 }}
-            >
+            <button onClick={handleSave} disabled={saving} style={{ ...btn('primary'), padding: '7px 20px', fontSize: 13, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>

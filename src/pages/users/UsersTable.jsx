@@ -92,6 +92,9 @@ export default function UsersTable({
               <TH>User</TH>
               <TH>Role</TH>
               <TH>Department</TH>
+              <TH>Job Title</TH>
+              <TH>Manager</TH>
+              <TH>Contract</TH>
               <TH>Services</TH>
               <TH>Status</TH>
               <TH>Last Login</TH>
@@ -139,9 +142,18 @@ export default function UsersTable({
                       <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: '#EEF2FF', color: '#4338CA', fontWeight: 500 }}>
                         {u.role}
                       </span>
-                    ) : u.role}
+                    ) : u.role === 'dept_head' ? (
+                      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: '#FEF3C7', color: '#92400E', fontWeight: 500 }}>
+                        Dept Head
+                      </span>
+                    ) : (
+                      <span style={{ color: T.muted }}>User</span>
+                    )}
                   </TD>
                   <TD style={{ color: T.muted }}>{u.department || '—'}</TD>
+                  <TD style={{ color: T.muted }}>{u.job_title || '—'}</TD>
+                  <TD style={{ color: T.muted }}>{u.manager_name || '—'}</TD>
+                  <TD style={{ color: T.muted }}>{u.contract_type || '—'}</TD>
                   <TD>
                     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                       {u.access?.filter(a => a.level !== 'none').slice(0, 4).map(a => (
