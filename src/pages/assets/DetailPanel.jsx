@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { T, fmtAgo, fmtDate, healthScore, isOnline, STATUS_COLORS, calcDepreciation, DEPRECIATION_METHODS } from './shared'
+import { usePermission } from '../../hooks/usePermission'
 import api from '../../services/api'
 
 const TABS = ['Overview', 'Hardware', 'Software', 'Network', 'History', 'Maintenance', 'Files']
@@ -995,6 +996,8 @@ export default function DetailPanel({
     }
   }, [tab])
 
+  const { hasPermission } = usePermission()
+
   if (!asset) return null
 
   const on = isOnline(asset)
@@ -1084,13 +1087,14 @@ export default function DetailPanel({
 
       {/* Action buttons */}
       <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-        <ActionBtn label="Edit" onClick={onEdit} />
-        {!asset.checked_out_to
-          ? <ActionBtn label="Check Out" onClick={onCheckout} color={T.blue} />
-          : <ActionBtn label="Check In" onClick={onCheckin} color={T.navy} />
-        }
+        {hasPermission('assets', 'edit') && <ActionBtn label="Edit" onClick={onEdit} />}
+        {hasPermission('assets', 'checkout') && (
+          !asset.checked_out_to
+            ? <ActionBtn label="Check Out" onClick={onCheckout} color={T.blue} />
+            : <ActionBtn label="Check In" onClick={onCheckin} color={T.navy} />
+        )}
         <ActionBtn label="Clone" onClick={onClone} />
-        <ActionBtn label="Audit" onClick={onAudit} />
+        {hasPermission('assets', 'audit') && <ActionBtn label="Audit" onClick={onAudit} />}
         <ActionBtn label="QR Tag" onClick={onQR} />
         {isAdmin && asset.rustdesk_id && (
           <ActionBtn label="Connect" onClick={() => onConnect(asset)} color={T.navy} />
@@ -1110,7 +1114,7 @@ export default function DetailPanel({
         {asset.snipe_id && (
           <ActionBtn label="Snipe-IT ↗" onClick={() => window.open(`https://snipe.fayait.com/hardware/${asset.snipe_id}`, '_blank')} />
         )}
-        <ActionBtn label="Delete" onClick={onRetire} color={T.red} />
+        {hasPermission('assets', 'delete') && <ActionBtn label="Delete" onClick={onRetire} color={T.red} />}
       </div>
 
       {cmdMsg && (

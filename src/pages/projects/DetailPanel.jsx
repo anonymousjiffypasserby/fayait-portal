@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { T, STATUS_COLORS, PRIORITY_COLORS, STATUSES, PRIORITIES, ProgressBar, Avatar, fmtDate, fmtDateShort, isOverdue, isAdmin } from './shared'
+import { usePermission } from '../../hooks/usePermission'
 import TasksTab from './TasksTab'
 import CommentsTab from './CommentsTab'
 import ActivityTab from './ActivityTab'
@@ -17,10 +18,11 @@ export default function DetailPanel({ projectId, users, user, onClose, onProject
   const [actionLoading, setActionLoading] = useState(null)
   const [error, setError] = useState('')
 
+  const { hasPermission } = usePermission()
   const admin = isAdmin(user)
-  const canEdit = admin || project?.created_by === user?.id || project?.assigned_to === user?.id
-  const canDelete = admin || project?.created_by === user?.id
-  const canSignoff = admin && project?.status === 'review' && project?.requires_signoff
+  const canEdit = (admin || project?.created_by === user?.id || project?.assigned_to === user?.id) && hasPermission('projects', 'edit')
+  const canDelete = (admin || project?.created_by === user?.id) && hasPermission('projects', 'delete')
+  const canSignoff = admin && project?.status === 'review' && project?.requires_signoff && hasPermission('projects', 'signoff')
 
   const load = async () => {
     try {

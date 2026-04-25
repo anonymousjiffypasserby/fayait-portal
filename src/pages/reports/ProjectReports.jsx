@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { T, fetchReport, exportReport, formatDate, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
+import { usePermission } from '../../hooks/usePermission'
 
 // ── Shared sub-components (mirror MonitoringReports pattern) ──────────────────
 
@@ -52,6 +53,8 @@ function SummaryBar({ stats }) {
 }
 
 function ExportBar({ onCSV, onPDF, exporting }) {
+  const { hasPermission } = usePermission()
+  if (!hasPermission('reports', 'export')) return null
   return (
     <div style={{ padding: '10px 24px', background: '#fff', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 10, flexShrink: 0 }}>
       <button onClick={onCSV} disabled={!!exporting} style={outlineBtnStyle}>{exporting === 'csv' ? 'Exporting…' : '↓ Export CSV'}</button>

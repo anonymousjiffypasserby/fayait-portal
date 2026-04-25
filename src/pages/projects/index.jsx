@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { usePermission } from '../../hooks/usePermission'
 import { useNavigate } from 'react-router-dom'
 import { T, isAdmin } from './shared'
 import Sidebar from './Sidebar'
@@ -41,6 +42,7 @@ function filterProjectsByView(projects, view, user) {
 
 export default function Projects() {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const navigate = useNavigate()
 
   const [projects, setProjects]   = useState([])
@@ -237,16 +239,18 @@ export default function Projects() {
               </span>
             )}
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            style={{
-              padding: '6px 14px', background: '#6366f1', color: '#fff',
-              border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', fontFamily: T.font,
-            }}
-          >
-            + New Project
-          </button>
+          {hasPermission('projects', 'create') && (
+            <button
+              onClick={() => setShowNew(true)}
+              style={{
+                padding: '6px 14px', background: '#6366f1', color: '#fff',
+                border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500,
+                cursor: 'pointer', fontFamily: T.font,
+              }}
+            >
+              + New Project
+            </button>
+          )}
         </div>
 
         {/* View area */}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { T, STATUS_COLORS, getStatus, initials, fmtDate, btn } from './shared'
 import { ProvisioningRow } from './ProvisioningBadge'
+import { usePermission } from '../../hooks/usePermission'
 
 const TH = ({ children, style }) => (
   <th style={{
@@ -49,6 +50,7 @@ export default function UsersTable({
   onBulkDeactivate, onBulkActivate, onBulkResetPassword,
 }) {
   const [expandedProv, setExpandedProv] = useState(null)
+  const { hasPermission } = usePermission()
   const allSelected = users.length > 0 && users.every(u => selected.has(u.id))
   const someSelected = selected.size > 0
 
@@ -71,8 +73,12 @@ export default function UsersTable({
           <span style={{ fontSize: 12, color: T.orange, fontWeight: 500 }}>
             {selected.size} selected
           </span>
-          <button onClick={onBulkDeactivate} style={{ ...btn('danger'), fontSize: 11 }}>Deactivate</button>
-          <button onClick={onBulkActivate} style={{ ...btn('ghost'), fontSize: 11 }}>Activate</button>
+          {hasPermission('users', 'deactivate') && (
+            <>
+              <button onClick={onBulkDeactivate} style={{ ...btn('danger'), fontSize: 11 }}>Deactivate</button>
+              <button onClick={onBulkActivate} style={{ ...btn('ghost'), fontSize: 11 }}>Activate</button>
+            </>
+          )}
           <button onClick={onBulkResetPassword} style={{ ...btn('ghost'), fontSize: 11 }}>Reset Passwords (CSV)</button>
         </div>
       )}
@@ -189,15 +195,19 @@ export default function UsersTable({
                   </TD>
                   <TD style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <button onClick={() => onEdit(u)} style={btn('ghost')}>Edit</button>
-                      <button
-                        onClick={() => onToggleActive(u)}
-                        style={btn(u.active !== false ? 'danger' : 'ghost')}
-                      >
-                        {u.active !== false ? 'Deactivate' : 'Activate'}
-                      </button>
+                      {hasPermission('users', 'edit') && (
+                        <button onClick={() => onEdit(u)} style={btn('ghost')}>Edit</button>
+                      )}
+                      {hasPermission('users', 'deactivate') && (
+                        <button
+                          onClick={() => onToggleActive(u)}
+                          style={btn(u.active !== false ? 'danger' : 'ghost')}
+                        >
+                          {u.active !== false ? 'Deactivate' : 'Activate'}
+                        </button>
+                      )}
                       <button onClick={() => onResetPassword(u)} style={btn('ghost')}>Reset PW</button>
-                      {hasFailed && (
+                      {hasFailed && hasPermission('users', 'edit') && (
                         <button onClick={() => onEdit(u)} style={{ ...btn('ghost'), color: '#A32D2D', borderColor: 'rgba(163,45,45,0.4)' }}>
                           Retry
                         </button>

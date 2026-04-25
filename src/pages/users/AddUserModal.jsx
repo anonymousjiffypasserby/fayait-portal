@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import api from '../../services/api'
+import api, { rolesApi } from '../../services/api'
 import { T, SERVICE_LABELS, SERVICE_ACCESS_LEVELS, btn } from './shared'
 
 const field = { marginBottom: 14 }
@@ -12,9 +12,10 @@ const input = {
 
 export default function AddUserModal({ activeServices, onClose, onCreated }) {
   const [departments, setDepartments] = useState([])
+  const [customRoles, setCustomRoles] = useState([])
   const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', role: 'staff',
-    department: '', welcomeEmail: false,
+    firstName: '', lastName: '', email: '', roleSelectVal: 'staff',
+    role: 'staff', role_id: null, department: '', welcomeEmail: false,
     access: Object.fromEntries(
       [...activeServices].map(s => [s, SERVICE_ACCESS_LEVELS[s]?.[1] || 'view'])
     ),
@@ -23,11 +24,25 @@ export default function AddUserModal({ activeServices, onClose, onCreated }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.getDepartments().then(setDepartments).catch(() => {})
+    Promise.all([api.getDepartments(), rolesApi.getRoles()])
+      .then(([d, r]) => { setDepartments(d); setCustomRoles(Array.isArray(r) ? r : []) })
+      .catch(() => {})
   }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setAccess = (svc, level) => setForm(f => ({ ...f, access: { ...f.access, [svc]: level } }))
+
+  const handleRoleChange = (val) => {
+    if (val.startsWith('custom:')) {
+      set('roleSelectVal', val)
+      set('role', 'staff')
+      set('role_id', val.slice(7))
+    } else {
+      set('roleSelectVal', val)
+      set('role', val)
+      set('role_id', null)
+    }
+  }
 
   const handleSubmit = async () => {
     if (!form.firstName.trim() || !form.email.trim()) {
@@ -45,6 +60,12 @@ export default function AddUserModal({ activeServices, onClose, onCreated }) {
         department: form.department || undefined,
         access,
       })
+      if (form.role_id) {
+        const newUserId = result.user?.id || result.id
+        if (newUserId) {
+          await rolesApi.assignRole(form.role_id, newUserId).catch(() => {})
+        }
+      }
       onCreated(result)
     } catch (err) {
       setError(err.message)
@@ -93,10 +114,18 @@ export default function AddUserModal({ activeServices, onClose, onCreated }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={label}>Role</label>
-              <select style={{ ...input }} value={form.role} onChange={e => set('role', e.target.value)}>
-                <option value="staff">User</option>
+              <select style={{ ...input }} value={form.roleSelectVal} onChange={e => handleRoleChange(e.target.value)}>
+                <option value="staff">Staff</option>
                 <option value="dept_head">Dept Head</option>
                 <option value="admin">Admin</option>
+                {customRoles.length > 0 && (
+                  <>
+                    <option disabled>──────────</option>
+                    {customRoles.map(r => (
+                      <option key={r.id} value={`custom:${r.id}`}>{r.name}</option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
             <div>
@@ -111,9 +140,7 @@ export default function AddUserModal({ activeServices, onClose, onCreated }) {
           {activeServices.size > 0 && (
             <div style={{ marginBottom: 14 }}>
               <div style={{ ...label, marginBottom: 8 }}>Service Access</div>
-              <div style={{
-                border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden',
-              }}>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
                 {[...activeServices].map((svc, i) => {
                   const levels = SERVICE_ACCESS_LEVELS[svc] || ['none', 'view']
                   return (

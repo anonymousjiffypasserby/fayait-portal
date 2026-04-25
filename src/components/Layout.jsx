@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { usePermission } from '../hooks/usePermission'
 import NotificationBell from './NotificationBell'
 import ServiceFrame from '../pages/ServiceFrame'
 
@@ -23,25 +24,25 @@ const SERVICES = [
   {
     section: 'Workspace',
     items: [
-      { key: 'tickets', label: 'Tickets', icon: '🎫', path: '/tickets' },
-      { key: 'assets',  label: 'Assets',   icon: '💻', path: '/assets' },
-      { key: 'chat', label: 'Chat', icon: '💬', path: '/chat' },
-      { key: 'files', label: 'Files', icon: '📁', path: '/files' },
-      { key: 'projects', label: 'Projects', icon: '📋', path: '/projects' },
-      { key: 'hr',       label: 'HR',       icon: '👔', path: '/hr' },
+      { key: 'tickets',  label: 'Tickets',  icon: '🎫', path: '/tickets' },
+      { key: 'assets',   label: 'Assets',   icon: '💻', path: '/assets',   permissionModule: 'assets' },
+      { key: 'chat',     label: 'Chat',     icon: '💬', path: '/chat' },
+      { key: 'files',    label: 'Files',    icon: '📁', path: '/files' },
+      { key: 'projects', label: 'Projects', icon: '📋', path: '/projects', permissionModule: 'projects' },
+      { key: 'hr',       label: 'HR',       icon: '👔', path: '/hr',       permissionModule: 'hr_employees' },
     ]
   },
   {
     section: 'Monitoring',
     items: [
-      { key: 'status', label: 'Status', icon: '🟢', path: '/status' },
+      { key: 'status',  label: 'Status',    icon: '🟢', path: '/status' },
       { key: 'grafana', label: 'Analytics', icon: '📊', path: '/grafana' },
     ]
   },
   {
     section: 'Account',
     items: [
-      { key: 'users', label: 'Users', icon: '👥', path: '/users' },
+      { key: 'users',   label: 'Users',   icon: '👥', path: '/users',   permissionModule: 'users' },
       { key: 'billing', label: 'Billing', icon: '💳', path: '/billing' },
       { key: 'profile', label: 'Profile', icon: '👤', path: '/profile' },
     ]
@@ -50,9 +51,9 @@ const SERVICES = [
     section: 'Admin',
     adminOnly: true,
     items: [
-      { key: 'settings',  label: 'Settings',  icon: '⚙', path: '/settings', alwaysVisible: true },
-      { key: 'reports',   label: 'Reports',   icon: '📈', path: '/reports',  alwaysVisible: true },
-      { key: 'admin',     label: 'Companies', icon: '🏢', path: '/admin',    alwaysVisible: true, superadminOnly: true },
+      { key: 'settings', label: 'Settings',  icon: '⚙', path: '/settings', alwaysVisible: true },
+      { key: 'reports',  label: 'Reports',   icon: '📈', path: '/reports',  alwaysVisible: true, permissionModule: 'reports' },
+      { key: 'admin',    label: 'Companies', icon: '🏢', path: '/admin',    alwaysVisible: true, superadminOnly: true },
     ]
   },
 ]
@@ -61,16 +62,27 @@ const ADMIN_ROLES = ['superadmin', 'admin']
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
+  const { hasPermission } = usePermission()
   const navigate = useNavigate()
   const location = useLocation()
   const [hovered, setHovered] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [globalToast, setGlobalToast] = useState(null)
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      setGlobalToast(e.detail?.message || 'Permission denied')
+      setTimeout(() => setGlobalToast(null), 4000)
+    }
+    window.addEventListener('app:error', handler)
+    return () => window.removeEventListener('app:error', handler)
   }, [])
 
   const handleLogout = () => {
@@ -92,9 +104,11 @@ export default function Layout({ children }) {
       ...section,
       items: section.items.filter(item => {
         if (item.superadminOnly && user?.role !== 'superadmin') return false
-        if (item.alwaysVisible) return true
+        if (item.alwaysVisible) return !item.permissionModule || hasPermission(item.permissionModule, 'view')
         if (item.key === 'dashboard') return true
-        if (['users', 'billing', 'profile'].includes(item.key)) return true
+        if (['billing', 'profile'].includes(item.key)) return true
+        if (item.permissionModule && !hasPermission(item.permissionModule, 'view')) return false
+        if (item.key === 'users') return true
         const status = services[item.key]
         if (status === 'active') return true
         if (isAdmin) return true
@@ -106,6 +120,19 @@ export default function Layout({ children }) {
   return (
     <>
     <style>{`.faya-nav::-webkit-scrollbar{display:none}`}</style>
+    {globalToast && (
+      <div style={{
+        position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+        background: '#1e1e2e', color: '#fff', borderRadius: 10,
+        padding: '12px 18px', fontSize: 13, fontWeight: 500,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        border: '1px solid rgba(255,100,100,0.3)',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <span style={{ color: '#f87171' }}>⛔</span>
+        {globalToast}
+      </div>
+    )}
     <div style={{
       display: 'flex',
       height: '100vh',

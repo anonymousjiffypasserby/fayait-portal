@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import api from '../../services/api'
+import api, { rolesApi } from '../../services/api'
 import { hrApi } from '../hr/shared'
 import ProvisioningBadge from './ProvisioningBadge'
 import { T, SERVICE_LABELS, SERVICE_ACCESS_LEVELS, PROVISION_SERVICE_MAP, CONTRACT_TYPES, btn } from './shared'
@@ -15,10 +15,15 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
   const [departments, setDepartments] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [jobFunctions, setJobFunctions] = useState([])
+  const [customRoles, setCustomRoles] = useState([])
+
+  const initRoleSelectVal = user.role_id ? `custom:${user.role_id}` : (user.role || 'staff')
 
   const [form, setForm] = useState({
     name:            user.name || '',
     role:            user.role || 'staff',
+    role_id:         user.role_id || null,
+    roleSelectVal:   initRoleSelectVal,
     department:      user.department || '',
     job_title:       user.job_title || '',
     manager_id:      user.manager_id || '',
@@ -48,15 +53,25 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
       api.getDepartments(),
       api.getUsers(),
       hrApi.getJobFunctions(),
-    ]).then(([d, u, jf]) => {
+      rolesApi.getRoles(),
+    ]).then(([d, u, jf, r]) => {
       setDepartments(d)
       setAllUsers(u.filter(u => u.id !== user.id))
       setJobFunctions(Array.isArray(jf) ? jf : [])
+      setCustomRoles(Array.isArray(r) ? r : [])
     }).catch(() => {})
   }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setAccess = (svc, level) => setForm(f => ({ ...f, access: { ...f.access, [svc]: level } }))
+
+  const handleRoleChange = (val) => {
+    if (val.startsWith('custom:')) {
+      setForm(f => ({ ...f, roleSelectVal: val, role: 'staff', role_id: val.slice(7) }))
+    } else {
+      setForm(f => ({ ...f, roleSelectVal: val, role: val, role_id: null }))
+    }
+  }
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Name is required'); return }
@@ -78,7 +93,20 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
         job_function_id: form.job_function_id || null,
         access,
       })
-      onSaved()
+
+      const originalRoleId = user.role_id || null
+      const newRoleId = form.role_id || null
+      const roleIdChanged = originalRoleId !== newRoleId
+
+      if (roleIdChanged) {
+        if (newRoleId) {
+          await rolesApi.assignRole(newRoleId, user.id)
+        } else if (originalRoleId) {
+          await rolesApi.unassignRole(originalRoleId, user.id)
+        }
+      }
+
+      onSaved(roleIdChanged)
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -131,10 +159,18 @@ export default function EditUserModal({ user, activeServices, onClose, onSaved }
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={label}>Role</label>
-              <select style={{ ...input }} value={form.role} onChange={e => set('role', e.target.value)}>
-                <option value="staff">User</option>
+              <select style={{ ...input }} value={form.roleSelectVal} onChange={e => handleRoleChange(e.target.value)}>
+                <option value="staff">Staff</option>
                 <option value="dept_head">Dept Head</option>
                 <option value="admin">Admin</option>
+                {customRoles.length > 0 && (
+                  <>
+                    <option disabled>──────────</option>
+                    {customRoles.map(r => (
+                      <option key={r.id} value={`custom:${r.id}`}>{r.name}</option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
             <div>

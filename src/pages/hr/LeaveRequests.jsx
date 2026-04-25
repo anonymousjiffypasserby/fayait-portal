@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { T, hrApi, fmtDate, fmtDateShort, Avatar, Spinner, EmptyState, LeaveStatusBadge, Btn, Modal, Field, Textarea, ErrMsg } from './shared'
+import PermissionGate from '../../components/PermissionGate'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -100,16 +101,18 @@ export default function LeaveRequests() {
                         <div style={{ fontSize: 12, color: T.muted, marginTop: 3, fontStyle: 'italic' }}>"{r.reason}"</div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <Btn variant="primary" style={{ fontSize: 12, padding: '5px 12px' }}
-                        loading={acting === r.id} onClick={() => approve(r.id)}>
-                        Approve
-                      </Btn>
-                      <Btn variant="danger" style={{ fontSize: 12, padding: '5px 12px' }}
-                        loading={acting === r.id} onClick={() => setDenyModal(r)}>
-                        Deny
-                      </Btn>
-                    </div>
+                    <PermissionGate module="hr_leave" action="approve">
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <Btn variant="primary" style={{ fontSize: 12, padding: '5px 12px' }}
+                          loading={acting === r.id} onClick={() => approve(r.id)}>
+                          Approve
+                        </Btn>
+                        <Btn variant="danger" style={{ fontSize: 12, padding: '5px 12px' }}
+                          loading={acting === r.id} onClick={() => setDenyModal(r)}>
+                          Deny
+                        </Btn>
+                      </div>
+                    </PermissionGate>
                   </div>
                 ))}
               </div>

@@ -5,14 +5,19 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [permissions, setPermissions] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const stored = localStorage.getItem('faya_user')
     const token = localStorage.getItem('faya_token')
+    const storedPerms = localStorage.getItem('faya_permissions')
     if (stored && token) {
       const parsedUser = JSON.parse(stored)
       setUser(parsedUser)
+      if (storedPerms) {
+        try { setPermissions(JSON.parse(storedPerms)) } catch {}
+      }
       // Refresh services from API
       api.getCompanyConfig()
         .then(data => {
@@ -31,16 +36,21 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await api.login(email, password)
-    localStorage.setItem('faya_token', data.token)
-    localStorage.setItem('faya_user', JSON.stringify(data.user))
-    setUser(data.user)
-    return data.user
+    const { user, token, permissions: perms = [] } = data
+    localStorage.setItem('faya_token', token)
+    localStorage.setItem('faya_user', JSON.stringify(user))
+    localStorage.setItem('faya_permissions', JSON.stringify(perms))
+    setUser(user)
+    setPermissions(perms)
+    return user
   }
 
   const logout = () => {
     localStorage.removeItem('faya_token')
     localStorage.removeItem('faya_user')
+    localStorage.removeItem('faya_permissions')
     setUser(null)
+    setPermissions([])
   }
 
   const updateUser = (updates) => {
@@ -50,7 +60,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, permissions, login, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

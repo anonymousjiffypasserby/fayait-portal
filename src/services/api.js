@@ -9,6 +9,12 @@ const headers = () => ({
 
 const handle = async (res) => {
   const data = await res.json()
+  if (res.status === 403) {
+    window.dispatchEvent(new CustomEvent('app:error', {
+      detail: { message: "You don't have permission to perform this action" }
+    }))
+    throw new Error('Forbidden')
+  }
   if (!res.ok) throw new Error(data.error || 'Request failed')
   return data
 }
@@ -624,6 +630,22 @@ export const rolesApi = {
     fetch(`${BASE}/api/roles/${id}`, {
       method: 'DELETE',
       headers: headers()
+    }).then(handle),
+
+  getRoleUsers: (roleId) =>
+    fetch(`${BASE}/api/roles/${roleId}/users`, { headers: headers() }).then(handle),
+
+  assignRole: (roleId, userId) =>
+    fetch(`${BASE}/api/roles/${roleId}/assign`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ user_id: userId }),
+    }).then(handle),
+
+  unassignRole: (roleId, userId) =>
+    fetch(`${BASE}/api/roles/${roleId}/assign/${userId}`, {
+      method: 'DELETE',
+      headers: headers(),
     }).then(handle),
 }
 

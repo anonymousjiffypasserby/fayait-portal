@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { T, hrApi, fmtDate, fmtHours, Avatar, Spinner, EmptyState, TsBadge, Btn, ErrMsg } from './shared'
+import PermissionGate from '../../components/PermissionGate'
 
 export default function TeamTimesheets() {
   const [timesheets, setTimesheets] = useState([])
@@ -57,9 +58,11 @@ export default function TeamTimesheets() {
           )}
         </div>
         {selected.size > 0 && (
-          <Btn variant="primary" loading={acting === 'bulk'} onClick={bulkApprove}>
-            Approve {selected.size} Selected
-          </Btn>
+          <PermissionGate module="hr_timesheets" action="approve">
+            <Btn variant="primary" loading={acting === 'bulk'} onClick={bulkApprove}>
+              Approve {selected.size} Selected
+            </Btn>
+          </PermissionGate>
         )}
       </div>
 
@@ -116,14 +119,16 @@ export default function TeamTimesheets() {
                       <td style={{ padding: '12px 14px', fontSize: 12, color: T.muted }}>{fmtDate(ts.submitted_at)}</td>
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <Btn variant="primary" style={{ fontSize: 11, padding: '4px 10px' }}
-                            loading={acting === ts.id} onClick={() => act(ts.id, 'approve')}>
-                            Approve
-                          </Btn>
-                          <Btn variant="danger" style={{ fontSize: 11, padding: '4px 10px' }}
-                            loading={acting === ts.id} onClick={() => act(ts.id, 'reject')}>
-                            Reject
-                          </Btn>
+                          <PermissionGate module="hr_timesheets" action="approve">
+                            <Btn variant="primary" style={{ fontSize: 11, padding: '4px 10px' }}
+                              loading={acting === ts.id} onClick={() => act(ts.id, 'approve')}>
+                              Approve
+                            </Btn>
+                            <Btn variant="danger" style={{ fontSize: 11, padding: '4px 10px' }}
+                              loading={acting === ts.id} onClick={() => act(ts.id, 'reject')}>
+                              Reject
+                            </Btn>
+                          </PermissionGate>
                           <button
                             onClick={() => setExpanded(expanded === ts.id ? null : ts.id)}
                             style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 12 }}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { T, hrApi, fmtDate, fmtMoney, Spinner, EmptyState, RunStatusBadge, Btn, Modal, Field, Input, Select, ErrMsg } from './shared'
+import PermissionGate from '../../components/PermissionGate'
 
 export default function PayrollRuns() {
   const [periods, setPeriods]   = useState([])
@@ -150,7 +151,9 @@ export default function PayrollRuns() {
       {/* Payroll Runs */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: T.navy }}>Payroll Runs</div>
-        <Btn variant="primary" style={{ fontSize: 12 }} onClick={() => { setShowNewRun(true); setErr(null) }}>+ New Run</Btn>
+        <PermissionGate module="hr_payroll" action="run">
+          <Btn variant="primary" style={{ fontSize: 12 }} onClick={() => { setShowNewRun(true); setErr(null) }}>+ New Run</Btn>
+        </PermissionGate>
       </div>
 
       <div style={{ display: 'flex', gap: 16 }}>
@@ -200,9 +203,11 @@ export default function PayrollRuns() {
                     <Btn variant="ghost" style={{ fontSize: 12 }} onClick={exportCsv}>CSV</Btn>
                   )}
                   {selectedRun.status === 'draft' && (
-                    <Btn variant="primary" style={{ fontSize: 12 }} loading={finalizing} onClick={() => finalize(selectedRun.id)}>
-                      Finalize & Notify
-                    </Btn>
+                    <PermissionGate module="hr_payroll" action="finalize">
+                      <Btn variant="primary" style={{ fontSize: 12 }} loading={finalizing} onClick={() => finalize(selectedRun.id)}>
+                        Finalize & Notify
+                      </Btn>
+                    </PermissionGate>
                   )}
                 </div>
               </div>

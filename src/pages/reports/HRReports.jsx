@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { T, fetchReport, exportReport, formatDate, formatCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
+import { usePermission } from '../../hooks/usePermission'
 
 // ── Shared primitives (same pattern as AssetReports) ─────────────────────────
 
@@ -55,6 +56,8 @@ function SummaryBar({ stats }) {
 }
 
 function ExportBar({ onCSV, onPDF, exporting }) {
+  const { hasPermission } = usePermission()
+  if (!hasPermission('reports', 'export')) return null
   return (
     <div style={{
       padding: '10px 24px', background: '#fff', borderTop: `1px solid ${T.border}`,

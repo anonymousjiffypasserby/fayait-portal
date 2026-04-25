@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { usePermission } from '../../hooks/usePermission'
 import api from '../../services/api'
 import Sidebar from './Sidebar'
 import UsersTable from './UsersTable'
@@ -35,6 +36,7 @@ function filterUsers(users, view) {
 
 export default function Users() {
   const { user: authMe } = useAuth()
+  const { hasPermission } = usePermission()
   const isAdmin       = ADMIN_ROLES.includes(authMe?.role)
   const canManage     = DEPT_HEAD_ROLES.includes(authMe?.role)
 
@@ -191,7 +193,7 @@ export default function Users() {
             <h1 style={{ fontSize: 18, fontWeight: 600, color: T.navy, margin: 0 }}>
               {PEOPLE_TITLES[view]}
             </h1>
-            {isAdmin && (
+            {hasPermission('users', 'invite') && (
               <button
                 onClick={() => setShowAdd(true)}
                 style={{ background: T.orange, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: T.font }}
@@ -230,7 +232,7 @@ export default function Users() {
       case 'jobfunctions':
         return <JobFunctionsView showToast={showToast} />
       case 'roles':
-        return <RolesPermissions />
+        return <RolesPermissions showToast={showToast} />
       case 'import':
         return <ImportUsers showToast={showToast} />
       case 'activitylog':
@@ -271,7 +273,11 @@ export default function Users() {
           user={editUser}
           activeServices={activeServices}
           onClose={() => setEditUser(null)}
-          onSaved={() => { setEditUser(null); fetchUsers(); showToast('User updated') }}
+          onSaved={(roleChanged) => {
+            setEditUser(null)
+            fetchUsers()
+            showToast(roleChanged ? 'Role updated — changes take effect on next login.' : 'User updated')
+          }}
         />
       )}
       {resultData && (
