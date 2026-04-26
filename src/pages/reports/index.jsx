@@ -6,6 +6,7 @@ import MonitoringReports from './MonitoringReports'
 import CustomReport from './CustomReport'
 import ProjectReports from './ProjectReports'
 import HRReports from './HRReports'
+import TicketReports from './TicketReports'
 
 const NAV = [
   {
@@ -63,6 +64,19 @@ const NAV = [
     ],
   },
   {
+    section: 'Tickets',
+    items: [
+      { key: 'tk-overview',    label: 'Overview'             },
+      { key: 'tk-by-priority', label: 'By Priority'          },
+      { key: 'tk-by-group',    label: 'By Group / Team'      },
+      { key: 'tk-response',    label: 'Response Time'        },
+      { key: 'tk-resolution',  label: 'Resolution Time'      },
+      { key: 'tk-agent-perf',  label: 'Agent Performance'    },
+      { key: 'tk-sla',         label: 'SLA Compliance'       },
+      { key: 'tk-csat',        label: 'Customer Satisfaction'},
+    ],
+  },
+  {
     section: 'Custom',
     items: [
       { key: 'custom', label: 'Custom Report Builder' },
@@ -75,6 +89,7 @@ const FINANCIAL_VIEWS = new Set(['depreciation','purchase-cost','maintenance-cos
 const MONITORING_VIEWS= new Set(['alert-history','offline-history','software-inventory','pending-updates'])
 const PROJECTS_VIEWS  = new Set(['proj-overview','proj-by-dept','proj-by-user','proj-overdue','proj-activity'])
 const HR_VIEWS        = new Set(['hr-payroll','hr-hours','hr-leave-bal','hr-leave-use','hr-overtime','hr-headcount','hr-schedule'])
+const TICKET_VIEWS    = new Set(['tk-overview','tk-by-priority','tk-by-group','tk-response','tk-resolution','tk-agent-perf','tk-sla','tk-csat'])
 
 export default function Reports() {
   const [view, setView] = useState('inventory')
@@ -155,6 +170,7 @@ export default function Reports() {
         {MONITORING_VIEWS.has(view) && <MonitoringReports view={view} />}
         {PROJECTS_VIEWS.has(view)   && <ProjectReports view={view} />}
         {HR_VIEWS.has(view)         && <HRReports view={view} />}
+        {TICKET_VIEWS.has(view)     && <TicketReports view={view} />}
         {view === 'custom'          && <CustomReport />}
       </div>
     </div>

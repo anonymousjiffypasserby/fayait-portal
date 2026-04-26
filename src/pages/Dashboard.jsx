@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import zammadApi from '../services/zammadApi'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -873,6 +874,85 @@ function HRStat({ label, value, icon, onClick, alert }) {
   )
 }
 
+// ── Tickets Widget ────────────────────────────────────────────────────────────
+function TicketStat({ label, value, color, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        flex: 1, minWidth: 100, background: '#f8f9fa', borderRadius: 8,
+        padding: '12px 14px', textAlign: 'center', cursor: onClick ? 'pointer' : 'default',
+        border: '1px solid rgba(0,0,0,0.06)',
+      }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = '#f0f2f5' }}
+      onMouseLeave={e => { e.currentTarget.style.background = '#f8f9fa' }}
+    >
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || T.navy, lineHeight: 1 }}>{value ?? '…'}</div>
+      <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{label}</div>
+    </div>
+  )
+}
+
+function TicketsWidget() {
+  const [min, toggle] = useWidget('tickets-detail')
+  const navigate      = useNavigate()
+  const [counts, setCounts] = useState({ open: null, overdue: null, unassigned: null, my: null })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (min) return
+    setLoading(true)
+    Promise.allSettled([
+      zammadApi.getAllTickets(200),
+      zammadApi.getOverdueTickets(100),
+      zammadApi.getUnassignedTickets(100),
+      zammadApi.getMyTickets(100),
+    ]).then(([all, overdue, unassigned, my]) => {
+      const allRows = all.status === 'fulfilled' && Array.isArray(all.value) ? all.value : []
+      const openCount = allRows.filter(t => {
+        const s = (t.state || '').toLowerCase()
+        return s === 'open' || s === 'new'
+      }).length
+      setCounts({
+        open:       openCount,
+        overdue:    overdue.status === 'fulfilled' && Array.isArray(overdue.value) ? overdue.value.length : null,
+        unassigned: unassigned.status === 'fulfilled' && Array.isArray(unassigned.value) ? unassigned.value.length : null,
+        my:         my.status === 'fulfilled' && Array.isArray(my.value) ? my.value.length : null,
+      })
+    }).finally(() => setLoading(false))
+  }, [min])
+
+  const viewAllAction = (
+    <button
+      onClick={e => { e.stopPropagation(); navigate('/tickets') }}
+      style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: T.font, padding: 0 }}
+    >
+      View all →
+    </button>
+  )
+
+  return (
+    <WidgetCard title="Tickets" icon="🎫"
+      badge={counts.overdue > 0 ? counts.overdue : null}
+      badgeColor={T.red}
+      minimized={min} onToggle={toggle} action={viewAllAction}
+    >
+      {loading ? (
+        <div style={{ padding: '16px 20px', fontSize: 12, color: T.muted }}>Loading…</div>
+      ) : (
+        <div style={{ padding: '14px 18px' }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <TicketStat label="Open" value={counts.open} color="#3b82f6" onClick={() => navigate('/tickets?view=open')} />
+            <TicketStat label="Overdue" value={counts.overdue} color={counts.overdue > 0 ? T.red : T.muted} onClick={() => navigate('/tickets?view=overdue')} />
+            <TicketStat label="Unassigned" value={counts.unassigned} color={counts.unassigned > 0 ? T.yellow : T.muted} onClick={() => navigate('/tickets?view=unassigned')} />
+            <TicketStat label="My Tickets" value={counts.my} color="#6366f1" onClick={() => navigate('/tickets')} />
+          </div>
+        </div>
+      )}
+    </WidgetCard>
+  )
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
@@ -1110,6 +1190,11 @@ export default function Dashboard() {
         {/* Row 6 — HR summary (only if service active) */}
         {services.hr === 'active' && (
           <HRWidget />
+        )}
+
+        {/* Row 7 — Tickets detail (only if service active) */}
+        {services.tickets === 'active' && (
+          <TicketsWidget />
         )}
 
       </div>
