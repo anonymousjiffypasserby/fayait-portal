@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import {
   Modal, ConfirmModal, Field, inputStyle, selectStyle, btnStyle,
-  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
+  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow, SyncBadge,
 } from './shared'
 
 const CATEGORY_TYPES = ['asset', 'accessory', 'consumable', 'component', 'license']
@@ -85,11 +85,11 @@ export default function CategoriesTab({ showToast }) {
       <PageHeader title="Categories" onAdd={openAdd} addLabel="Add Category" />
 
       <Table
-        columns={['Name', 'Type', 'Notes', 'Min Qty']}
+        columns={['Name', 'Type', 'Notes', 'Min Qty', 'Sync']}
         empty={!loading && !fetchErr && rows.length === 0 ? 'No categories yet — add one above.' : null}
       >
-        {loading && <LoadingRow cols={4} />}
-        {fetchErr && <ErrorRow cols={4} message={fetchErr} />}
+        {loading && <LoadingRow cols={5} />}
+        {fetchErr && <ErrorRow cols={5} message={fetchErr} />}
         {!loading && rows.map(row => {
           const badge = TYPE_BADGE[row.type] || { bg: '#f3f4f6', color: '#374151' }
           return (
@@ -104,6 +104,14 @@ export default function CategoriesTab({ showToast }) {
               </td>
               <Td muted={!row.notes}>{row.notes || '—'}</Td>
               <Td>{row.min_quantity ?? 0}</Td>
+              <Td>
+                <SyncBadge
+                  syncStatus={row.sync_status}
+                  entity="category"
+                  id={row.id}
+                  onRetried={updated => setRows(r => r.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+                />
+              </Td>
               <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
             </tr>
           )

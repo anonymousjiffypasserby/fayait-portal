@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import {
   Modal, ConfirmModal, Field, inputStyle, btnStyle,
-  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
+  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow, SyncBadge,
 } from './shared'
 
 const EMPTY = { name: '', address: '' }
@@ -70,13 +70,21 @@ export default function LocationsTab({ showToast }) {
     <div>
       <PageHeader title="Locations" onAdd={openAdd} addLabel="Add Location" />
 
-      <Table columns={['Name', 'Address']} empty={!loading && !fetchErr && rows.length === 0 ? 'No locations yet — add one above.' : null}>
-        {loading && <LoadingRow cols={2} />}
-        {fetchErr && <ErrorRow cols={2} message={fetchErr} />}
+      <Table columns={['Name', 'Address', 'Sync']} empty={!loading && !fetchErr && rows.length === 0 ? 'No locations yet — add one above.' : null}>
+        {loading && <LoadingRow cols={3} />}
+        {fetchErr && <ErrorRow cols={3} message={fetchErr} />}
         {!loading && rows.map(row => (
           <tr key={row.id}>
             <Td>{row.name}</Td>
             <Td muted={!row.address}>{row.address || '—'}</Td>
+            <Td>
+              <SyncBadge
+                syncStatus={row.sync_status}
+                entity="location"
+                id={row.id}
+                onRetried={updated => setRows(r => r.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+              />
+            </Td>
             <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
           </tr>
         ))}

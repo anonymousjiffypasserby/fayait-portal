@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import {
   Modal, ConfirmModal, Field, inputStyle, selectStyle, btnStyle,
-  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
+  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow, SyncBadge,
 } from './shared'
 
 const EMPTY = { name: '', manufacturer_id: '', category: '', eol_date: '', notes: '', min_quantity: 0, notify_low_stock: false }
@@ -102,11 +102,11 @@ export default function ModelsTab({ showToast }) {
       <PageHeader title="Models" onAdd={openAdd} addLabel="Add Model" />
 
       <Table
-        columns={['Name', 'Manufacturer', 'Category', 'EOL Date', 'Min Qty']}
+        columns={['Name', 'Manufacturer', 'Category', 'EOL Date', 'Min Qty', 'Sync']}
         empty={!loading && !fetchErr && rows.length === 0 ? 'No models yet — add one above.' : null}
       >
-        {loading && <LoadingRow cols={5} />}
-        {fetchErr && <ErrorRow cols={5} message={fetchErr} />}
+        {loading && <LoadingRow cols={6} />}
+        {fetchErr && <ErrorRow cols={6} message={fetchErr} />}
         {!loading && rows.map(row => (
           <tr key={row.id}>
             <Td>{row.name}</Td>
@@ -114,6 +114,14 @@ export default function ModelsTab({ showToast }) {
             <Td muted={!row.category}>{row.category || '—'}</Td>
             <Td muted={!row.eol_date}>{row.eol_date ? row.eol_date.slice(0, 10) : '—'}</Td>
             <Td>{row.min_quantity ?? 0}</Td>
+            <Td>
+              <SyncBadge
+                syncStatus={row.sync_status}
+                entity="model"
+                id={row.id}
+                onRetried={updated => setRows(r => r.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+              />
+            </Td>
             <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
           </tr>
         ))}

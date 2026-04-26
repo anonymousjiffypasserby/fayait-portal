@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import {
   Modal, ConfirmModal, Field, inputStyle, btnStyle,
-  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
+  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow, SyncBadge,
 } from './shared'
 
 const EMPTY = { name: '', url: '', support_url: '', support_phone: '', support_email: '' }
@@ -81,17 +81,25 @@ export default function ManufacturersTab({ showToast }) {
       <PageHeader title="Manufacturers" onAdd={openAdd} addLabel="Add Manufacturer" />
 
       <Table
-        columns={['Name', 'Website', 'Support Email', 'Support Phone']}
+        columns={['Name', 'Website', 'Support Email', 'Support Phone', 'Sync']}
         empty={!loading && !fetchErr && rows.length === 0 ? 'No manufacturers yet — add one above.' : null}
       >
-        {loading && <LoadingRow cols={4} />}
-        {fetchErr && <ErrorRow cols={4} message={fetchErr} />}
+        {loading && <LoadingRow cols={5} />}
+        {fetchErr && <ErrorRow cols={5} message={fetchErr} />}
         {!loading && rows.map(row => (
           <tr key={row.id}>
             <Td>{row.name}</Td>
             <Td muted={!row.url}>{row.url || '—'}</Td>
             <Td muted={!row.support_email}>{row.support_email || '—'}</Td>
             <Td muted={!row.support_phone}>{row.support_phone || '—'}</Td>
+            <Td>
+              <SyncBadge
+                syncStatus={row.sync_status}
+                entity="manufacturer"
+                id={row.id}
+                onRetried={updated => setRows(r => r.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+              />
+            </Td>
             <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
           </tr>
         ))}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import {
   Modal, ConfirmModal, Field, inputStyle, btnStyle,
-  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow,
+  PageHeader, Table, Td, ActionCell, LoadingRow, ErrorRow, SyncBadge,
 } from './shared'
 
 const EMPTY = { name: '' }
@@ -70,12 +70,20 @@ export default function DepartmentsTab({ showToast }) {
     <div>
       <PageHeader title="Departments" onAdd={openAdd} addLabel="Add Department" />
 
-      <Table columns={['Name']} empty={!loading && !fetchErr && rows.length === 0 ? 'No departments yet — add one above.' : null}>
-        {loading && <LoadingRow cols={1} />}
-        {fetchErr && <ErrorRow cols={1} message={fetchErr} />}
+      <Table columns={['Name', 'Sync']} empty={!loading && !fetchErr && rows.length === 0 ? 'No departments yet — add one above.' : null}>
+        {loading && <LoadingRow cols={2} />}
+        {fetchErr && <ErrorRow cols={2} message={fetchErr} />}
         {!loading && rows.map(row => (
           <tr key={row.id}>
             <Td>{row.name}</Td>
+            <Td>
+              <SyncBadge
+                syncStatus={row.sync_status}
+                entity="department"
+                id={row.id}
+                onRetried={updated => setRows(r => r.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+              />
+            </Td>
             <ActionCell onEdit={() => openEdit(row)} onDelete={() => { setDelTarget(row); setDelErr(null) }} />
           </tr>
         ))}

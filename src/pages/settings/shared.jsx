@@ -1,4 +1,6 @@
 // Shared primitives for all Settings tabs
+import { useState } from 'react'
+import api from '../../services/api'
 
 export function Modal({ title, onClose, children, width = 480 }) {
   return (
@@ -154,6 +156,105 @@ export function ActionCell({ onEdit, onDelete }) {
       <button onClick={onEdit} title="Edit" style={btnStyle('icon')}>✏️</button>
       <button onClick={onDelete} title="Delete" style={btnStyle('icon')}>🗑️</button>
     </td>
+  )
+}
+
+// ── SyncBadge ─────────────────────────────────────────────────────────────────
+
+function syncSummary(status = {}) {
+  const vals = Object.values(status)
+  if (!vals.length) return 'pending'
+  if (vals.every(v => v === 'ok')) return 'ok'
+  if (vals.some(v => v === 'ok')) return 'partial'
+  return 'failed'
+}
+
+const BADGE = {
+  ok:      { label: '✅ Synced',  bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
+  partial: { label: '⚠️ Partial', bg: '#fffbeb', border: '#fcd34d', color: '#92400e' },
+  failed:  { label: '❌ Failed',  bg: '#fef2f2', border: '#fca5a5', color: '#b91c1c' },
+  pending: { label: '⏳ Pending', bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' },
+}
+
+export function SyncBadge({ syncStatus, entity, id, onRetried }) {
+  const [open, setOpen]       = useState(false)
+  const [retrying, setRetrying] = useState(false)
+  const [err, setErr]         = useState(null)
+  const state = syncSummary(syncStatus)
+  const badge = BADGE[state]
+
+  const handleRetry = async (e) => {
+    e.stopPropagation()
+    setRetrying(true)
+    setErr(null)
+    try {
+      const updated = await api.retrySyncEntity(entity, id)
+      onRetried?.(updated)
+      setOpen(false)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  const services = Object.entries(syncStatus || {})
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => (state === 'pending' ? null : setOpen(o => !o))}
+        style={{
+          padding: '2px 8px', fontSize: 11, fontWeight: 500, borderRadius: 12,
+          border: `1px solid ${badge.border}`, background: badge.bg, color: badge.color,
+          cursor: state === 'pending' ? 'default' : 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {badge.label}
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+          <div style={{
+            position: 'absolute', top: '110%', right: 0, zIndex: 100,
+            background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '12px 14px',
+            minWidth: 180,
+          }}>
+            {services.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>No sync data yet</div>
+            ) : services.map(([svc, st]) => (
+              <div key={svc} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
+                <span style={{ color: st === 'ok' ? '#16a34a' : '#dc2626', fontSize: 14 }}>
+                  {st === 'ok' ? '✅' : '❌'}
+                </span>
+                <span style={{ color: '#374151', textTransform: 'capitalize' }}>{svc}</span>
+                <span style={{ color: '#9ca3af' }}>{st}</span>
+              </div>
+            ))}
+            {(state === 'failed' || state === 'partial') && (
+              <>
+                {err && <div style={{ fontSize: 11, color: '#dc2626', marginBottom: 6 }}>{err}</div>}
+                <button
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  style={{
+                    marginTop: 4, width: '100%', padding: '5px 0', fontSize: 12,
+                    borderRadius: 6, border: '1px solid #d1d5db',
+                    background: retrying ? '#f3f4f6' : '#fff', cursor: retrying ? 'default' : 'pointer',
+                    color: '#374151',
+                  }}
+                >
+                  {retrying ? 'Retrying…' : 'Retry sync'}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

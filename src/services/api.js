@@ -604,6 +604,12 @@ export const api = {
 
   getProjectActivity: (projectId) =>
     fetch(`${BASE}/api/projects/${projectId}/activity`, { headers: headers() }).then(handle),
+
+  getSyncStatus: () =>
+    fetch(`${BASE}/api/sync/status`, { headers: headers() }).then(handle),
+
+  retrySyncEntity: (entity, id) =>
+    fetch(`${BASE}/api/sync/retry`, { method: 'POST', headers: headers(), body: JSON.stringify({ entity, id }) }).then(handle),
 }
 
 export default api

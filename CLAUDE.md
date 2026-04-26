@@ -71,6 +71,71 @@ Superadmin accounts belong to Faya IT staff only
 and must not be able to read or write any
 company's portal data.
 
+## Automation Architecture
+
+### n8n handles (keep these workflows):
+- Uptime Kuma → Zammad ticket → Element/Matrix alerts
+- Any future complex multi-step conditional workflows
+
+### portal-api handles directly (no n8n):
+- User provisioning (already built in lib/provisioning.js)
+- Master data sync (departments, locations, categories)
+- All simple API calls to external services
+
+### Rule:
+Simple data operations → portal-api direct API calls
+Complex multi-step conditional workflows → n8n
+
+## Master Data Sync Architecture
+
+portal-api/src/lib/sync.js is the single sync library.
+It exports functions called by settings routes whenever
+master data changes.
+
+Sync functions:
+- syncDepartment(dept, action)
+  action: created|updated|deleted
+  → Zammad: POST/PUT/DELETE /api/v1/organizations
+  → Snipe-IT: POST/PUT/DELETE /api/v1/departments
+
+- syncLocation(location, action)
+  → Snipe-IT: POST/PUT/DELETE /api/v1/locations
+
+- syncCategory(category, action)
+  → Snipe-IT: POST/PUT/DELETE /api/v1/categories
+
+- syncManufacturer(manufacturer, action)
+  → Snipe-IT: POST/PUT/DELETE /api/v1/manufacturers
+
+- syncModel(model, action)
+  → Snipe-IT: POST/PUT/DELETE /api/v1/models
+
+Sync rules:
+- Portal DB always updated first
+- Sync failures logged but never block portal operation
+- Each settings table has _sync_status JSONB column
+  tracking { zammad: ok|failed, snipe: ok|failed }
+- Failed syncs retried on next update of that record
+
+## SSO Architecture (Token Passthrough)
+
+Users authenticate once via portal login.
+On login, portal-api acquires service tokens:
+- Zammad: POST /api/v1/user_access_tokens
+  with user credentials
+- Snipe-IT: company-level SNIPE_TOKEN from env
+  (Snipe-IT uses per-company tokens not per-user)
+
+Tokens added to JWT payload:
+{ zammad_token, snipe_token }
+
+Frontend uses tokens directly when calling
+service APIs via portal-api proxy endpoints.
+All external API calls proxied through portal-api
+to avoid CORS and hide credentials from browser.
+
+Future: Replace with Authentik OAuth2/OIDC.
+
 ## Still To Do
 - Superadmin portal data access fix (plan written — audit + gate middleware in portal-api)
 - HR API gaps fix (partial: cancel leave + report column names fixed; gate middleware pending)
