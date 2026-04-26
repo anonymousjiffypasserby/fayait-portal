@@ -13,28 +13,30 @@ export const T = {
 
 export const ADMIN_ROLES = ['superadmin', 'admin']
 export const isAdmin = (u) => ADMIN_ROLES.includes(u?.role)
+export const isAgent = (u) => ['superadmin', 'admin', 'agent'].includes(u?.role)
 
-// Zammad priority IDs: 1=low, 2=normal, 3=high, 4=emergency (varies by instance)
 export const PRIORITY_COLORS = {
-  1: { color: '#888',    bg: '#f1f5f9', label: 'Low'       },
-  2: { color: '#3b82f6', bg: '#eff6ff', label: 'Normal'    },
-  3: { color: '#f59e0b', bg: '#fffbeb', label: 'High'      },
-  4: { color: '#e74c3c', bg: '#fef2f2', label: 'Emergency' },
+  1: { color: '#888',    bg: '#f1f5f9', label: 'Low',       dot: '#94a3b8' },
+  2: { color: '#3b82f6', bg: '#eff6ff', label: 'Normal',    dot: '#3b82f6' },
+  3: { color: '#f59e0b', bg: '#fffbeb', label: 'High',      dot: '#f59e0b' },
+  4: { color: '#e74c3c', bg: '#fef2f2', label: 'Emergency', dot: '#e74c3c' },
 }
 
 export const STATE_COLORS = {
-  new:              { color: '#1D9E75', bg: '#f0fdf4', label: 'New'              },
-  open:             { color: '#3b82f6', bg: '#eff6ff', label: 'Open'             },
-  'pending reminder':{ color: '#f59e0b', bg: '#fffbeb', label: 'Pending'         },
-  'pending close':  { color: '#f59e0b', bg: '#fffbeb', label: 'Pending Close'    },
-  closed:           { color: '#888',    bg: '#f1f5f9', label: 'Closed'           },
+  new:               { color: '#1D9E75', bg: '#f0fdf4', label: 'New'          },
+  open:              { color: '#3b82f6', bg: '#eff6ff', label: 'Open'         },
+  'pending reminder':{ color: '#f59e0b', bg: '#fffbeb', label: 'Pending'      },
+  'pending close':   { color: '#f59e0b', bg: '#fffbeb', label: 'Pending Close'},
+  closed:            { color: '#888',    bg: '#f1f5f9', label: 'Closed'       },
 }
+
+export const STATE_ORDER = ['new', 'open', 'pending reminder', 'closed']
 
 export const stateColor = (stateName) =>
   STATE_COLORS[stateName?.toLowerCase()] || { color: '#888', bg: '#f1f5f9', label: stateName || '—' }
 
 export const priorityColor = (priorityId) =>
-  PRIORITY_COLORS[priorityId] || { color: '#888', bg: '#f1f5f9', label: `P${priorityId}` }
+  PRIORITY_COLORS[priorityId] || { color: '#888', bg: '#f1f5f9', label: `P${priorityId}`, dot: '#94a3b8' }
 
 export const fmtDate = (d) => {
   if (!d) return '—'
@@ -47,4 +49,45 @@ export const fmtDateTime = (d) => {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit',
   })
+}
+
+// ── SLA helpers ───────────────────────────────────────────────────────────────
+
+export const fmtDuration = (ms) => {
+  const abs = Math.abs(ms)
+  const totalMin = Math.floor(abs / 60000)
+  if (totalMin < 60) return `${totalMin}m`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h < 24) return m > 0 ? `${h}h ${m}m` : `${h}h`
+  const d = Math.floor(h / 24)
+  const rh = h % 24
+  return rh > 0 ? `${d}d ${rh}h` : `${d}d`
+}
+
+export const fmtCountdown = (ms) => {
+  if (ms < 0) return `Overdue by ${fmtDuration(ms)}`
+  return `${fmtDuration(ms)} remaining`
+}
+
+export const slaStatus = (ticket) => {
+  if (!ticket?.escalation_at) return null
+  const deadline  = new Date(ticket.escalation_at).getTime()
+  const created   = new Date(ticket.created_at).getTime()
+  const now       = Date.now()
+  const remaining = deadline - now
+  const total     = deadline - created
+  if (total <= 0) return null
+  const pct = remaining / total
+
+  if (remaining < 0) return { level: 'red',    pct: 0,   remaining, label: fmtCountdown(remaining) }
+  if (pct < 0.10)    return { level: 'red',    pct,      remaining, label: fmtCountdown(remaining) }
+  if (pct < 0.50)    return { level: 'yellow', pct,      remaining, label: fmtCountdown(remaining) }
+  return               { level: 'green',  pct,      remaining, label: fmtCountdown(remaining) }
+}
+
+export const SLA_COLORS = {
+  green:  { color: '#1D9E75', bg: '#f0fdf4' },
+  yellow: { color: '#f59e0b', bg: '#fffbeb' },
+  red:    { color: '#e74c3c', bg: '#fef2f2' },
 }

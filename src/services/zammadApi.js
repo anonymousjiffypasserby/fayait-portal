@@ -100,6 +100,21 @@ const zammadApi = {
   getTicketsByState: (stateName, limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `state.name:"${stateName}"`, limit, offset })}`, { headers: headers() }).then(handle),
 
+  getAllTickets: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'state.name:new OR state.name:open OR state.name:"pending reminder" OR state.name:closed', limit, offset })}`, { headers: headers() }).then(handle),
+
+  getUnassignedTickets: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'owner.login:- AND (state.name:new OR state.name:open)', limit, offset })}`, { headers: headers() }).then(handle),
+
+  getOverdueTickets: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'escalation_at:<now AND state.name:open', limit, offset })}`, { headers: headers() }).then(handle),
+
+  getTicketsByPriority: (priorityId, limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `priority.id:${priorityId} AND (state.name:new OR state.name:open)`, limit, offset })}`, { headers: headers() }).then(handle),
+
+  deleteTicket: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
   // ── Search ────────────────────────────────────────────────────────────────
   searchTickets: (query, limit = 50) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query, limit })}`, { headers: headers() }).then(handle),

@@ -900,7 +900,7 @@ export default function Dashboard() {
   useEffect(() => {
     Promise.all([
       api.getAssets().catch(() => ({ rows: [], total: 0 })),
-      api.getTicketCount().catch(() => ({ open: null, pending: null, resolved: null })),
+      api.getTicketCount().catch(() => ({ open: null, pending: null, resolved: null, overdue: 0, unassigned: 0 })),
       api.getUsers().catch(() => []),
       api.getActivity(10).catch(() => ({ rows: [] })),
     ]).then(([assetData, ticketData, userData, activityData]) => {
@@ -971,8 +971,10 @@ export default function Dashboard() {
       label: 'Open Tickets',
       value: tickets.open ?? '—',
       icon: '🎫', color: '#ff6b35',
-      sub: tickets.pending != null ? `${tickets.pending} pending` : 'View in tickets',
+      sub: tickets.overdue > 0 ? `${tickets.overdue} overdue` : tickets.pending != null ? `${tickets.pending} pending` : 'View in tickets',
       path: '/tickets',
+      overdueCount: tickets.overdue,
+      unassignedCount: tickets.unassigned,
     },
     {
       label: 'Total Assets',
@@ -1040,6 +1042,16 @@ export default function Dashboard() {
               {stat.warranty > 0 && (
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9, background: T.red + '18', color: T.red }}>
                   {stat.warranty} warranty
+                </span>
+              )}
+              {stat.overdueCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9, background: T.red + '18', color: T.red }}>
+                  {stat.overdueCount} overdue
+                </span>
+              )}
+              {stat.unassignedCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9, background: T.yellow + '22', color: T.yellow }}>
+                  {stat.unassignedCount} unassigned
                 </span>
               )}
             </div>

@@ -16,25 +16,37 @@ const sectionLabel = {
   textTransform: 'uppercase', padding: '14px 16px 4px', fontWeight: 600,
 }
 
-const VIEWS = [
-  { section: 'My Work', items: [
-    { key: 'my_tickets',    label: 'My Tickets',     icon: '🎫' },
-    { key: 'created_by_me', label: 'Created by Me',  icon: '✏️' },
-  ]},
-  { section: 'Status', items: [
-    { key: 'new',     label: 'New',     icon: '🟢' },
-    { key: 'open',    label: 'Open',    icon: '🔵' },
-    { key: 'pending', label: 'Pending', icon: '🟡' },
-    { key: 'closed',  label: 'Closed',  icon: '⚫' },
-  ]},
+const MY_VIEWS = [
+  { key: 'my_all',    label: 'All My Tickets', icon: '🎫' },
+  { key: 'my_open',   label: 'Open',           icon: '🔵' },
+  { key: 'my_pending',label: 'Pending',        icon: '🟡' },
+  { key: 'my_closed', label: 'Closed',         icon: '⚫' },
 ]
 
-export default function TicketSidebar({ view, counts, onView, onNew, onSearch }) {
+const TEAM_VIEWS = [
+  { key: 'all',         label: 'All Tickets',  icon: '📋' },
+  { key: 'unassigned',  label: 'Unassigned',   icon: '❓' },
+  { key: 'overdue',     label: 'Overdue',      icon: '🔴' },
+  { key: 'by_priority', label: 'By Priority',  icon: '⚡' },
+]
+
+export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent }) {
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e) => {
     e.preventDefault()
-    if (searchVal.trim()) onSearch(searchVal.trim())
+    if (searchVal.trim()) onView('search:' + searchVal.trim())
+  }
+
+  const badge = (key) => {
+    const n = counts[key]
+    if (!n) return null
+    return (
+      <span style={{
+        fontSize: 10, background: '#f1f5f9', borderRadius: 8,
+        padding: '1px 6px', color: T.muted,
+      }}>{n}</span>
+    )
   }
 
   return (
@@ -44,6 +56,7 @@ export default function TicketSidebar({ view, counts, onView, onNew, onSearch })
       overflowY: 'auto', display: 'flex', flexDirection: 'column',
       fontFamily: T.font,
     }}>
+      {/* New ticket */}
       <div style={{ padding: '14px 12px 10px' }}>
         <button onClick={onNew} style={{
           width: '100%', padding: '8px 0', borderRadius: 8,
@@ -54,6 +67,7 @@ export default function TicketSidebar({ view, counts, onView, onNew, onSearch })
         </button>
       </div>
 
+      {/* Search */}
       <form onSubmit={handleSearch} style={{ padding: '0 12px 10px' }}>
         <input
           value={searchVal}
@@ -67,25 +81,47 @@ export default function TicketSidebar({ view, counts, onView, onNew, onSearch })
         />
       </form>
 
-      {VIEWS.map(({ section, items }) => (
-        <div key={section}>
-          <div style={sectionLabel}>{section}</div>
-          {items.map(({ key, label, icon }) => (
+      {/* View toggle */}
+      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4 }}>
+        {['list', 'board'].map(mode => (
+          <button key={mode} onClick={() => onDisplayMode(mode)} style={{
+            flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11, fontFamily: T.font,
+            fontWeight: displayMode === mode ? 700 : 400,
+            border: `1px solid ${displayMode === mode ? '#6366f1' : T.border}`,
+            background: displayMode === mode ? '#eef2ff' : '#fafafa',
+            color: displayMode === mode ? '#6366f1' : T.muted,
+            cursor: 'pointer', textTransform: 'capitalize',
+          }}>
+            {mode === 'list' ? '☰ List' : '⊞ Board'}
+          </button>
+        ))}
+      </div>
+
+      {/* My Tickets */}
+      <div>
+        <div style={sectionLabel}>My Tickets</div>
+        {MY_VIEWS.map(({ key, label, icon }) => (
+          <button key={key} style={navBtn(view === key)} onClick={() => onView(key)}>
+            <span>{icon}</span>
+            <span style={{ flex: 1 }}>{label}</span>
+            {badge(key)}
+          </button>
+        ))}
+      </div>
+
+      {/* Team (agent/admin only) */}
+      {isAgent && (
+        <div>
+          <div style={sectionLabel}>Team</div>
+          {TEAM_VIEWS.map(({ key, label, icon }) => (
             <button key={key} style={navBtn(view === key)} onClick={() => onView(key)}>
               <span>{icon}</span>
               <span style={{ flex: 1 }}>{label}</span>
-              {counts[key] > 0 && (
-                <span style={{
-                  fontSize: 10, background: '#f1f5f9', borderRadius: 8,
-                  padding: '1px 6px', color: T.muted,
-                }}>
-                  {counts[key]}
-                </span>
-              )}
+              {badge(key)}
             </button>
           ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
