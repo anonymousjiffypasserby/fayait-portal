@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { T, zammadApi } from './shared'
 
 const STATUSES = [
-  { key: 'new',              label: 'New'          },
-  { key: 'open',             label: 'Open'         },
-  { key: 'pending reminder', label: 'Pending'      },
-  { key: 'closed',           label: 'Closed'       },
+  { key: 'new',              label: 'New'     },
+  { key: 'open',             label: 'Open'    },
+  { key: 'pending reminder', label: 'Pending' },
+  { key: 'closed',           label: 'Closed'  },
 ]
 
 const PRIORITIES = [
@@ -16,13 +16,13 @@ const PRIORITIES = [
 ]
 
 export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
-  const [groups,  setGroups]  = useState([])
-  const [agents,  setAgents]  = useState([])
+  const [agents, setAgents] = useState([])
 
   useEffect(() => {
-    zammadApi.getGroups().then(g => setGroups(Array.isArray(g) ? g : [])).catch(() => {})
     if (isAdmin) {
-      zammadApi.getUsers().then(u => setAgents(Array.isArray(u) ? u.filter(x => x.role_ids?.length || x.roles?.length) : [])).catch(() => {})
+      zammadApi.getUsers()
+        .then(u => setAgents(Array.isArray(u) ? u.filter(x => x.role_ids?.some(id => id > 1)) : []))
+        .catch(() => {})
     }
   }, [isAdmin])
 
@@ -37,7 +37,6 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
   const activeCount = [
     (filters.status || []).length,
     (filters.priority || []).length,
-    filters.group ? 1 : 0,
     filters.agent ? 1 : 0,
     filters.dateFrom || filters.dateTo ? 1 : 0,
     filters.overdue ? 1 : 0,
@@ -46,11 +45,11 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
   return (
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 280, background: T.card, borderLeft: `1px solid ${T.border}`,
+      width: 260, background: T.card, borderLeft: `1px solid ${T.border}`,
       zIndex: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column',
       boxShadow: '-4px 0 16px rgba(0,0,0,0.08)',
     }}>
-      {/* header */}
+      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 16px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
@@ -60,8 +59,10 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
           {activeCount > 0 && (
-            <button onClick={() => onChange({ status: [], priority: [], group: '', agent: '', dateFrom: '', dateTo: '', overdue: false })}
-              style={ghostBtn}>Clear all</button>
+            <button
+              onClick={() => onChange({ status: [], priority: [], agent: '', dateFrom: '', dateTo: '', overdue: false })}
+              style={ghostBtn}
+            >Clear all</button>
           )}
           <button onClick={onClose} style={ghostBtn}>✕</button>
         </div>
@@ -86,14 +87,6 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
           ))}
         </Section>
 
-        {/* Group */}
-        <Section label="Group / Team">
-          <select value={filters.group || ''} onChange={e => set('group', e.target.value)} style={selectStyle}>
-            <option value="">All groups</option>
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </Section>
-
         {/* Agent (admin only) */}
         {isAdmin && (
           <Section label="Agent">
@@ -115,7 +108,7 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
           </div>
         </Section>
 
-        {/* Toggles */}
+        {/* Other */}
         <Section label="Other">
           <ToggleRow label="Overdue (past SLA)" checked={!!filters.overdue}
             onChange={() => set('overdue', !filters.overdue)} />

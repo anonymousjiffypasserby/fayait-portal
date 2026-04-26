@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { T, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
+import { T, stateColor, priorityColor, fmtDateTime, slaStatus, isNewTicket } from './shared'
 import SlaIndicator from './SlaIndicator'
 import FilterPanel from './FilterPanel'
 
@@ -17,9 +17,21 @@ const td = {
 }
 
 const EMPTY_FILTERS = {
-  status: [], priority: [], group: '', agent: '',
+  status: [], priority: [], agent: '',
   dateFrom: '', dateTo: '', overdue: false,
 }
+
+const COLUMNS = [
+  { field: 'number',      label: '#',        w: 60   },
+  { field: 'title',       label: 'Title',    w: null  },
+  { field: 'state',       label: 'Status',   w: 110  },
+  { field: 'priority_id', label: 'Priority', w: 105  },
+  { field: 'customer',    label: 'Customer', w: 130  },
+  { field: 'owner',       label: 'Agent',    w: 120  },
+  { field: 'created_at',  label: 'Created',  w: 130  },
+  { field: 'updated_at',  label: 'Updated',  w: 130  },
+  { field: 'sla',         label: 'SLA',      w: 150  },
+]
 
 export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner }) {
   const [search,      setSearch]      = useState('')
@@ -30,7 +42,6 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
   const activeFilterCount = [
     (filters.status || []).length,
     (filters.priority || []).length,
-    filters.group ? 1 : 0,
     filters.agent ? 1 : 0,
     filters.dateFrom || filters.dateTo ? 1 : 0,
     filters.overdue ? 1 : 0,
@@ -53,9 +64,6 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
 
     if (filters.priority?.length)
       rows = rows.filter(t => filters.priority.includes(String(t.priority_id)))
-
-    if (filters.group)
-      rows = rows.filter(t => String(t.group_id) === String(filters.group))
 
     if (filters.agent)
       rows = rows.filter(t => String(t.owner_id) === String(filters.agent))
@@ -152,21 +160,10 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
             No tickets match your filters
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
-                {[
-                  { field: 'number',     label: '#',        w: 60  },
-                  { field: 'title',      label: 'Title',    w: null },
-                  { field: 'state',      label: 'Status',   w: 110 },
-                  { field: 'priority_id',label: 'Priority', w: 105 },
-                  { field: 'customer',   label: 'Customer', w: 130 },
-                  { field: 'group',      label: 'Group',    w: 120 },
-                  { field: 'owner',      label: 'Agent',    w: 120 },
-                  { field: 'created_at', label: 'Created',  w: 130 },
-                  { field: 'updated_at', label: 'Updated',  w: 130 },
-                  { field: 'sla',        label: 'SLA',      w: 150 },
-                ].map(col => (
+                {COLUMNS.map(col => (
                   <th key={col.field} style={{ ...th, width: col.w || undefined }} onClick={() => toggleSort(col.field)}>
                     {col.label}{sortArrow(col.field)}
                   </th>
@@ -177,7 +174,6 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
               {sorted.map(ticket => {
                 const sc = stateColor(ticket.state)
                 const pc = priorityColor(ticket.priority_id)
-                const sla = slaStatus(ticket)
                 return (
                   <tr
                     key={ticket.id}
@@ -190,7 +186,7 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                       #{ticket.number || ticket.id}
                     </td>
                     <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 280 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 300 }}>
                         {isNewTicket(ticket) && (
                           <span style={{
                             fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, flexShrink: 0,
@@ -221,13 +217,10 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                       </span>
                     </td>
                     <td style={{ ...td, color: T.muted, fontSize: 12 }}>{ticket.customer || '—'}</td>
-                    <td style={{ ...td, color: T.muted, fontSize: 12 }}>{ticket.group || '—'}</td>
                     <td style={{ ...td, color: T.muted, fontSize: 12 }}>{ticket.owner && ticket.owner !== '-' ? ticket.owner : '—'}</td>
                     <td style={{ ...td, color: T.muted, fontSize: 12 }}>{fmtDateTime(ticket.created_at)}</td>
                     <td style={{ ...td, color: T.muted, fontSize: 12 }}>{fmtDateTime(ticket.updated_at)}</td>
-                    <td style={td}>
-                      <SlaIndicator ticket={ticket} />
-                    </td>
+                    <td style={td}><SlaIndicator ticket={ticket} /></td>
                   </tr>
                 )
               })}

@@ -16,7 +16,6 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
   const [ticket,    setTicket]    = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState('Conversation')
-  const [groups,    setGroups]    = useState([])
   const [agents,    setAgents]    = useState([])
   const [editTitle, setEditTitle] = useState(false)
   const [titleVal,  setTitleVal]  = useState('')
@@ -35,8 +34,6 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
 
   useEffect(() => {
     load()
-    zammadApi.getGroups().then(g => setGroups(Array.isArray(g) ? g : [])).catch(() => {})
-    // Load Zammad users — their IDs are what owner_id expects
     zammadApi.getUsers()
       .then(users => setAgents(Array.isArray(users) ? users.filter(isZammadAgent) : []))
       .catch(() => {})
@@ -184,17 +181,6 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
             {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
 
-          {/* Group */}
-          {groups.length > 0 && (
-            <select
-              value={ticket.group_id || ''}
-              onChange={e => patch({ group_id: Number(e.target.value) })}
-              style={dropdownStyle}
-            >
-              <option value="">No group</option>
-              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          )}
         </div>
 
         {/* Assignee row — shown for agents and admins */}

@@ -5,6 +5,7 @@ export const SLA_PRIORITY_LABELS = { 1: 'Low', 2: 'Normal', 3: 'High', 4: 'Emerg
 export const DEFAULTS = {
   slaHours: { 1: 24, 2: 8, 3: 4, 4: 1 },
   newBadgeHours: 24,
+  predefinedTags: [],
 }
 
 export function getTicketSettings() {
@@ -15,10 +16,11 @@ export function getTicketSettings() {
       return {
         slaHours: { ...DEFAULTS.slaHours, ...(stored.slaHours || {}) },
         newBadgeHours: stored.newBadgeHours ?? DEFAULTS.newBadgeHours,
+        predefinedTags: Array.isArray(stored.predefinedTags) ? stored.predefinedTags : [],
       }
     }
   } catch {}
-  return { slaHours: { ...DEFAULTS.slaHours }, newBadgeHours: DEFAULTS.newBadgeHours }
+  return { slaHours: { ...DEFAULTS.slaHours }, newBadgeHours: DEFAULTS.newBadgeHours, predefinedTags: [] }
 }
 
 export function saveTicketSettings(settings) {
