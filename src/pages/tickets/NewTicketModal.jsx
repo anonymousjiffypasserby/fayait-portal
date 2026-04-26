@@ -17,20 +17,15 @@ export default function NewTicketModal({ onCreated, onClose }) {
   const [priorityId,     setPriority]   = useState('2')
   const [ownerId,        setOwner]      = useState('')
   const [tags,           setTags]       = useState([])
-  const [file,           setFile]       = useState(null)
-  const [agents,         setAgents]     = useState([])
-  const [defaultGroupId, setDefaultGroup] = useState(null)
-  const [submitting,     setSubmitting] = useState(false)
+  const [file,       setFile]     = useState(null)
+  const [agents,     setAgents]   = useState([])
+  const [submitting, setSubmitting] = useState(false)
   const [error,          setError]      = useState(null)
   const fileRef = useRef(null)
 
   const predefinedTags = getTicketSettings().predefinedTags
 
   useEffect(() => {
-    // Fetch default group silently — Zammad requires group_id but we don't expose it in the UI
-    zammadApi.getGroups()
-      .then(g => { if (Array.isArray(g) && g[0]) setDefaultGroup(g[0].id) })
-      .catch(() => {})
     zammadApi.getUsers()
       .then(u => setAgents(Array.isArray(u) ? u.filter(isZammadAgent) : []))
       .catch(() => {})
@@ -50,7 +45,6 @@ export default function NewTicketModal({ onCreated, onClose }) {
         title: title.trim(),
         article: { body: body.trim(), type: 'note', internal: false },
         priority_id: Number(priorityId) || 2,
-        group_id: defaultGroupId || 1,
         ...(ownerId ? { owner_id: Number(ownerId) } : {}),
         ...(tags.length ? { tags: tags.join(',') } : {}),
       }
