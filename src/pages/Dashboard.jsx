@@ -676,14 +676,15 @@ function MyProjectsWidget() {
   const [loading, setLoading]   = useState(true)
   const [min, toggle]           = useWidget('my-projects')
   const navigate                = useNavigate()
+  const { user }                = useAuth()
 
   useEffect(() => {
-    if (min) return
-    api.getProjects('?assigned_to=me&limit=5')
+    if (min || !user?.id) return
+    api.getProjects(`?assigned_to=${user.id}`)
       .then(data => setProjects((data.rows || data || []).slice(0, 5)))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [min])
+  }, [min, user?.id])
 
   const fmtShort = (d) => {
     if (!d) return null

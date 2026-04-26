@@ -145,8 +145,12 @@ export default function Sidebar({ view, filters, projects, tasks, user, onView, 
             }}
           >
             <option value=''>All Assignees</option>
-            {[...new Set(projects.map(p => p.assigned_to_name).filter(Boolean))].map(name => (
-              <option key={name} value={name}>{name}</option>
+            {[...new Map(
+              projects
+                .filter(p => p.assigned_to && p.assigned_to_name)
+                .map(p => [p.assigned_to, p.assigned_to_name])
+            ).entries()].map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
             ))}
           </select>
         )}
