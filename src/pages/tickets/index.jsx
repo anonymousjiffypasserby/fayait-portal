@@ -1,22 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { zammadApi, T, isAdmin, isAgent } from './shared'
-import TicketSidebar  from './Sidebar'
-import ListView       from './ListView'
-import BoardView      from './BoardView'
-import DetailPanel    from './DetailPanel'
-import NewTicketModal from './NewTicketModal'
+import TicketSidebar       from './Sidebar'
+import ListView            from './ListView'
+import BoardView           from './BoardView'
+import DetailPanel         from './DetailPanel'
+import NewTicketModal      from './NewTicketModal'
+import TicketSettingsModal from './TicketSettingsModal'
+import TicketReports       from '../reports/TicketReports'
 
 const POLL_INTERVAL = 60000
 
+const REPORT_VIEWS = new Set([
+  'tk-overview', 'tk-by-priority', 'tk-by-group',
+  'tk-response', 'tk-resolution', 'tk-agent-perf', 'tk-sla', 'tk-csat',
+])
+
 async function fetchView(view) {
+  if (REPORT_VIEWS.has(view)) return []
   if (view.startsWith('search:')) return zammadApi.searchTickets(view.slice(7), 50)
 
   switch (view) {
     case 'my_all':      return zammadApi.getMyTickets(100)
-    case 'my_open':     return zammadApi.getTicketsByState('open', 100).then(r => (r || []).filter(t => t.owner?.toLowerCase() !== '-'))
-    case 'my_pending':  return zammadApi.getTicketsByState('pending reminder', 100)
-    case 'my_closed':   return zammadApi.getTicketsByState('closed', 50)
+    case 'my_open':     return zammadApi.getMyTicketsByState('open', 100)
+    case 'my_pending':  return zammadApi.getMyTicketsByState('pending reminder', 100)
+    case 'my_closed':   return zammadApi.getMyTicketsByState('closed', 50)
     case 'all':         return zammadApi.getAllTickets(100)
     case 'unassigned':  return zammadApi.getUnassignedTickets(100)
     case 'overdue':     return zammadApi.getOverdueTickets(100)
@@ -25,7 +33,7 @@ async function fetchView(view) {
   }
 }
 
-async function fetchCounts(agentUser) {
+async function fetchCounts() {
   const views = ['my_all', 'my_open', 'my_pending', 'unassigned', 'overdue']
   const results = await Promise.allSettled(views.map(v => fetchView(v)))
   return Object.fromEntries(views.map((v, i) => [
@@ -42,6 +50,7 @@ export default function Tickets() {
   const [loading, setLoading]     = useState(true)
   const [selectedId, setSelectedId] = useState(null)
   const [showNew, setShowNew]     = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [counts, setCounts]       = useState({})
   const [newBanner, setNewBanner] = useState(0)
 
@@ -49,7 +58,10 @@ export default function Tickets() {
   const admin    = isAdmin(user)
   const agent    = isAgent(user)
 
+  const isReport = REPORT_VIEWS.has(view)
+
   const load = useCallback(async (currentView, silent = false) => {
+    if (REPORT_VIEWS.has(currentView)) return
     if (!silent) setLoading(true)
     try {
       const result = await fetchView(currentView)
@@ -114,6 +126,7 @@ export default function Tickets() {
         displayMode={displayMode}
         onDisplayMode={setMode}
         isAgent={agent}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* Main area */}
@@ -139,7 +152,11 @@ export default function Tickets() {
 
         {/* Content */}
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          {displayMode === 'board' ? (
+          {isReport ? (
+            <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <TicketReports view={view} />
+            </div>
+          ) : displayMode === 'board' ? (
             <BoardView
               tickets={tickets}
               onSelect={t => setSelectedId(t.id)}
@@ -163,6 +180,7 @@ export default function Tickets() {
               onClose={() => setSelectedId(null)}
               onUpdated={handleUpdated}
               isAdmin={admin}
+              isAgent={agent}
             />
           )}
         </div>
@@ -174,6 +192,10 @@ export default function Tickets() {
           onClose={() => setShowNew(false)}
         />
       )}
+
+      {showSettings && (
+        <TicketSettingsModal onClose={() => setShowSettings(false)} />
+      )}
     </div>
   )
 }
@@ -181,14 +203,22 @@ export default function Tickets() {
 function viewLabel(view) {
   if (view.startsWith('search:')) return `Search: "${view.slice(7)}"`
   const labels = {
-    my_all:      'All My Tickets',
-    my_open:     'Open',
-    my_pending:  'Pending',
-    my_closed:   'Closed',
-    all:         'All Tickets',
-    unassigned:  'Unassigned',
-    overdue:     'Overdue',
-    by_priority: 'By Priority',
+    my_all:          'All My Tickets',
+    my_open:         'Open',
+    my_pending:      'Pending',
+    my_closed:       'Closed',
+    all:             'All Tickets',
+    unassigned:      'Unassigned',
+    overdue:         'Overdue',
+    by_priority:     'By Priority',
+    'tk-overview':   'Reports — Overview',
+    'tk-by-priority':'Reports — By Priority',
+    'tk-by-group':   'Reports — By Group',
+    'tk-response':   'Reports — Response Time',
+    'tk-resolution': 'Reports — Resolution Time',
+    'tk-agent-perf': 'Reports — Agent Performance',
+    'tk-sla':        'Reports — SLA Compliance',
+    'tk-csat':       'Reports — Customer Satisfaction',
   }
   return labels[view] || view
 }

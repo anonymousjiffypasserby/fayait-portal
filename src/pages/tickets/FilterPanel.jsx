@@ -40,7 +40,6 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
     filters.group ? 1 : 0,
     filters.agent ? 1 : 0,
     filters.dateFrom || filters.dateTo ? 1 : 0,
-    filters.hasAttachment ? 1 : 0,
     filters.overdue ? 1 : 0,
   ].reduce((a, b) => a + b, 0)
 
@@ -61,7 +60,7 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
           {activeCount > 0 && (
-            <button onClick={() => onChange({ status: [], priority: [], group: '', agent: '', dateFrom: '', dateTo: '', hasAttachment: false, overdue: false })}
+            <button onClick={() => onChange({ status: [], priority: [], group: '', agent: '', dateFrom: '', dateTo: '', overdue: false })}
               style={ghostBtn}>Clear all</button>
           )}
           <button onClick={onClose} style={ghostBtn}>✕</button>
@@ -118,8 +117,6 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
 
         {/* Toggles */}
         <Section label="Other">
-          <ToggleRow label="Has attachment" checked={!!filters.hasAttachment}
-            onChange={() => set('hasAttachment', !filters.hasAttachment)} />
           <ToggleRow label="Overdue (past SLA)" checked={!!filters.overdue}
             onChange={() => set('overdue', !filters.overdue)} />
         </Section>

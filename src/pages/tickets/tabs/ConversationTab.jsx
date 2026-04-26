@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { T, zammadApi, fmtDateTime } from '../shared'
 
 const CHANNEL_ICONS = { email: '✉', phone: '📞', chat: '💬', web: '🌐', note: '📝' }
@@ -83,7 +83,7 @@ function ArticleBubble({ article }) {
   )
 }
 
-export default function ConversationTab({ ticketId, onReplySent }) {
+export default function ConversationTab({ ticketId, onReplySent, isAgent, insertText, onInsertConsumed }) {
   const [articles,   setArticles]   = useState([])
   const [loading,    setLoading]    = useState(true)
   const [reply,      setReply]      = useState('')
@@ -108,6 +108,13 @@ export default function ConversationTab({ ticketId, onReplySent }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [articles])
 
+  useEffect(() => {
+    if (!insertText) return
+    setReply(prev => prev ? prev + '\n\n' + insertText : insertText)
+    setInternal(false)
+    onInsertConsumed?.()
+  }, [insertText])
+
   const sendReply = async () => {
     if (!reply.trim() || sending) return
     setSending(true)
@@ -121,7 +128,7 @@ export default function ConversationTab({ ticketId, onReplySent }) {
         body: reply.trim(),
         type: internal ? 'note' : 'web',
         internal,
-        sender: internal ? 'Agent' : 'Customer',
+        sender: isAgent ? 'Agent' : 'Customer',
       })
       setReply('')
       setFile(null)

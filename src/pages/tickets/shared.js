@@ -1,4 +1,5 @@
 import zammadApi from '../../services/zammadApi'
+import { getTicketSettings } from './ticketSettings'
 
 export { zammadApi }
 
@@ -70,9 +71,22 @@ export const fmtCountdown = (ms) => {
   return `${fmtDuration(ms)} remaining`
 }
 
+// Returns SLA deadline as timestamp. Uses Zammad's escalation_at when present,
+// otherwise computes from created_at + configured hours per priority.
+const getSlaDeadline = (ticket) => {
+  if (!ticket?.created_at) return null
+  if (ticket.escalation_at) return new Date(ticket.escalation_at).getTime()
+  const state = (ticket.state || '').toLowerCase()
+  if (state === 'closed') return null
+  const settings = getTicketSettings()
+  const hours = settings.slaHours[ticket.priority_id] ?? 8
+  return new Date(ticket.created_at).getTime() + hours * 3600000
+}
+
 export const slaStatus = (ticket) => {
-  if (!ticket?.escalation_at) return null
-  const deadline  = new Date(ticket.escalation_at).getTime()
+  if (!ticket) return null
+  const deadline = getSlaDeadline(ticket)
+  if (!deadline) return null
   const created   = new Date(ticket.created_at).getTime()
   const now       = Date.now()
   const remaining = deadline - now
@@ -80,10 +94,18 @@ export const slaStatus = (ticket) => {
   if (total <= 0) return null
   const pct = remaining / total
 
-  if (remaining < 0) return { level: 'red',    pct: 0,   remaining, label: fmtCountdown(remaining) }
-  if (pct < 0.10)    return { level: 'red',    pct,      remaining, label: fmtCountdown(remaining) }
-  if (pct < 0.50)    return { level: 'yellow', pct,      remaining, label: fmtCountdown(remaining) }
-  return               { level: 'green',  pct,      remaining, label: fmtCountdown(remaining) }
+  if (remaining < 0) return { level: 'red',    pct: 0,  remaining, label: fmtCountdown(remaining) }
+  if (pct < 0.10)    return { level: 'red',    pct,     remaining, label: fmtCountdown(remaining) }
+  if (pct < 0.50)    return { level: 'yellow', pct,     remaining, label: fmtCountdown(remaining) }
+  return               { level: 'green',  pct,     remaining, label: fmtCountdown(remaining) }
+}
+
+// Returns true when a ticket should display a "New" badge based on age threshold.
+export const isNewTicket = (ticket) => {
+  if (!ticket?.created_at) return false
+  const settings = getTicketSettings()
+  const ageMs = Date.now() - new Date(ticket.created_at).getTime()
+  return ageMs < settings.newBadgeHours * 3600000
 }
 
 export const SLA_COLORS = {

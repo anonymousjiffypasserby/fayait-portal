@@ -92,13 +92,16 @@ const zammadApi = {
 
   // ── Ticket views ──────────────────────────────────────────────────────────
   getMyTickets: (limit = 25, offset = 0) =>
-    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'owner.login:me', limit, offset })}`, { headers: headers() }).then(handle),
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'owner.login:me OR customer.login:me', limit, offset })}`, { headers: headers() }).then(handle),
 
   getTicketsCreatedByMe: (limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'customer.login:me', limit, offset })}`, { headers: headers() }).then(handle),
 
   getTicketsByState: (stateName, limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `state.name:"${stateName}"`, limit, offset })}`, { headers: headers() }).then(handle),
+
+  getMyTicketsByState: (stateName, limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `(owner.login:me OR customer.login:me) AND state.name:"${stateName}"`, limit, offset })}`, { headers: headers() }).then(handle),
 
   getAllTickets: (limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'state.name:new OR state.name:open OR state.name:"pending reminder" OR state.name:closed', limit, offset })}`, { headers: headers() }).then(handle),

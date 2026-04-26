@@ -30,7 +30,18 @@ const TEAM_VIEWS = [
   { key: 'by_priority', label: 'By Priority',  icon: '⚡' },
 ]
 
-export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent }) {
+const REPORT_VIEWS = [
+  { key: 'tk-overview',    label: 'Overview',            icon: '📊' },
+  { key: 'tk-by-priority', label: 'By Priority',         icon: '🔢' },
+  { key: 'tk-by-group',    label: 'By Group',            icon: '👥' },
+  { key: 'tk-response',    label: 'Response Time',       icon: '⏱' },
+  { key: 'tk-resolution',  label: 'Resolution Time',     icon: '✅' },
+  { key: 'tk-agent-perf',  label: 'Agent Performance',   icon: '🏆' },
+  { key: 'tk-sla',         label: 'SLA Compliance',      icon: '📋' },
+  { key: 'tk-csat',        label: 'Customer Satisfaction',icon: '⭐' },
+]
+
+export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent, onOpenSettings }) {
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e) => {
@@ -48,6 +59,8 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
       }}>{n}</span>
     )
   }
+
+  const isReport = view.startsWith('tk-')
 
   return (
     <div style={{
@@ -81,21 +94,23 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
         />
       </form>
 
-      {/* View toggle */}
-      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4 }}>
-        {['list', 'board'].map(mode => (
-          <button key={mode} onClick={() => onDisplayMode(mode)} style={{
-            flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11, fontFamily: T.font,
-            fontWeight: displayMode === mode ? 700 : 400,
-            border: `1px solid ${displayMode === mode ? '#6366f1' : T.border}`,
-            background: displayMode === mode ? '#eef2ff' : '#fafafa',
-            color: displayMode === mode ? '#6366f1' : T.muted,
-            cursor: 'pointer', textTransform: 'capitalize',
-          }}>
-            {mode === 'list' ? '☰ List' : '⊞ Board'}
-          </button>
-        ))}
-      </div>
+      {/* View toggle — only show when not in a report */}
+      {!isReport && (
+        <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4 }}>
+          {['list', 'board'].map(mode => (
+            <button key={mode} onClick={() => onDisplayMode(mode)} style={{
+              flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11, fontFamily: T.font,
+              fontWeight: displayMode === mode ? 700 : 400,
+              border: `1px solid ${displayMode === mode ? '#6366f1' : T.border}`,
+              background: displayMode === mode ? '#eef2ff' : '#fafafa',
+              color: displayMode === mode ? '#6366f1' : T.muted,
+              cursor: 'pointer', textTransform: 'capitalize',
+            }}>
+              {mode === 'list' ? '☰ List' : '⊞ Board'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* My Tickets */}
       <div>
@@ -122,6 +137,28 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
           ))}
         </div>
       )}
+
+      {/* Reports */}
+      <div>
+        <div style={sectionLabel}>Reports</div>
+        {REPORT_VIEWS.map(({ key, label, icon }) => (
+          <button key={key} style={navBtn(view === key)} onClick={() => onView(key)}>
+            <span>{icon}</span>
+            <span style={{ flex: 1 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Settings */}
+      <div style={{ marginTop: 'auto', borderTop: `1px solid ${T.border}`, padding: '8px 12px' }}>
+        <button onClick={onOpenSettings} style={{
+          width: '100%', padding: '7px 12px', borderRadius: 7, fontSize: 12,
+          border: `1px solid ${T.border}`, background: '#fafafa', color: T.muted,
+          cursor: 'pointer', fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span>⚙</span> Ticket Settings
+        </button>
+      </div>
     </div>
   )
 }

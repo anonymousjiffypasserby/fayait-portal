@@ -13,13 +13,13 @@ export default function BoardView({ tickets, onSelect, onTicketUpdated }) {
   const [dragId,   setDragId]   = useState(null)
   const [overCol,  setOverCol]  = useState(null)
   const [updating, setUpdating] = useState(null)
-  const dragOver = useRef(null)
+  const sourceCol = useRef(null)
 
   const byState = (stateKey) =>
     tickets.filter(t => (t.state || '').toLowerCase() === stateKey)
 
   const handleDrop = async (colKey) => {
-    if (!dragId || colKey === dragOver.current) return
+    if (!dragId || colKey === sourceCol.current) return
     setUpdating(dragId)
     try {
       await zammadApi.updateTicket(dragId, { state: colKey })
@@ -28,7 +28,7 @@ export default function BoardView({ tickets, onSelect, onTicketUpdated }) {
     setUpdating(null)
     setDragId(null)
     setOverCol(null)
-    dragOver.current = null
+    sourceCol.current = null
   }
 
   return (
@@ -45,7 +45,7 @@ export default function BoardView({ tickets, onSelect, onTicketUpdated }) {
         return (
           <div
             key={col.key}
-            onDragOver={e => { e.preventDefault(); setOverCol(col.key); dragOver.current = col.key }}
+            onDragOver={e => { e.preventDefault(); setOverCol(col.key) }}
             onDragLeave={() => setOverCol(null)}
             onDrop={() => handleDrop(col.key)}
             style={{
@@ -81,7 +81,7 @@ export default function BoardView({ tickets, onSelect, onTicketUpdated }) {
                   <BoardCard
                     ticket={t}
                     onSelect={onSelect}
-                    onDragStart={id => { setDragId(id); dragOver.current = col.key }}
+                    onDragStart={id => { setDragId(id); sourceCol.current = col.key }}
                   />
                 </div>
               ))}

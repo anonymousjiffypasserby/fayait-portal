@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { T, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS } from './shared'
+import { T, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
 import SlaIndicator from './SlaIndicator'
 import FilterPanel from './FilterPanel'
 
@@ -18,7 +18,7 @@ const td = {
 
 const EMPTY_FILTERS = {
   status: [], priority: [], group: '', agent: '',
-  dateFrom: '', dateTo: '', hasAttachment: false, overdue: false,
+  dateFrom: '', dateTo: '', overdue: false,
 }
 
 export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner }) {
@@ -33,7 +33,6 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
     filters.group ? 1 : 0,
     filters.agent ? 1 : 0,
     filters.dateFrom || filters.dateTo ? 1 : 0,
-    filters.hasAttachment ? 1 : 0,
     filters.overdue ? 1 : 0,
   ].reduce((a, b) => a + b, 0)
 
@@ -191,8 +190,16 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                       #{ticket.number || ticket.id}
                     </td>
                     <td style={td}>
-                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
-                        {ticket.title}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 280 }}>
+                        {isNewTicket(ticket) && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, flexShrink: 0,
+                            background: '#dcfce7', color: '#15803d', letterSpacing: 0.4,
+                          }}>NEW</span>
+                        )}
+                        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ticket.title}
+                        </span>
                       </div>
                     </td>
                     <td style={td}>

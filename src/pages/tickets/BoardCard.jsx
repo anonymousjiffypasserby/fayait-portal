@@ -1,4 +1,4 @@
-import { T, priorityColor, fmtDateTime } from './shared'
+import { T, priorityColor, isNewTicket } from './shared'
 import SlaIndicator from './SlaIndicator'
 
 export default function BoardCard({ ticket, onSelect, onDragStart }) {
@@ -34,13 +34,22 @@ export default function BoardCard({ ticket, onSelect, onDragStart }) {
         <SlaIndicator ticket={ticket} compact />
       </div>
 
-      {/* Title */}
-      <div style={{
-        fontSize: 13, fontWeight: 600, color: T.navy, lineHeight: 1.35,
-        marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical', overflow: 'hidden',
-      }}>
-        {ticket.title}
+      {/* Title + New badge */}
+      <div style={{ marginBottom: 8 }}>
+        {isNewTicket(ticket) && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+            background: '#dcfce7', color: '#15803d', letterSpacing: 0.4,
+            display: 'inline-block', marginBottom: 4,
+          }}>NEW</span>
+        )}
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: T.navy, lineHeight: 1.35,
+          display: '-webkit-box', WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {ticket.title}
+        </div>
       </div>
 
       {/* Customer + agent row */}

@@ -1,59 +1,44 @@
 import { useState, useEffect, useRef } from 'react'
 import { zammadApi, T } from './shared'
+import api from '../../services/api'
+
+const AGENT_ROLES = ['admin', 'agent']
 
 export default function NewTicketModal({ onCreated, onClose }) {
   const [title,      setTitle]      = useState('')
   const [body,       setBody]       = useState('')
   const [priorityId, setPriority]   = useState('2')
   const [groupId,    setGroup]      = useState('')
-  const [customerId, setCustomer]   = useState('')
-  const [customerQ,  setCustomerQ]  = useState('')
-  const [customerOpts, setCustomerOpts] = useState([])
+  const [ownerId,    setOwner]      = useState('')
   const [tags,       setTags]       = useState([])
   const [tagInput,   setTagInput]   = useState('')
   const [file,       setFile]       = useState(null)
   const [priorities, setPriorities] = useState([])
   const [groups,     setGroups]     = useState([])
+  const [agents,     setAgents]     = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error,      setError]      = useState(null)
   const fileRef = useRef(null)
-  const custTimer = useRef(null)
 
   useEffect(() => {
-    Promise.all([zammadApi.getTicketPriorities(), zammadApi.getGroups()])
-      .then(([p, g]) => {
+    Promise.all([
+      zammadApi.getTicketPriorities(),
+      zammadApi.getGroups(),
+      api.getUsers(),
+    ])
+      .then(([p, g, u]) => {
         const pArr = Array.isArray(p) ? p : []
         const gArr = Array.isArray(g) ? g : []
+        const uArr = Array.isArray(u) ? u.filter(x => AGENT_ROLES.includes(x.role)) : []
         setPriorities(pArr)
         setGroups(gArr)
+        setAgents(uArr)
         const def = pArr.find(x => x.default_create)?.id || pArr[1]?.id || pArr[0]?.id
         if (def) setPriority(String(def))
         if (gArr[0]) setGroup(String(gArr[0].id))
       })
       .catch(() => {})
   }, [])
-
-  const searchCustomers = (q) => {
-    clearTimeout(custTimer.current)
-    if (!q.trim()) { setCustomerOpts([]); return }
-    custTimer.current = setTimeout(() => {
-      zammadApi.getUsers({ query: q, limit: 10 })
-        .then(data => setCustomerOpts(Array.isArray(data) ? data : []))
-        .catch(() => {})
-    }, 300)
-  }
-
-  const handleCustomerQ = (e) => {
-    setCustomerQ(e.target.value)
-    setCustomerId('')
-    searchCustomers(e.target.value)
-  }
-
-  const selectCustomer = (u) => {
-    setCustomerId(u.id)
-    setCustomerQ(`${u.firstname} ${u.lastname} <${u.email}>`)
-    setCustomerOpts([])
-  }
 
   const addTag = (e) => {
     e.preventDefault()
@@ -73,7 +58,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
         article: { body: body.trim(), type: 'note', internal: false },
         priority_id: Number(priorityId) || 2,
         group_id: Number(groupId) || undefined,
-        ...(customerId ? { customer_id: Number(customerId) } : {}),
+        ...(ownerId ? { owner_id: Number(ownerId) } : {}),
         tags: tags.join(',') || undefined,
       }
       const ticket = await zammadApi.createTicket(payload)
@@ -111,37 +96,6 @@ export default function NewTicketModal({ onCreated, onClose }) {
             <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Brief description" style={inp} />
           </Field>
 
-          {/* Customer */}
-          <Field label="Customer">
-            <div style={{ position: 'relative' }}>
-              <input
-                value={customerQ}
-                onChange={handleCustomerQ}
-                placeholder="Search by name or email…"
-                style={inp}
-              />
-              {customerOpts.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0,
-                  background: '#fff', border: `1px solid ${T.border}`,
-                  borderRadius: 7, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: 180, overflowY: 'auto',
-                }}>
-                  {customerOpts.map(u => (
-                    <div
-                      key={u.id}
-                      onClick={() => selectCustomer(u)}
-                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.navy, borderBottom: `1px solid ${T.border}` }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={e => e.currentTarget.style.background = ''}
-                    >
-                      {u.firstname} {u.lastname} <span style={{ color: T.muted }}>· {u.email}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </Field>
-
           {/* Priority + Group */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Priority">
@@ -155,6 +109,20 @@ export default function NewTicketModal({ onCreated, onClose }) {
               </select>
             </Field>
           </div>
+
+          {/* Assignee */}
+          {agents.length > 0 && (
+            <Field label="Assign to">
+              <select value={ownerId} onChange={e => setOwner(e.target.value)} style={inp}>
+                <option value="">Unassigned</option>
+                {agents.map(a => (
+                  <option key={a.id} value={a.zammad_user_id || a.id}>
+                    {a.name || a.email}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <Field label="Description *">
             <textarea

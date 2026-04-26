@@ -1,24 +1,29 @@
 import { useState, useEffect } from 'react'
-import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS } from './shared'
+import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
 import ConversationTab   from './tabs/ConversationTab'
 import DetailsTab        from './tabs/DetailsTab'
 import KnowledgeBaseTab  from './tabs/KnowledgeBaseTab'
+import api from '../../services/api'
 
-const STATES     = ['new', 'open', 'pending reminder', 'closed']
+// 'new' removed — it is set automatically by Zammad on creation, not manually
+const STATES     = ['open', 'pending reminder', 'closed']
 const PRIORITIES = [{ id: 1, name: 'Low' }, { id: 2, name: 'Normal' }, { id: 3, name: 'High' }, { id: 4, name: 'Emergency' }]
 const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
-export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
-  const [ticket,   setTicket]   = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [tab,      setTab]      = useState('Conversation')
-  const [groups,   setGroups]   = useState([])
-  const [agents,   setAgents]   = useState([])
+const AGENT_ROLES = ['admin', 'agent']
+
+export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isAgent }) {
+  const [ticket,    setTicket]    = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [tab,       setTab]       = useState('Conversation')
+  const [groups,    setGroups]    = useState([])
+  const [agents,    setAgents]    = useState([])
   const [editTitle, setEditTitle] = useState(false)
   const [titleVal,  setTitleVal]  = useState('')
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState(null)
+  const [deleting,  setDeleting]  = useState(false)
+  const [kbInsert,  setKbInsert]  = useState('')
 
   const load = () => {
     setLoading(true)
@@ -31,13 +36,20 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
   useEffect(() => {
     load()
     zammadApi.getGroups().then(g => setGroups(Array.isArray(g) ? g : [])).catch(() => {})
-    if (isAdmin) {
-      zammadApi.getUsers().then(u => setAgents(Array.isArray(u) ? u : [])).catch(() => {})
-    }
+    // Load agents from portal API (company-scoped) for the assignee dropdown
+    api.getUsers()
+      .then(users => {
+        const agentUsers = Array.isArray(users)
+          ? users.filter(u => AGENT_ROLES.includes(u.role))
+          : []
+        setAgents(agentUsers)
+      })
+      .catch(() => {})
   }, [ticketId])
 
   const patch = async (data) => {
     setSaving(true)
+    setError(null)
     try {
       const updated = await zammadApi.updateTicket(ticketId, data)
       setTicket(prev => ({ ...prev, ...updated }))
@@ -85,10 +97,14 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
     )
   }
 
-  const sc  = stateColor(ticket.state)
-  const pc  = priorityColor(ticket.priority_id)
-  const sla = slaStatus(ticket)
+  const sc   = stateColor(ticket.state)
+  const pc   = priorityColor(ticket.priority_id)
+  const sla  = slaStatus(ticket)
   const slaC = sla ? SLA_COLORS[sla.level] : null
+  const showNewBadge = isNewTicket(ticket)
+
+  // Current assignee name from portal agent list (matched by email if available)
+  const currentAgentName = ticket.owner && ticket.owner !== '-' ? ticket.owner : null
 
   return (
     <PanelShell onClose={onClose}>
@@ -97,26 +113,29 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
         padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
         background: T.card, flexShrink: 0,
       }}>
-        {/* Ticket # + close + delete */}
+        {/* Ticket # + actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: T.muted }}>#{ticket.number || ticket.id}</span>
+          {showNewBadge && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 6,
+              background: '#dcfce7', color: '#15803d', letterSpacing: 0.5,
+            }}>NEW</span>
+          )}
           <div style={{ flex: 1 }} />
           {saving && <span style={{ fontSize: 11, color: T.muted }}>Saving…</span>}
-          {error && <span style={{ fontSize: 11, color: T.red }}>{error}</span>}
-          {ticket.state !== 'closed' && (
-            <button
-              onClick={() => patch({ state: 'closed' })}
-              style={actionBtn('#1D9E75', '#f0fdf4')}
-            >
+          {error && <span style={{ fontSize: 11, color: T.red, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{error}</span>}
+          {ticket.state !== 'closed' ? (
+            <button onClick={() => patch({ state: 'closed' })} style={actionBtn('#1D9E75', '#f0fdf4')}>
               Close Ticket
+            </button>
+          ) : (
+            <button onClick={() => patch({ state: 'open' })} style={actionBtn('#3b82f6', '#eff6ff')}>
+              Reopen
             </button>
           )}
           {isAdmin && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              style={actionBtn('#e74c3c', '#fef2f2')}
-            >
+            <button onClick={handleDelete} disabled={deleting} style={actionBtn('#e74c3c', '#fef2f2')}>
               {deleting ? '…' : 'Delete'}
             </button>
           )}
@@ -149,12 +168,15 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
 
         {/* Dropdowns row */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* State */}
+          {/* State — 'new' excluded; shown read-only if current state is new */}
           <select
-            value={ticket.state || ''}
+            value={STATES.includes(ticket.state) ? ticket.state : ''}
             onChange={e => patch({ state: e.target.value })}
             style={{ ...dropdownStyle, color: sc.color, background: sc.bg, borderColor: sc.color + '44' }}
           >
+            {ticket.state === 'new' && (
+              <option value="" disabled>New (auto)</option>
+            )}
             {STATES.map(s => <option key={s} value={s}>{stateColor(s).label}</option>)}
           </select>
 
@@ -178,19 +200,26 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
               {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           )}
+        </div>
 
-          {/* Agent (admin only) */}
-          {isAdmin && agents.length > 0 && (
+        {/* Assignee row — shown for agents and admins */}
+        {isAgent && agents.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 56 }}>Assigned</span>
             <select
               value={ticket.owner_id || ''}
-              onChange={e => patch({ owner_id: Number(e.target.value) })}
-              style={dropdownStyle}
+              onChange={e => patch({ owner_id: Number(e.target.value) || undefined })}
+              style={{ ...dropdownStyle, flex: 1 }}
             >
               <option value="">Unassigned</option>
-              {agents.map(a => <option key={a.id} value={a.id}>{a.firstname} {a.lastname}</option>)}
+              {agents.map(a => (
+                <option key={a.id} value={a.zammad_user_id || a.id}>
+                  {a.name || a.email}
+                </option>
+              ))}
             </select>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* SLA */}
         {sla && slaC && (
@@ -199,7 +228,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
             padding: '3px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
             color: slaC.color, background: slaC.bg,
           }}>
-            <span style={{ fontSize: 8 }}>●</span> {sla.label}
+            <span style={{ fontSize: 8 }}>●</span> SLA: {sla.label}
           </div>
         )}
       </div>
@@ -226,13 +255,22 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin }) {
       {/* Tab content */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {tab === 'Conversation' && (
-          <ConversationTab ticketId={ticketId} onReplySent={() => { load(); onUpdated?.() }} />
+          <ConversationTab
+            ticketId={ticketId}
+            onReplySent={() => { load(); onUpdated?.() }}
+            isAgent={isAgent}
+            insertText={kbInsert}
+            onInsertConsumed={() => setKbInsert('')}
+          />
         )}
         {tab === 'Details' && (
           <DetailsTab ticket={ticket} onTagsChanged={onUpdated} />
         )}
         {tab === 'Knowledge Base' && (
-          <KnowledgeBaseTab ticketTitle={ticket.title} />
+          <KnowledgeBaseTab
+            ticketTitle={ticket.title}
+            onInsert={text => { setKbInsert(text); setTab('Conversation') }}
+          />
         )}
       </div>
     </PanelShell>
