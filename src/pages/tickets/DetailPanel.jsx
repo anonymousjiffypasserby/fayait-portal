@@ -3,14 +3,14 @@ import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_CO
 import ConversationTab   from './tabs/ConversationTab'
 import DetailsTab        from './tabs/DetailsTab'
 import KnowledgeBaseTab  from './tabs/KnowledgeBaseTab'
-import api from '../../services/api'
 
 // 'new' removed — it is set automatically by Zammad on creation, not manually
 const STATES     = ['open', 'pending reminder', 'closed']
 const PRIORITIES = [{ id: 1, name: 'Low' }, { id: 2, name: 'Normal' }, { id: 3, name: 'High' }, { id: 4, name: 'Emergency' }]
 const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
-const AGENT_ROLES = ['admin', 'agent']
+// Zammad role_ids > 1 means the user has at least one non-default role (i.e. is an agent/admin)
+const isZammadAgent = (u) => Array.isArray(u.role_ids) ? u.role_ids.some(id => id > 1) : false
 
 export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isAgent }) {
   const [ticket,    setTicket]    = useState(null)
@@ -36,14 +36,9 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
   useEffect(() => {
     load()
     zammadApi.getGroups().then(g => setGroups(Array.isArray(g) ? g : [])).catch(() => {})
-    // Load agents from portal API (company-scoped) for the assignee dropdown
-    api.getUsers()
-      .then(users => {
-        const agentUsers = Array.isArray(users)
-          ? users.filter(u => AGENT_ROLES.includes(u.role))
-          : []
-        setAgents(agentUsers)
-      })
+    // Load Zammad users — their IDs are what owner_id expects
+    zammadApi.getUsers()
+      .then(users => setAgents(Array.isArray(users) ? users.filter(isZammadAgent) : []))
       .catch(() => {})
   }, [ticketId])
 
@@ -213,8 +208,8 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
             >
               <option value="">Unassigned</option>
               {agents.map(a => (
-                <option key={a.id} value={a.zammad_user_id || a.id}>
-                  {a.name || a.email}
+                <option key={a.id} value={a.id}>
+                  {a.firstname} {a.lastname}
                 </option>
               ))}
             </select>

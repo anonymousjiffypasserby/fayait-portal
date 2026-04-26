@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { zammadApi, T } from './shared'
-import api from '../../services/api'
 
-const AGENT_ROLES = ['admin', 'agent']
+const isZammadAgent = (u) => Array.isArray(u.role_ids) ? u.role_ids.some(id => id > 1) : false
 
 export default function NewTicketModal({ onCreated, onClose }) {
   const [title,      setTitle]      = useState('')
@@ -24,12 +23,12 @@ export default function NewTicketModal({ onCreated, onClose }) {
     Promise.all([
       zammadApi.getTicketPriorities(),
       zammadApi.getGroups(),
-      api.getUsers(),
+      zammadApi.getUsers(),
     ])
       .then(([p, g, u]) => {
         const pArr = Array.isArray(p) ? p : []
         const gArr = Array.isArray(g) ? g : []
-        const uArr = Array.isArray(u) ? u.filter(x => AGENT_ROLES.includes(x.role)) : []
+        const uArr = Array.isArray(u) ? u.filter(isZammadAgent) : []
         setPriorities(pArr)
         setGroups(gArr)
         setAgents(uArr)
@@ -116,8 +115,8 @@ export default function NewTicketModal({ onCreated, onClose }) {
               <select value={ownerId} onChange={e => setOwner(e.target.value)} style={inp}>
                 <option value="">Unassigned</option>
                 {agents.map(a => (
-                  <option key={a.id} value={a.zammad_user_id || a.id}>
-                    {a.name || a.email}
+                  <option key={a.id} value={a.id}>
+                    {a.firstname} {a.lastname}
                   </option>
                 ))}
               </select>
