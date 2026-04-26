@@ -6,6 +6,7 @@ import ServiceFrame from './pages/ServiceFrame'
 import Assets from './pages/assets'
 import Projects from './pages/projects'
 import HR from './pages/hr'
+import Tickets from './pages/tickets'
 import Settings from './pages/settings'
 import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
@@ -24,6 +25,14 @@ function HRRoute({ children }) {
   if (loading) return null
   if (!user) return <Navigate to="/login" />
   if (user.services?.hr !== 'active') return <Navigate to="/" />
+  return children
+}
+
+function TicketsRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" />
+  if (user.services?.tickets !== 'active') return <Navigate to="/" />
   return children
 }
 
@@ -56,7 +65,8 @@ function AppRoutes() {
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/projects/*" element={<PrivateRoute><Projects /></PrivateRoute>} />
                 <Route path="/hr/*" element={<HRRoute><HR /></HRRoute>} />
-                {/* iframe services (/tickets /chat /grafana /files /status)
+                <Route path="/tickets/*" element={<TicketsRoute><Tickets /></TicketsRoute>} />
+                {/* iframe services (/chat /grafana /files /status)
                     are rendered persistently in Layout — no routes needed here */}
               </Routes>
             </Layout>

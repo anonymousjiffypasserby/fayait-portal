@@ -59,6 +59,72 @@ const zammadApi = {
 
   getCurrentUser: () =>
     fetch(`${BASE}/api/proxy/zammad/users/me`, { headers: headers() }).then(handle),
+
+  // ── States / Priorities / Groups ──────────────────────────────────────────
+  getTicketStates: () =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_states`, { headers: headers() }).then(handle),
+
+  getTicketPriorities: () =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_priorities`, { headers: headers() }).then(handle),
+
+  getGroups: () =>
+    fetch(`${BASE}/api/proxy/zammad/groups`, { headers: headers() }).then(handle),
+
+  // ── Tags ──────────────────────────────────────────────────────────────────
+  getTicketTags: (ticketId) =>
+    fetch(`${BASE}/api/proxy/zammad/tags${qs({ object: 'Ticket', o_id: ticketId })}`, { headers: headers() }).then(handle),
+
+  addTicketTag: (ticketId, tag) =>
+    fetch(`${BASE}/api/proxy/zammad/tags`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ object: 'Ticket', o_id: ticketId, item: tag }),
+    }).then(handle),
+
+  removeTicketTag: (ticketId, tag) =>
+    fetch(`${BASE}/api/proxy/zammad/tags`, {
+      method: 'DELETE', headers: headers(),
+      body: JSON.stringify({ object: 'Ticket', o_id: ticketId, item: tag }),
+    }).then(handle),
+
+  // ── History ───────────────────────────────────────────────────────────────
+  getTicketHistory: (ticketId) =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_history/${ticketId}`, { headers: headers() }).then(handle),
+
+  // ── Ticket views ──────────────────────────────────────────────────────────
+  getMyTickets: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'owner.login:me', limit, offset })}`, { headers: headers() }).then(handle),
+
+  getTicketsCreatedByMe: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'customer.login:me', limit, offset })}`, { headers: headers() }).then(handle),
+
+  getTicketsByState: (stateName, limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `state.name:"${stateName}"`, limit, offset })}`, { headers: headers() }).then(handle),
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  searchTickets: (query, limit = 50) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query, limit })}`, { headers: headers() }).then(handle),
+
+  getTicketCount: (query) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query, limit: 1 })}`, { headers: headers() }).then(handle),
+
+  // ── Attachments ───────────────────────────────────────────────────────────
+  uploadAttachment: (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const tok = localStorage.getItem('faya_token')
+    return fetch(`${BASE}/api/proxy/zammad/attachments`, {
+      method: 'POST',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      body: form,
+    }).then(handle)
+  },
+
+  // ── Knowledge Base ────────────────────────────────────────────────────────
+  getKnowledgeBase: () =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_bases`, { headers: headers() }).then(handle),
+
+  getKnowledgeBaseAnswers: (kbId) =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_base/${kbId}/locale/en/answers`, { headers: headers() }).then(handle),
 }
 
 export default zammadApi

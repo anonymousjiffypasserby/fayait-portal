@@ -6,12 +6,11 @@ import NotificationBell from './NotificationBell'
 import ServiceFrame from '../pages/ServiceFrame'
 
 const IFRAME_SERVICES = [
-  { key: 'tickets', path: '/tickets' },
   { key: 'chat',    path: '/chat'    },
   { key: 'grafana', path: '/grafana' },
   { key: 'files',   path: '/files'   },
   { key: 'status',  path: '/status'  },
-  // hr is a custom React module — not an iframe service
+  // tickets and hr are custom React modules — not iframe services
 ]
 
 const SERVICES = [
