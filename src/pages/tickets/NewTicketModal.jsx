@@ -9,7 +9,8 @@ const PRIORITIES = [
   { id: 4, name: 'Emergency' },
 ]
 
-const isZammadAgent = (u) => Array.isArray(u.role_ids) ? u.role_ids.some(id => id > 1) : false
+// Role IDs in this Zammad: 1=Admin, 2=Agent, 3=Customer. Only Admin/Agent can own tickets.
+const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function NewTicketModal({ onCreated, onClose }) {
   const [title,          setTitle]      = useState('')

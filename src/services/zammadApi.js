@@ -112,6 +112,9 @@ const zammadApi = {
   getOverdueTickets: (limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'escalation_at:<now AND state.name:open', limit, offset })}`, { headers: headers() }).then(handle),
 
+  getClosedTickets: (limit = 25, offset = 0) =>
+    fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: 'state.name:closed', limit, offset })}`, { headers: headers() }).then(handle),
+
   getTicketsByPriority: (priorityId, limit = 25, offset = 0) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/search${qs({ query: `priority.id:${priorityId} AND (state.name:new OR state.name:open)`, limit, offset })}`, { headers: headers() }).then(handle),
 

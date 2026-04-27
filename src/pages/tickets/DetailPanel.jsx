@@ -9,8 +9,8 @@ const STATES     = ['open', 'pending reminder', 'closed']
 const PRIORITIES = [{ id: 1, name: 'Low' }, { id: 2, name: 'Normal' }, { id: 3, name: 'High' }, { id: 4, name: 'Emergency' }]
 const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
-// Zammad role_ids > 1 means the user has at least one non-default role (i.e. is an agent/admin)
-const isZammadAgent = (u) => Array.isArray(u.role_ids) ? u.role_ids.some(id => id > 1) : false
+// Role IDs in this Zammad: 1=Admin, 2=Agent, 3=Customer. Only Admin/Agent can own tickets.
+const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isAgent }) {
   const [ticket,    setTicket]    = useState(null)
@@ -43,8 +43,9 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     setSaving(true)
     setError(null)
     try {
-      const updated = await zammadApi.updateTicket(ticketId, data)
-      setTicket(prev => ({ ...prev, ...updated }))
+      await zammadApi.updateTicket(ticketId, data)
+      // Re-fetch so the panel always shows real server state (avoids stale owner_id etc.)
+      await load()
       onUpdated?.()
     } catch (err) {
       setError(err.message)

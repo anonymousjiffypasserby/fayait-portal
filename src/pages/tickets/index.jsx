@@ -29,12 +29,13 @@ async function fetchView(view) {
     case 'unassigned':  return zammadApi.getUnassignedTickets(100)
     case 'overdue':     return zammadApi.getOverdueTickets(100)
     case 'by_priority': return zammadApi.getAllTickets(100).then(r => [...(r || [])].sort((a, b) => b.priority_id - a.priority_id))
+    case 'closed_team': return zammadApi.getClosedTickets(100)
     default:            return []
   }
 }
 
 async function fetchCounts() {
-  const views = ['my_all', 'my_open', 'my_pending', 'unassigned', 'overdue']
+  const views = ['my_all', 'my_open', 'my_pending', 'my_closed', 'all', 'unassigned', 'overdue', 'closed_team']
   const results = await Promise.allSettled(views.map(v => fetchView(v)))
   return Object.fromEntries(views.map((v, i) => [
     v,
@@ -211,6 +212,7 @@ function viewLabel(view) {
     unassigned:      'Unassigned',
     overdue:         'Overdue',
     by_priority:     'By Priority',
+    closed_team:     'Closed',
     'tk-overview':   'Reports — Overview',
     'tk-by-priority':'Reports — By Priority',
     'tk-by-group':   'Reports — By Group',

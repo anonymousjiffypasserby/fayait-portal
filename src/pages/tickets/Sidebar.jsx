@@ -27,7 +27,8 @@ const TEAM_VIEWS = [
   { key: 'all',         label: 'All Tickets',  icon: '📋' },
   { key: 'unassigned',  label: 'Unassigned',   icon: '❓' },
   { key: 'overdue',     label: 'Overdue',      icon: '🔴' },
-  { key: 'by_priority', label: 'By Priority',  icon: '⚡' },
+  { key: 'by_priority', label: 'By Priority',  icon: '⚡', countKey: 'all' },
+  { key: 'closed_team', label: 'Closed',       icon: '⚫' },
 ]
 
 const REPORT_VIEWS = [
@@ -49,8 +50,8 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
     if (searchVal.trim()) onView('search:' + searchVal.trim())
   }
 
-  const badge = (key) => {
-    const n = counts[key]
+  const badge = (key, countKey) => {
+    const n = counts[countKey || key]
     if (!n) return null
     return (
       <span style={{
@@ -115,11 +116,11 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
       {/* My Tickets */}
       <div>
         <div style={sectionLabel}>My Tickets</div>
-        {MY_VIEWS.map(({ key, label, icon }) => (
+        {MY_VIEWS.map(({ key, label, icon, countKey }) => (
           <button key={key} style={navBtn(view === key)} onClick={() => onView(key)}>
             <span>{icon}</span>
             <span style={{ flex: 1 }}>{label}</span>
-            {badge(key)}
+            {badge(key, countKey)}
           </button>
         ))}
       </div>
@@ -128,11 +129,11 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
       {isAgent && (
         <div>
           <div style={sectionLabel}>Team</div>
-          {TEAM_VIEWS.map(({ key, label, icon }) => (
+          {TEAM_VIEWS.map(({ key, label, icon, countKey }) => (
             <button key={key} style={navBtn(view === key)} onClick={() => onView(key)}>
               <span>{icon}</span>
               <span style={{ flex: 1 }}>{label}</span>
-              {badge(key)}
+              {badge(key, countKey)}
             </button>
           ))}
         </div>
