@@ -52,11 +52,11 @@ export default function DetailsTab({ ticket, onTagsChanged }) {
         </Section>
       )}
 
-      {/* Tags */}
-      <Section label="Tags">
+      {/* Category */}
+      <Section label="Category">
         {predefinedTags.length === 0 ? (
           <div style={{ fontSize: 12, color: T.muted }}>
-            No tags configured. Add predefined tags in ⚙ Ticket Settings.
+            No categories configured. Add predefined categories in ⚙ Ticket Settings.
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -81,10 +81,10 @@ export default function DetailsTab({ ticket, onTagsChanged }) {
             })}
           </div>
         )}
-        {/* Show any tags on the ticket that aren't in predefined list */}
-        {tags.filter(t => !predefinedTags.includes(t)).length > 0 && (
+        {/* Non-predefined, non-system tags */}
+        {tags.filter(t => !predefinedTags.includes(t) && !t.startsWith('dept:') && !t.startsWith('contact:')).length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {tags.filter(t => !predefinedTags.includes(t)).map(tag => (
+            {tags.filter(t => !predefinedTags.includes(t) && !t.startsWith('dept:') && !t.startsWith('contact:')).map(tag => (
               <span key={tag} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 padding: '3px 10px', borderRadius: 20,
@@ -100,6 +100,18 @@ export default function DetailsTab({ ticket, onTagsChanged }) {
           </div>
         )}
       </Section>
+
+      {/* Department / Contact from system tags */}
+      {tags.some(t => t.startsWith('dept:') || t.startsWith('contact:')) && (
+        <Section label="Department">
+          {tags.filter(t => t.startsWith('dept:')).map(t => (
+            <div key={t} style={{ fontSize: 13, color: T.navy, fontWeight: 500, marginBottom: 2 }}>{t.slice(5)}</div>
+          ))}
+          {tags.filter(t => t.startsWith('contact:')).map(t => (
+            <div key={t} style={{ fontSize: 12, color: T.muted }}>{t.slice(8)}</div>
+          ))}
+        </Section>
+      )}
 
       {/* Dates */}
       <Section label="Dates">

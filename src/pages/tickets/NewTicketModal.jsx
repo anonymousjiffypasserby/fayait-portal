@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { zammadApi, T } from './shared'
 import { getTicketSettings } from './ticketSettings'
 
+const BASE = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
+const apiGet = (path) =>
+  fetch(`${BASE}${path}`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem('faya_token')}` },
+  }).then(r => r.ok ? r.json() : []).catch(() => [])
+
 const PRIORITIES = [
   { id: 1, name: 'Low' },
   { id: 2, name: 'Normal' },
@@ -9,31 +15,39 @@ const PRIORITIES = [
   { id: 4, name: 'Emergency' },
 ]
 
-// Role IDs in this Zammad: 1=Admin, 2=Agent, 3=Customer. Only Admin/Agent can own tickets.
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function NewTicketModal({ onCreated, onClose }) {
-  const [title,          setTitle]      = useState('')
-  const [body,           setBody]       = useState('')
-  const [priorityId,     setPriority]   = useState('2')
-  const [ownerId,        setOwner]      = useState('')
-  const [tags,           setTags]       = useState([])
-  const [file,       setFile]     = useState(null)
-  const [agents,     setAgents]   = useState([])
-  const [submitting, setSubmitting] = useState(false)
-  const [error,          setError]      = useState(null)
+  const [title,       setTitle]      = useState('')
+  const [body,        setBody]       = useState('')
+  const [priorityId,  setPriority]   = useState('2')
+  const [ownerId,     setOwner]      = useState('')
+  const [categories,  setCategories] = useState([])
+  const [deptId,      setDeptId]     = useState('')
+  const [contactId,   setContactId]  = useState('')
+  const [file,        setFile]       = useState(null)
+  const [agents,      setAgents]     = useState([])
+  const [departments, setDepartments]= useState([])
+  const [allUsers,    setAllUsers]   = useState([])
+  const [submitting,  setSubmitting] = useState(false)
+  const [error,       setError]      = useState(null)
   const fileRef = useRef(null)
 
-  const predefinedTags = getTicketSettings().predefinedTags
+  const predefinedCategories = getTicketSettings().predefinedTags
 
   useEffect(() => {
     zammadApi.getUsers()
       .then(u => setAgents(Array.isArray(u) ? u.filter(isZammadAgent) : []))
       .catch(() => {})
+    apiGet('/api/departments').then(d => setDepartments(Array.isArray(d) ? d : []))
+    apiGet('/api/users').then(u => setAllUsers(Array.isArray(u) ? u : []))
   }, [])
 
-  const toggleTag = (tag) => {
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+  const selectedDept    = departments.find(d => d.id === deptId)
+  const deptUsers       = deptId ? allUsers.filter(u => u.department_id === deptId) : []
+
+  const toggleCategory = (cat) => {
+    setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
   }
 
   const submit = async (e) => {
@@ -42,12 +56,19 @@ export default function NewTicketModal({ onCreated, onClose }) {
     setSubmitting(true)
     setError(null)
     try {
+      const allTags = [...categories]
+      if (selectedDept) allTags.push(`dept:${selectedDept.name}`)
+      if (contactId) {
+        const contact = allUsers.find(u => u.id === contactId)
+        if (contact) allTags.push(`contact:${contact.name}`)
+      }
+
       const payload = {
         title: title.trim(),
         article: { body: body.trim(), type: 'note', internal: false },
         priority_id: Number(priorityId) || 2,
-        ...(ownerId ? { owner_id: Number(ownerId) } : {}),
-        ...(tags.length ? { tags: tags.join(',') } : {}),
+        ...(ownerId     ? { owner_id: Number(ownerId) } : {}),
+        ...(allTags.length ? { tags: allTags.join(',') } : {}),
       }
       const ticket = await zammadApi.createTicket(payload)
       if (file) await zammadApi.uploadAttachment(file).catch(() => {})
@@ -70,7 +91,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: '#fff', borderRadius: 12, width: '100%', maxWidth: 540,
+        background: '#fff', borderRadius: 12, width: '100%', maxWidth: 560,
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
       }}>
@@ -96,7 +117,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
               value={body}
               onChange={e => setBody(e.target.value)}
               placeholder="Describe the issue…"
-              rows={5}
+              rows={4}
               style={{ ...inp, resize: 'vertical' }}
             />
           </Field>
@@ -109,7 +130,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
               </select>
             </Field>
             {agents.length > 0 && (
-              <Field label="Assign to">
+              <Field label="Assign to agent">
                 <select value={ownerId} onChange={e => setOwner(e.target.value)} style={inp}>
                   <option value="">Unassigned</option>
                   {agents.map(a => (
@@ -120,17 +141,39 @@ export default function NewTicketModal({ onCreated, onClose }) {
             )}
           </div>
 
-          {/* Tags — only show if predefined tags are configured */}
-          {predefinedTags.length > 0 && (
-            <Field label="Tags">
+          {/* Department + Contact user */}
+          <div style={{ display: 'grid', gridTemplateColumns: deptId && deptUsers.length > 0 ? '1fr 1fr' : '1fr', gap: 12 }}>
+            <Field label="Department">
+              <select
+                value={deptId}
+                onChange={e => { setDeptId(e.target.value); setContactId('') }}
+                style={inp}
+              >
+                <option value="">— None —</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </Field>
+            {deptId && deptUsers.length > 0 && (
+              <Field label="Contact user">
+                <select value={contactId} onChange={e => setContactId(e.target.value)} style={inp}>
+                  <option value="">— None —</option>
+                  {deptUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </Field>
+            )}
+          </div>
+
+          {/* Category (predefined tags) */}
+          {predefinedCategories.length > 0 && (
+            <Field label="Category">
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {predefinedTags.map(tag => {
-                  const active = tags.includes(tag)
+                {predefinedCategories.map(cat => {
+                  const active = categories.includes(cat)
                   return (
                     <button
-                      key={tag}
+                      key={cat}
                       type="button"
-                      onClick={() => toggleTag(tag)}
+                      onClick={() => toggleCategory(cat)}
                       style={{
                         padding: '4px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
                         fontFamily: T.font, fontWeight: active ? 600 : 400,
@@ -140,7 +183,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
                         transition: 'all 0.1s',
                       }}
                     >
-                      {active ? '✓ ' : ''}{tag}
+                      {active ? '✓ ' : ''}{cat}
                     </button>
                   )
                 })}

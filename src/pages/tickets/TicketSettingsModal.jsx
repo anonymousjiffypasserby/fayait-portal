@@ -84,11 +84,11 @@ export default function TicketSettingsModal({ onClose }) {
             </div>
           </SettingSection>
 
-          {/* Predefined tags */}
-          <SettingSection label="Predefined Tags" description="Tags available in the tag dropdown when creating or editing tickets.">
+          {/* Predefined categories */}
+          <SettingSection label="Predefined Categories" description="Categories available when creating or editing tickets.">
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
               {predefinedTags.length === 0 && (
-                <span style={{ fontSize: 12, color: T.muted }}>No tags yet</span>
+                <span style={{ fontSize: 12, color: T.muted }}>No categories yet</span>
               )}
               {predefinedTags.map(tag => (
                 <span key={tag} style={{
@@ -109,7 +109,7 @@ export default function TicketSettingsModal({ onClose }) {
               <input
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
-                placeholder="Add tag…"
+                placeholder="Add category…"
                 style={{
                   flex: 1, padding: '7px 10px', borderRadius: 6, fontSize: 13,
                   border: `1px solid ${T.border}`, fontFamily: T.font, color: T.navy, outline: 'none',
