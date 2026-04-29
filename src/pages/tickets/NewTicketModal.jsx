@@ -213,6 +213,21 @@ export default function NewTicketModal({ onCreated, onClose }) {
           </Field>
 
           {error && <div style={{ fontSize: 12, color: T.red, marginBottom: 12 }}>{error}</div>}
+
+          {/* GDPR notice */}
+          <div style={{
+            fontSize: 11, color: T.muted, lineHeight: 1.5,
+            background: '#f8fafc', borderRadius: 6, padding: '8px 10px',
+            border: `1px solid ${T.border}`, marginBottom: 4,
+          }}>
+            Your ticket data (name, contact details, message content) will be processed by our support team to resolve your request.
+            Data is retained per our{' '}
+            {getTicketSettings().privacyPolicyUrl
+              ? <a href={getTicketSettings().privacyPolicyUrl} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>Privacy Policy</a>
+              : 'Privacy Policy'
+            }.{' '}
+            You may request access, correction, or deletion of your data at any time.
+          </div>
         </form>
 
         {/* Footer */}

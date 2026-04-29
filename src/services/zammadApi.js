@@ -46,6 +46,16 @@ const zammadApi = {
       method: 'POST', headers: headers(), body: JSON.stringify(data),
     }).then(handle),
 
+  updateArticle: (id, data) =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_articles/${id}`, {
+      method: 'PUT', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  deleteArticle: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_articles/${id}`, {
+      method: 'DELETE', headers: headers(),
+    }).then(handle),
+
   // ── Organizations ─────────────────────────────────────────────────────────
   getOrganizations: (params = {}) =>
     fetch(`${BASE}/api/proxy/zammad/organizations${qs(params)}`, { headers: headers() }).then(handle),

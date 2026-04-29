@@ -49,9 +49,10 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const [titleVal,    setTitleVal]    = useState('')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
-  const [deleting,    setDeleting]    = useState(false)
-  const [kbInsert,    setKbInsert]    = useState('')
-  const [pendingTime, setPendingTime] = useState(defaultPendingTime)
+  const [deleting,     setDeleting]     = useState(false)
+  const [anonymizing,  setAnonymizing]  = useState(false)
+  const [kbInsert,     setKbInsert]     = useState('')
+  const [pendingTime,  setPendingTime]  = useState(defaultPendingTime)
 
   const predefinedCategories = getTicketSettings().predefinedTags
 
@@ -161,6 +162,77 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
     if (titleVal.trim() && titleVal.trim() !== ticket.title) patch({ title: titleVal.trim() })
   }
 
+  // GDPR: processing restriction toggle (tag-based)
+  const isRestricted  = tags.includes('gdpr:restricted')
+  const isAnonymized  = tags.includes('gdpr:anonymized')
+
+  const toggleRestriction = async () => {
+    if (isRestricted) {
+      await zammadApi.removeTicketTag(ticketId, 'gdpr:restricted').catch(() => {})
+      const newTags = tags.filter(t => t !== 'gdpr:restricted')
+      setTags(newTags)
+      onTicketUpdated?.({ ...ticket, tags: newTags })
+    } else {
+      await zammadApi.addTicketTag(ticketId, 'gdpr:restricted').catch(() => {})
+      const newTags = [...tags, 'gdpr:restricted']
+      setTags(newTags)
+      onTicketUpdated?.({ ...ticket, tags: newTags })
+    }
+  }
+
+  // GDPR: anonymize — redact articles where possible, post audit note, tag ticket
+  const handleAnonymize = async () => {
+    if (!window.confirm(
+      'Redact personal data from this ticket?\n\n' +
+      '• The ticket title will be set to "[Anonymized]"\n' +
+      '• Customer tag will be removed\n' +
+      '• An audit note will be posted\n' +
+      '• Article bodies will be redacted where the API permits\n\n' +
+      'This cannot be undone.'
+    )) return
+    setAnonymizing(true)
+    setError(null)
+    try {
+      const redactDate = new Date().toLocaleDateString('en-GB')
+      const redactedBody = `[Content redacted – GDPR erasure request – ${redactDate}]`
+
+      // Attempt to redact each article body
+      const articles = await zammadApi.getTicketArticles(ticketId).catch(() => [])
+      if (Array.isArray(articles)) {
+        await Promise.allSettled(
+          articles
+            .filter(a => !a.internal || isAdmin) // only redact internal if admin
+            .map(a => zammadApi.updateArticle(a.id, { body: redactedBody }).catch(() => null))
+        )
+      }
+
+      // Post an internal audit note
+      await zammadApi.createArticle({
+        ticket_id: ticketId,
+        body: `⚠️ GDPR erasure request processed on ${redactDate}. Customer personal data removed from ticket metadata. Article content redacted where API permitted. Review in Zammad admin for complete redaction if required.`,
+        type: 'note', internal: true, sender: 'Agent',
+      }).catch(() => {})
+
+      // Remove contact tag, add anonymized marker
+      const contactTags = tags.filter(t => t.startsWith('contact:'))
+      await Promise.allSettled(contactTags.map(t => zammadApi.removeTicketTag(ticketId, t)))
+      await zammadApi.addTicketTag(ticketId, 'gdpr:anonymized').catch(() => {})
+      await zammadApi.addTicketTag(ticketId, 'gdpr:restricted').catch(() => {})
+
+      // Update ticket title
+      const updated = await zammadApi.updateTicket(ticketId, { title: '[Anonymized]' })
+      const newTags = [...tags.filter(t => !t.startsWith('contact:')), 'gdpr:anonymized', 'gdpr:restricted']
+      setTags(newTags)
+      setTicket(updated)
+      setTitleVal('[Anonymized]')
+      onTicketUpdated?.({ ...updated, tags: newTags })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAnonymizing(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!window.confirm('Delete this ticket? This cannot be undone.')) return
     setDeleting(true)
@@ -206,6 +278,26 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
         padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
         background: T.card, flexShrink: 0,
       }}>
+        {/* GDPR banners */}
+        {isRestricted && (
+          <div style={{
+            background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6,
+            padding: '6px 10px', marginBottom: 8, fontSize: 11, color: '#b91c1c',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            🔒 <strong>Processing Restricted (GDPR Art. 18)</strong> — do not act on this ticket data without authorisation.
+          </div>
+        )}
+        {isAnonymized && (
+          <div style={{
+            background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6,
+            padding: '6px 10px', marginBottom: 8, fontSize: 11, color: '#92400e',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            ⚠️ <strong>Anonymized</strong> — personal data has been redacted from this ticket.
+          </div>
+        )}
+
         {/* Ticket # + actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: T.muted }}>#{ticket.number || ticket.id}</span>
@@ -373,6 +465,38 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
             </div>
           </div>
         )}
+
+        {/* GDPR controls */}
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={toggleRestriction}
+            style={{
+              padding: '3px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+              fontFamily: T.font, fontWeight: 600,
+              border: `1px solid ${isRestricted ? '#fca5a5' : T.border}`,
+              background: isRestricted ? '#fef2f2' : '#fafafa',
+              color: isRestricted ? '#b91c1c' : T.muted,
+            }}
+            title="GDPR Art. 18 — Restrict processing while a complaint or dispute is investigated"
+          >
+            🔒 {isRestricted ? 'Processing Restricted' : 'Restrict Processing'}
+          </button>
+          {isAdmin && !isAnonymized && (
+            <button
+              onClick={handleAnonymize}
+              disabled={anonymizing}
+              style={{
+                padding: '3px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                fontFamily: T.font, fontWeight: 600,
+                border: `1px solid #fcd34d`,
+                background: '#fffbeb', color: '#92400e',
+              }}
+              title="GDPR Art. 17 — Redact personal data from this ticket"
+            >
+              {anonymizing ? 'Anonymizing…' : '🗑 Anonymize (GDPR Art. 17)'}
+            </button>
+          )}
+        </div>
 
         {/* SLA */}
         {sla && slaC && (

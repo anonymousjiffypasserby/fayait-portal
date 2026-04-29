@@ -6,6 +6,9 @@ export const DEFAULTS = {
   slaHours: { 1: 24, 2: 8, 3: 4, 4: 1 },
   newBadgeHours: 24,
   predefinedTags: [],
+  retentionClosedDays: null,   // auto-flag closed tickets after N days (null = off)
+  deletionAfterMonths: null,   // flag for deletion after N months closed (null = off)
+  privacyPolicyUrl: '',
 }
 
 export function getTicketSettings() {
@@ -17,10 +20,13 @@ export function getTicketSettings() {
         slaHours: { ...DEFAULTS.slaHours, ...(stored.slaHours || {}) },
         newBadgeHours: stored.newBadgeHours ?? DEFAULTS.newBadgeHours,
         predefinedTags: Array.isArray(stored.predefinedTags) ? stored.predefinedTags : [],
+        retentionClosedDays: stored.retentionClosedDays ?? DEFAULTS.retentionClosedDays,
+        deletionAfterMonths: stored.deletionAfterMonths ?? DEFAULTS.deletionAfterMonths,
+        privacyPolicyUrl: stored.privacyPolicyUrl ?? DEFAULTS.privacyPolicyUrl,
       }
     }
   } catch {}
-  return { slaHours: { ...DEFAULTS.slaHours }, newBadgeHours: DEFAULTS.newBadgeHours, predefinedTags: [] }
+  return { ...DEFAULTS, slaHours: { ...DEFAULTS.slaHours } }
 }
 
 export function saveTicketSettings(settings) {

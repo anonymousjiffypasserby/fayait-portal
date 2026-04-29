@@ -4,14 +4,22 @@ import { getTicketSettings, saveTicketSettings, SLA_PRIORITY_LABELS, DEFAULTS } 
 
 export default function TicketSettingsModal({ onClose }) {
   const initial = getTicketSettings()
-  const [slaHours,       setSlaHours]       = useState({ ...initial.slaHours })
-  const [newBadgeHours,  setNewBadgeHours]  = useState(initial.newBadgeHours)
-  const [predefinedTags, setPredefinedTags] = useState(initial.predefinedTags)
-  const [tagInput,       setTagInput]       = useState('')
-  const [saved,          setSaved]          = useState(false)
+  const [slaHours,            setSlaHours]            = useState({ ...initial.slaHours })
+  const [newBadgeHours,       setNewBadgeHours]       = useState(initial.newBadgeHours)
+  const [predefinedTags,      setPredefinedTags]      = useState(initial.predefinedTags)
+  const [retentionClosedDays, setRetentionClosedDays] = useState(initial.retentionClosedDays ?? '')
+  const [deletionAfterMonths, setDeletionAfterMonths] = useState(initial.deletionAfterMonths ?? '')
+  const [privacyPolicyUrl,    setPrivacyPolicyUrl]    = useState(initial.privacyPolicyUrl ?? '')
+  const [tagInput,            setTagInput]            = useState('')
+  const [saved,               setSaved]               = useState(false)
 
   const handleSave = () => {
-    saveTicketSettings({ slaHours, newBadgeHours, predefinedTags })
+    saveTicketSettings({
+      slaHours, newBadgeHours, predefinedTags,
+      retentionClosedDays: retentionClosedDays !== '' ? Number(retentionClosedDays) : null,
+      deletionAfterMonths: deletionAfterMonths !== '' ? Number(deletionAfterMonths) : null,
+      privacyPolicyUrl,
+    })
     setSaved(true)
     setTimeout(() => { setSaved(false); onClose() }, 700)
   }
@@ -81,6 +89,42 @@ export default function TicketSettingsModal({ onClose }) {
                 style={numInput}
               />
               <span style={{ fontSize: 12, color: T.muted }}>hours</span>
+            </div>
+          </SettingSection>
+
+          {/* GDPR / Data Retention */}
+          <SettingSection label="GDPR & Data Retention" description="Configure how long ticket data is kept. Enforcement requires a scheduled job on the API server — these settings act as documented policy.">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <span style={{ fontSize: 13, color: T.navy, minWidth: 180 }}>Flag closed tickets after</span>
+              <input
+                type="number" min="1" step="1"
+                placeholder="off"
+                value={retentionClosedDays}
+                onChange={e => setRetentionClosedDays(e.target.value)}
+                style={numInput}
+              />
+              <span style={{ fontSize: 12, color: T.muted }}>days</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <span style={{ fontSize: 13, color: T.navy, minWidth: 180 }}>Schedule deletion after</span>
+              <input
+                type="number" min="1" step="1"
+                placeholder="off"
+                value={deletionAfterMonths}
+                onChange={e => setDeletionAfterMonths(e.target.value)}
+                style={numInput}
+              />
+              <span style={{ fontSize: 12, color: T.muted }}>months closed</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, color: T.navy, minWidth: 180 }}>Privacy Policy URL</span>
+              <input
+                type="url"
+                placeholder="https://…"
+                value={privacyPolicyUrl}
+                onChange={e => setPrivacyPolicyUrl(e.target.value)}
+                style={{ ...numInput, width: 200, textAlign: 'left' }}
+              />
             </div>
           </SettingSection>
 
