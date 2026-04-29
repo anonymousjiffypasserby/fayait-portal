@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { getTicketSettings } from './ticketSettings'
 import ConversationTab   from './tabs/ConversationTab'
 import DetailsTab        from './tabs/DetailsTab'
@@ -38,6 +39,7 @@ function defaultPendingTime() {
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpdated, isAdmin, isAgent }) {
+  const isMobile = useIsMobile()
   const [ticket,      setTicket]      = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [tab,         setTab]         = useState('Conversation')
@@ -300,6 +302,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
 
         {/* Ticket # + actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          {isMobile && (
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 16, color: '#6366f1', cursor: 'pointer', padding: '2px 6px 2px 0', fontFamily: T.font, fontWeight: 600, flexShrink: 0 }}>
+              ← Back
+            </button>
+          )}
           <span style={{ fontSize: 11, color: T.muted }}>#{ticket.number || ticket.id}</span>
           {showNewBadge && (
             <span style={{
@@ -557,14 +564,20 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
 }
 
 function PanelShell({ children }) {
+  const isMobile = useIsMobile()
+  const mobileStyle = isMobile ? {
+    position: 'fixed', inset: 0, width: '100%', minWidth: 0,
+    borderLeft: 'none', zIndex: 50,
+  } : {
+    position: 'absolute', top: 0, right: 0, bottom: 0,
+    width: 580, minWidth: 380, borderLeft: `1px solid ${T.border}`,
+    zIndex: 10,
+  }
   return (
     <div id="ticket-detail-panel" style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 580, minWidth: 380, background: T.card,
-      borderLeft: `1px solid ${T.border}`,
-      display: 'flex', flexDirection: 'column',
-      zIndex: 10, boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
-      fontFamily: T.font,
+      background: T.card, display: 'flex', flexDirection: 'column',
+      boxShadow: '-4px 0 24px rgba(0,0,0,0.10)', fontFamily: T.font,
+      ...mobileStyle,
     }}>
       {children}
     </div>

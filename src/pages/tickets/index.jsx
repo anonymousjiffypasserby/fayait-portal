@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { zammadApi, T, isAdmin, isAgent, slaStatus } from './shared'
 import TicketSidebar       from './Sidebar'
 import ListView            from './ListView'
@@ -97,10 +98,13 @@ export default function Tickets() {
   const [searchRows,   setSearchRows]   = useState([])
   const [searchLoading,setSearchLoading]= useState(false)
 
+  const isMobile     = useIsMobile()
   const admin        = isAdmin(user)
   const agent        = isAgent(user)
   const isReport     = REPORT_VIEWS.has(view)
   const isSearch     = view.startsWith('search:')
+
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const zammadMeRef  = useRef(null)     // Zammad user ID of the current agent
   const knownIds     = useRef(new Set())
@@ -201,6 +205,7 @@ export default function Tickets() {
     setSelectedId(null)
     setNewBanner(0)
     setView(v)
+    if (isMobile) setSidebarOpen(false)
   }
 
   const handleCreated = (ticket) => {
@@ -216,34 +221,54 @@ export default function Tickets() {
 
   return (
     <div style={{ display: 'flex', height: '100%', background: T.bg, fontFamily: T.font, position: 'relative', overflow: 'hidden' }}>
+      {/* Mobile sidebar backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 199 }}
+        />
+      )}
+
       <TicketSidebar
         view={view}
         counts={counts}
         onView={handleView}
-        onNew={() => setShowNew(true)}
+        onNew={() => { setShowNew(true); setSidebarOpen(false) }}
         displayMode={displayMode}
         onDisplayMode={setMode}
         isAgent={agent}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={() => { setShowSettings(true); setSidebarOpen(false) }}
+        isMobile={isMobile}
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
       />
 
       {/* Main area */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         {/* Page title */}
         <div style={{
-          padding: '12px 20px', background: T.card,
+          padding: isMobile ? '10px 12px' : '12px 20px', background: T.card,
           borderBottom: `1px solid ${T.border}`, flexShrink: 0,
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.navy }}>
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{ background: 'none', border: 'none', fontSize: 20, color: T.navy, cursor: 'pointer', padding: '2px 6px 2px 0', lineHeight: 1, flexShrink: 0 }}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+          )}
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.navy, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {viewLabel(view)}
           </div>
           {isSearch && (
             <button
               onClick={() => handleView('my_open')}
-              style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: 12, cursor: 'pointer', padding: 0 }}
+              style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: 12, cursor: 'pointer', padding: 0, flexShrink: 0 }}
             >
-              ← Clear search
+              ← Clear
             </button>
           )}
         </div>
@@ -283,6 +308,22 @@ export default function Tickets() {
           )}
         </div>
       </div>
+
+      {/* Mobile FAB — new ticket when sidebar is hidden */}
+      {isMobile && !showNew && !selectedId && (
+        <button
+          onClick={() => setShowNew(true)}
+          style={{
+            position: 'fixed', bottom: 22, right: 20, zIndex: 100,
+            width: 54, height: 54, borderRadius: '50%',
+            background: '#6366f1', color: '#fff', border: 'none',
+            fontSize: 26, lineHeight: 1, cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(99,102,241,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          aria-label="New ticket"
+        >+</button>
+      )}
 
       {showNew && (
         <NewTicketModal

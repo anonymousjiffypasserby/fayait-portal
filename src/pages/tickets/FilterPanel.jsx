@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { T, zammadApi } from './shared'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const STATUSES = [
   { key: 'new',              label: 'New'     },
@@ -16,6 +17,7 @@ const PRIORITIES = [
 ]
 
 export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
+  const isMobile = useIsMobile()
   const [agents, setAgents] = useState([])
 
   useEffect(() => {
@@ -44,9 +46,12 @@ export default function FilterPanel({ filters, onChange, isAdmin, onClose }) {
 
   return (
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 260, background: T.card, borderLeft: `1px solid ${T.border}`,
-      zIndex: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column',
+      position: isMobile ? 'fixed' : 'absolute',
+      top: 0, right: 0, bottom: 0,
+      width: isMobile ? '100%' : 260,
+      background: T.card, borderLeft: isMobile ? 'none' : `1px solid ${T.border}`,
+      zIndex: isMobile ? 300 : 20,
+      overflowY: 'auto', display: 'flex', flexDirection: 'column',
       boxShadow: '-4px 0 16px rgba(0,0,0,0.08)',
     }}>
       {/* Header */}

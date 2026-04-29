@@ -91,13 +91,13 @@ export default function NewTicketModal({ onCreated, onClose }) {
     // No onClick on the outer div — only the Cancel button and form submission close this modal
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       zIndex: 1000, fontFamily: T.font,
     }}>
       <div style={{
-        background: '#fff', borderRadius: 12, width: '100%', maxWidth: 560,
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+        background: '#fff', borderRadius: '12px 12px 0 0', width: '100%', maxWidth: 560,
+        maxHeight: '92dvh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 -4px 40px rgba(0,0,0,0.18)',
       }}>
         {/* Header */}
         <div style={{ padding: '18px 24px 14px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>

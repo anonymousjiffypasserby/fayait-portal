@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { T, zammadApi, stateColor, priorityColor, fmtDate, fmtDateTime, slaStatus, isNewTicket } from './shared'
 import SlaIndicator from './SlaIndicator'
 import FilterPanel from './FilterPanel'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const th = {
   padding: '8px 10px', textAlign: 'left', fontSize: 10,
@@ -139,6 +140,7 @@ ${ticketBlocks || '<p style="color:#aaa">No tickets found for this customer.</p>
 }
 
 export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner }) {
+  const isMobile = useIsMobile()
   const [search,      setSearch]      = useState('')
   const [filters,     setFilters]     = useState(EMPTY_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
@@ -235,6 +237,49 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: T.muted, fontSize: 13, fontFamily: T.font }}>Loading…</div>
   }
 
+  // ── Mobile card layout ──────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: T.font, position: 'relative' }}>
+        {newBanner > 0 && (
+          <div style={{ background: '#6366f1', color: '#fff', fontSize: 12, fontWeight: 600, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <span>{newBanner} new ticket{newBanner > 1 ? 's' : ''}</span>
+            <button onClick={onDismissBanner} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 11 }}>Dismiss</button>
+          </div>
+        )}
+        {/* Mobile toolbar */}
+        <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.border}`, background: T.card, flexShrink: 0 }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search…"
+            style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 14, fontFamily: T.font, color: T.navy, background: '#fafafa', outline: 'none' }}
+          />
+          <button
+            onClick={() => setShowFilters(f => !f)}
+            style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontFamily: T.font, border: `1px solid ${activeFilterCount > 0 ? '#6366f1' : T.border}`, background: activeFilterCount > 0 ? '#eef2ff' : T.card, color: activeFilterCount > 0 ? '#6366f1' : T.navy, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filter'}
+          </button>
+        </div>
+        {/* Card list */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {sorted.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: T.muted, fontSize: 13 }}>No tickets match your filters</div>
+          ) : (
+            sorted.map(ticket => <MobileCard key={ticket.id} ticket={ticket} onSelect={onSelect} />)
+          )}
+          {/* Bottom padding so FAB doesn't cover last card */}
+          <div style={{ height: 80 }} />
+        </div>
+        {showFilters && (
+          <FilterPanel filters={filters} onChange={setFilters} isAdmin={isAdmin} onClose={() => setShowFilters(false)} />
+        )}
+      </div>
+    )
+  }
+
+  // ── Desktop table layout ────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', fontFamily: T.font }}>
 
@@ -443,10 +488,10 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 3000, fontFamily: T.font,
+          zIndex: 3000, fontFamily: T.font, padding: '0 16px',
         }}>
           <div style={{
-            background: '#fff', borderRadius: 12, width: 460, padding: 28,
+            background: '#fff', borderRadius: 12, width: '100%', maxWidth: 460, padding: 28,
             boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
           }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: T.navy, marginBottom: 6 }}>
@@ -487,6 +532,52 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function MobileCard({ ticket, onSelect }) {
+  const sc      = stateColor(ticket.state)
+  const pc      = priorityColor(ticket.priority_id)
+  const cat     = getCategory(ticket)
+  const contact = getContact(ticket) || ticket.customer
+  const tags    = parseTags(ticket)
+  const restricted = tags.includes('gdpr:restricted')
+  const anonymized = tags.includes('gdpr:anonymized')
+
+  return (
+    <div
+      onClick={() => onSelect(ticket)}
+      style={{
+        padding: '14px 16px', borderBottom: `1px solid ${T.border}`,
+        cursor: 'pointer', background: '#fff', userSelect: 'none',
+        WebkitTapHighlightColor: 'rgba(99,102,241,0.08)',
+      }}
+    >
+      {/* Top row: status + priority + badges + number */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 8, color: sc.color, background: sc.bg }}>{sc.label}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 8, color: pc.color, background: pc.bg }}>{ticket.priority || pc.label}</span>
+        {isNewTicket(ticket) && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d' }}>NEW</span>}
+        {restricted && <span title="Processing Restricted">🔒</span>}
+        {anonymized && <span title="Anonymized">⚠️</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>#{ticket.number || ticket.id}</span>
+      </div>
+
+      {/* Title */}
+      <div style={{ fontSize: 14, fontWeight: 600, color: T.navy, marginBottom: 6, lineHeight: 1.35 }}>{ticket.title}</div>
+
+      {/* Meta row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: T.muted, flexWrap: 'wrap' }}>
+        {contact && <span>{contact}</span>}
+        {cat && <span style={{ padding: '1px 7px', borderRadius: 6, background: '#eef2ff', color: '#6366f1', fontSize: 11, fontWeight: 600 }}>{cat}</span>}
+        <span style={{ marginLeft: 'auto' }}>{fmtDate(ticket.updated_at)}</span>
+      </div>
+
+      {/* SLA */}
+      <div style={{ marginTop: 5 }}>
+        <SlaIndicator ticket={ticket} />
+      </div>
     </div>
   )
 }

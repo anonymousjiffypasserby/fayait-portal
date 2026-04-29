@@ -48,9 +48,10 @@ export default function TicketSettingsModal({ onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: '#fff', borderRadius: 12, width: 440,
-        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+        background: '#fff', borderRadius: 12, width: '100%', maxWidth: 440,
+        maxHeight: '85dvh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+        margin: '0 16px',
       }}>
         {/* Header */}
         <div style={{

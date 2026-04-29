@@ -42,7 +42,7 @@ const REPORT_VIEWS = [
   { key: 'tk-csat',        label: 'Customer Satisfaction',icon: '⭐' },
 ]
 
-export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent, onOpenSettings }) {
+export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent, onOpenSettings, isMobile, sidebarOpen, onCloseSidebar }) {
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e) => {
@@ -63,15 +63,31 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
 
   const isReport = view.startsWith('tk-')
 
+  const mobileStyle = isMobile ? {
+    position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 200,
+    transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+    transition: 'transform 0.24s cubic-bezier(0.4,0,0.2,1)',
+    boxShadow: '4px 0 28px rgba(0,0,0,0.18)',
+    height: '100dvh',
+  } : {}
+
   return (
     <div style={{
       width: T.sidebar, minWidth: T.sidebar, background: T.card,
       borderRight: `1px solid ${T.border}`, height: '100%',
       overflowY: 'auto', display: 'flex', flexDirection: 'column',
-      fontFamily: T.font,
+      fontFamily: T.font, ...mobileStyle,
     }}>
+      {/* Mobile header row */}
+      {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 12px 0' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.navy }}>Menu</span>
+          <button onClick={onCloseSidebar} style={{ background: 'none', border: 'none', fontSize: 20, color: T.muted, cursor: 'pointer', lineHeight: 1, padding: 4 }} aria-label="Close menu">×</button>
+        </div>
+      )}
+
       {/* New ticket */}
-      <div style={{ padding: '14px 12px 10px' }}>
+      <div style={{ padding: isMobile ? '10px 12px' : '14px 12px 10px' }}>
         <button onClick={onNew} style={{
           width: '100%', padding: '8px 0', borderRadius: 8,
           background: '#6366f1', color: '#fff', border: 'none',
