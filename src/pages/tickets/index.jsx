@@ -16,6 +16,20 @@ const REPORT_VIEWS = new Set([
   'tk-response', 'tk-resolution', 'tk-agent-perf', 'tk-sla', 'tk-csat',
 ])
 
+// Read zammad_user_id straight from the JWT payload (it's there but not in the
+// login response user object, so AuthContext doesn't carry it).
+function readZammadUserIdFromJwt() {
+  try {
+    const token = localStorage.getItem('faya_token')
+    if (!token) return null
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')))
+    return payload.zammad_user_id || null
+  } catch {
+    return null
+  }
+}
+
 // ── Master fetch ────────────────────────────────────────────────────────────
 // Fetches all ticket states in two parallel requests, returns a flat array.
 async function fetchAllTickets() {
@@ -116,11 +130,8 @@ export default function Tickets() {
   useEffect(() => {
     let cancelled = false
     async function init() {
-      // Resolve who the current agent is in Zammad
-      const me = await zammadApi.getCurrentUser().catch(() => null)
+      zammadMeRef.current = readZammadUserIdFromJwt()
       if (cancelled) return
-      if (me?.id) zammadMeRef.current = me.id
-
       await doRefresh()
     }
     init()
