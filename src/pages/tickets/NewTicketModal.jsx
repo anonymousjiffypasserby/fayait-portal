@@ -43,8 +43,11 @@ export default function NewTicketModal({ onCreated, onClose }) {
     apiGet('/api/users').then(u => setAllUsers(Array.isArray(u) ? u : []))
   }, [])
 
-  const selectedDept    = departments.find(d => d.id === deptId)
-  const deptUsers       = deptId ? allUsers.filter(u => u.department_id === deptId) : []
+  // When a dept is selected, filter the customer list to that dept.
+  // Otherwise show all portal users.
+  const customerList = deptId
+    ? allUsers.filter(u => String(u.department_id) === String(deptId))
+    : allUsers
 
   const toggleCategory = (cat) => {
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
@@ -57,9 +60,12 @@ export default function NewTicketModal({ onCreated, onClose }) {
     setError(null)
     try {
       const allTags = [...categories]
+
+      const selectedDept = departments.find(d => String(d.id) === String(deptId))
       if (selectedDept) allTags.push(`dept:${selectedDept.name}`)
+
       if (contactId) {
-        const contact = allUsers.find(u => u.id === contactId)
+        const contact = allUsers.find(u => String(u.id) === String(contactId))
         if (contact) allTags.push(`contact:${contact.name}`)
       }
 
@@ -67,7 +73,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
         title: title.trim(),
         article: { body: body.trim(), type: 'note', internal: false },
         priority_id: Number(priorityId) || 2,
-        ...(ownerId     ? { owner_id: Number(ownerId) } : {}),
+        ...(ownerId    ? { owner_id: Number(ownerId) } : {}),
         ...(allTags.length ? { tags: allTags.join(',') } : {}),
       }
       const ticket = await zammadApi.createTicket(payload)
@@ -82,14 +88,12 @@ export default function NewTicketModal({ onCreated, onClose }) {
   const canSubmit = title.trim() && body.trim() && !submitting
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000, fontFamily: T.font,
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
+    // No onClick on the outer div — only the Cancel button and form submission close this modal
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, fontFamily: T.font,
+    }}>
       <div style={{
         background: '#fff', borderRadius: 12, width: '100%', maxWidth: 560,
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
@@ -141,27 +145,31 @@ export default function NewTicketModal({ onCreated, onClose }) {
             )}
           </div>
 
-          {/* Department + Contact user */}
-          <div style={{ display: 'grid', gridTemplateColumns: deptId && deptUsers.length > 0 ? '1fr 1fr' : '1fr', gap: 12 }}>
-            <Field label="Department">
-              <select
-                value={deptId}
-                onChange={e => { setDeptId(e.target.value); setContactId('') }}
-                style={inp}
-              >
-                <option value="">— None —</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </Field>
-            {deptId && deptUsers.length > 0 && (
-              <Field label="Contact user">
-                <select value={contactId} onChange={e => setContactId(e.target.value)} style={inp}>
-                  <option value="">— None —</option>
-                  {deptUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </Field>
-            )}
-          </div>
+          {/* Department */}
+          <Field label="Department">
+            <select
+              value={deptId}
+              onChange={e => { setDeptId(e.target.value); setContactId('') }}
+              style={inp}
+            >
+              <option value="">— None —</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </Field>
+
+          {/* Customer — always shown; filtered by dept when one is selected */}
+          <Field label="Customer">
+            <select
+              value={contactId}
+              onChange={e => setContactId(e.target.value)}
+              style={inp}
+            >
+              <option value="">— None —</option>
+              {customerList.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </Field>
 
           {/* Category (predefined tags) */}
           {predefinedCategories.length > 0 && (

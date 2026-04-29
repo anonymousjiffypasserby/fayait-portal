@@ -148,7 +148,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
 
   if (loading) {
     return (
-      <PanelShell onClose={onClose}>
+      <PanelShell>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: T.muted, fontSize: 13 }}>
           Loading…
         </div>
@@ -158,7 +158,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
 
   if (!ticket) {
     return (
-      <PanelShell onClose={onClose}>
+      <PanelShell>
         <div style={{ padding: 24, color: T.red, fontSize: 13 }}>{error || 'Not found'}</div>
       </PanelShell>
     )
@@ -171,7 +171,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
   const showNewBadge = isNewTicket(ticket)
 
   return (
-    <PanelShell onClose={onClose}>
+    <PanelShell>
       {/* Header */}
       <div style={{
         padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
@@ -391,9 +391,9 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
   )
 }
 
-function PanelShell({ onClose, children }) {
+function PanelShell({ children }) {
   return (
-    <div style={{
+    <div id="ticket-detail-panel" style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
       width: 580, minWidth: 380, background: T.card,
       borderLeft: `1px solid ${T.border}`,
@@ -401,10 +401,6 @@ function PanelShell({ onClose, children }) {
       zIndex: 10, boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
       fontFamily: T.font,
     }}>
-      <button onClick={onClose} style={{
-        position: 'absolute', top: 12, right: 16, background: 'none', border: 'none',
-        fontSize: 18, cursor: 'pointer', color: T.muted, zIndex: 1, lineHeight: 1,
-      }}>×</button>
       {children}
     </div>
   )

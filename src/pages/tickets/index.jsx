@@ -16,21 +16,74 @@ const REPORT_VIEWS = new Set([
   'tk-response', 'tk-resolution', 'tk-agent-perf', 'tk-sla', 'tk-csat',
 ])
 
+// Singleton: fetch the current Zammad user's login once and cache it.
+// "owner.login:me" is NOT valid Zammad search syntax — must use the real login string.
+let _zammadLoginPromise = null
+function getZammadLogin() {
+  if (!_zammadLoginPromise) {
+    _zammadLoginPromise = zammadApi.getCurrentUser()
+      .then(me => me?.login || null)
+      .catch(() => null)
+  }
+  return _zammadLoginPromise
+}
+
 async function fetchView(view) {
   if (REPORT_VIEWS.has(view)) return []
   if (view.startsWith('search:')) return zammadApi.searchTickets(view.slice(7), 50)
 
+  const login = await getZammadLogin()
+  const me = login ? `(owner.login:"${login}" OR customer.login:"${login}")` : null
+
   switch (view) {
-    case 'my_all':      return zammadApi.getMyTickets(100)
-    case 'my_open':     return zammadApi.getMyTicketsByState('open', 100)
-    case 'my_pending':  return zammadApi.getMyTicketsByState('pending reminder', 100)
-    case 'my_closed':   return zammadApi.getMyTicketsByState('closed', 50)
-    case 'all':         return zammadApi.getAllTickets(100)
-    case 'unassigned':  return zammadApi.getUnassignedTickets(100)
-    case 'overdue':     return zammadApi.getOverdueTickets(100)
-    case 'by_priority': return zammadApi.getAllTickets(100).then(r => [...(r || [])].sort((a, b) => b.priority_id - a.priority_id))
-    case 'closed_team': return zammadApi.getClosedTickets(100)
-    default:            return []
+    case 'my_all':
+      if (!me) return zammadApi.getAllTickets(100)
+      return zammadApi.searchTickets(me, 100)
+
+    case 'my_open':
+      if (!me) return zammadApi.searchTickets('state.name:"open"', 100)
+      return zammadApi.searchTickets(`${me} AND state.name:"open"`, 100)
+
+    case 'my_pending':
+      if (!me) return zammadApi.searchTickets('state.name:"pending reminder"', 100)
+      return zammadApi.searchTickets(`${me} AND state.name:"pending reminder"`, 100)
+
+    case 'my_closed':
+      if (!me) return zammadApi.searchTickets('state.name:"closed"', 50)
+      return zammadApi.searchTickets(`${me} AND state.name:"closed"`, 50)
+
+    case 'all':
+      return zammadApi.getAllTickets(100)
+
+    case 'unassigned': {
+      // Zammad search for unassigned uses owner_id:1 (system user) — filter client-side to be safe
+      const rows = await zammadApi.searchTickets(
+        'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
+      ).catch(() => [])
+      return (Array.isArray(rows) ? rows : []).filter(
+        t => !t.owner || t.owner === '-'
+      )
+    }
+
+    case 'overdue': {
+      // escalation_at:<now is not valid Zammad syntax — filter client-side
+      const rows = await zammadApi.searchTickets(
+        'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
+      ).catch(() => [])
+      const now = Date.now()
+      return (Array.isArray(rows) ? rows : []).filter(
+        t => t.escalation_at && new Date(t.escalation_at).getTime() < now
+      )
+    }
+
+    case 'by_priority':
+      return zammadApi.getAllTickets(100).then(r => [...(r || [])].sort((a, b) => b.priority_id - a.priority_id))
+
+    case 'closed_team':
+      return zammadApi.getClosedTickets(100)
+
+    default:
+      return []
   }
 }
 
@@ -44,22 +97,42 @@ async function fetchCounts() {
 }
 
 export default function Tickets() {
-  const { user }                  = useAuth()
-  const [view, setView]           = useState('my_open')
-  const [displayMode, setMode]    = useState('list')
-  const [tickets, setTickets]     = useState([])
-  const [loading, setLoading]     = useState(true)
+  const { user }                    = useAuth()
+  const [view, setView]             = useState('my_open')
+  const [displayMode, setMode]      = useState('list')
+  const [tickets, setTickets]       = useState([])
+  const [loading, setLoading]       = useState(true)
   const [selectedId, setSelectedId] = useState(null)
-  const [showNew, setShowNew]     = useState(false)
+  const [showNew, setShowNew]       = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [counts, setCounts]       = useState({})
-  const [newBanner, setNewBanner] = useState(0)
+  const [counts, setCounts]         = useState({})
+  const [newBanner, setNewBanner]   = useState(0)
 
   const knownIds = useRef(new Set())
   const admin    = isAdmin(user)
   const agent    = isAgent(user)
 
   const isReport = REPORT_VIEWS.has(view)
+
+  // Close detail panel when clicking outside of it (mousedown fires before click,
+  // so a click on a ticket row still opens the ticket after this closes the current one)
+  useEffect(() => {
+    if (!selectedId) return
+    const handle = (e) => {
+      const panel = document.getElementById('ticket-detail-panel')
+      if (panel && !panel.contains(e.target)) setSelectedId(null)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [selectedId])
+
+  // Also close on Escape
+  useEffect(() => {
+    if (!selectedId) return
+    const handle = (e) => { if (e.key === 'Escape') setSelectedId(null) }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [selectedId])
 
   const load = useCallback(async (currentView, silent = false) => {
     if (REPORT_VIEWS.has(currentView)) return
@@ -76,8 +149,8 @@ export default function Tickets() {
       knownIds.current = new Set(rows.map(t => t.id))
       setTickets(rows)
 
-      // Zammad search results don't include tags — fetch them in background so
-      // category / dept / contact columns populate after the list is visible.
+      // Zammad search results don't include tags — fetch them in the background so
+      // Category / Dept / Customer columns populate after the list appears.
       Promise.allSettled(rows.map(t => zammadApi.getTicketTags(t.id))).then(results => {
         const tagMap = {}
         rows.forEach((t, i) => {
@@ -94,17 +167,14 @@ export default function Tickets() {
     }
   }, [])
 
-  // Initial load + poll
   useEffect(() => {
     knownIds.current = new Set()
     setNewBanner(0)
     load(view)
-
     const timer = setInterval(() => load(view, true), POLL_INTERVAL)
     return () => clearInterval(timer)
   }, [view, load])
 
-  // Sidebar counts — load once, refresh after mutations
   const refreshCounts = useCallback(() => {
     fetchCounts().then(setCounts).catch(() => {})
   }, [])
@@ -186,7 +256,6 @@ export default function Tickets() {
             />
           )}
 
-          {/* Detail panel overlay */}
           {selectedId && (
             <DetailPanel
               ticketId={selectedId}

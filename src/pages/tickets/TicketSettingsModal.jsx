@@ -72,7 +72,7 @@ export default function TicketSettingsModal({ onClose }) {
           </SettingSection>
 
           {/* New badge */}
-          <SettingSection label='"New" Badge Duration' description='How long to show the NEW badge on recently created tickets.'>
+          <SettingSection label='"New" Badge Duration' description='Tickets created within this window show a green NEW badge in the list and detail panel. Does not affect the Zammad ticket state — only this visual indicator.'>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input
                 type="number" min="1" step="1"
