@@ -25,7 +25,7 @@ const zammadApi = {
     fetch(`${BASE}/api/proxy/zammad/tickets${qs(params)}`, { headers: headers() }).then(handle),
 
   getTicket: (id) =>
-    fetch(`${BASE}/api/proxy/zammad/tickets/${id}`, { headers: headers() }).then(handle),
+    fetch(`${BASE}/api/proxy/zammad/tickets/${id}?expand=true`, { headers: headers() }).then(handle),
 
   createTicket: (data) =>
     fetch(`${BASE}/api/proxy/zammad/tickets`, {
@@ -33,7 +33,7 @@ const zammadApi = {
     }).then(handle),
 
   updateTicket: (id, data) =>
-    fetch(`${BASE}/api/proxy/zammad/tickets/${id}`, {
+    fetch(`${BASE}/api/proxy/zammad/tickets/${id}?expand=true`, {
       method: 'PUT', headers: headers(), body: JSON.stringify(data),
     }).then(handle),
 

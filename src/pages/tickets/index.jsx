@@ -58,12 +58,13 @@ async function enrichWithTags(tickets) {
 // Derive all sidebar views from a flat ticket array.
 // meId: the Zammad user ID of the current agent (null → "My" = all).
 function deriveViews(all, meId) {
-  const isMine = (t) => meId != null && Number(t.owner_id) === Number(meId)
-  const active  = (t) => t.state !== 'closed'
+  const isMine    = (t) => meId != null && Number(t.owner_id) === Number(meId)
+  const isActive  = (t) => t.state !== 'closed'
+  const isOpen    = (t) => t.state === 'open' || t.state === 'new'
 
   const my_all     = meId != null ? all.filter(isMine) : all
-  const my_open    = meId != null ? all.filter(t => isMine(t) && t.state === 'open')
-                                  : all.filter(t => t.state === 'open')
+  const my_open    = meId != null ? all.filter(t => isMine(t) && isOpen(t))
+                                  : all.filter(isOpen)
   const my_pending = meId != null ? all.filter(t => isMine(t) && t.state === 'pending reminder')
                                   : all.filter(t => t.state === 'pending reminder')
   const my_closed  = meId != null ? all.filter(t => isMine(t) && t.state === 'closed')
@@ -75,9 +76,9 @@ function deriveViews(all, meId) {
     my_pending,
     my_closed,
     all,
-    unassigned:  all.filter(t => active(t) && (!t.owner || t.owner === '-')),
+    unassigned:  all.filter(t => isActive(t) && (!t.owner || t.owner === '-')),
     overdue:     all.filter(t => { const s = slaStatus(t); return s && s.remaining < 0 }),
-    by_priority: [...all.filter(active)].sort((a, b) => (b.priority_id || 0) - (a.priority_id || 0)),
+    by_priority: [...all.filter(isActive)].sort((a, b) => (b.priority_id || 0) - (a.priority_id || 0)),
     closed_team: all.filter(t => t.state === 'closed'),
   }
 }
@@ -101,8 +102,9 @@ export default function Tickets() {
   const isReport     = REPORT_VIEWS.has(view)
   const isSearch     = view.startsWith('search:')
 
-  const zammadMeRef  = useRef(null)   // Zammad user ID of the current agent
+  const zammadMeRef  = useRef(null)     // Zammad user ID of the current agent
   const knownIds     = useRef(new Set())
+  const rawRef       = useRef([])        // master flat array; kept in sync with cache
 
   // ── Core refresh ─────────────────────────────────────────────────────────
   // Phase 1: fetch tickets → update cache immediately (no tags yet)
@@ -118,12 +120,22 @@ export default function Tickets() {
       if (count > 0) setNewBanner(n => n + count)
     }
     knownIds.current = new Set(raw.map(t => t.id))
-
+    rawRef.current = raw
     setCache(deriveViews(raw, me))
 
     // Phase 2 — tags fill in (runs after the list is already visible)
     const enriched = await enrichWithTags(raw)
+    rawRef.current = enriched
     setCache(deriveViews(enriched, me))
+  }, [])
+
+  // Update one ticket in the cache without re-fetching anything — instant.
+  const updateCachedTicket = useCallback((updatedTicket) => {
+    const me = zammadMeRef.current
+    rawRef.current = rawRef.current.map(t =>
+      t.id === updatedTicket.id ? { ...t, ...updatedTicket } : t
+    )
+    setCache(deriveViews(rawRef.current, me))
   }, [])
 
   // ── Initial mount ─────────────────────────────────────────────────────────
@@ -264,6 +276,7 @@ export default function Tickets() {
               ticketId={selectedId}
               onClose={() => setSelectedId(null)}
               onUpdated={handleUpdated}
+              onTicketUpdated={updateCachedTicket}
               isAdmin={admin}
               isAgent={agent}
             />

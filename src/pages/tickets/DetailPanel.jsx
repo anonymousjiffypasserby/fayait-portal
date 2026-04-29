@@ -18,7 +18,7 @@ const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
-export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isAgent }) {
+export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpdated, isAdmin, isAgent }) {
   const [ticket,      setTicket]      = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [tab,         setTab]         = useState('Conversation')
@@ -81,10 +81,10 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     setError(null)
     try {
       const updated = await zammadApi.updateTicket(ticketId, data)
-      // Use the PUT response directly — avoids a full reload and the loading flash
       setTicket(updated)
       setTitleVal(updated.title || '')
-      onUpdated?.()
+      // Merge tags from local state into the cache update (PUT response has no tags)
+      onTicketUpdated?.({ ...updated, tags })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -103,7 +103,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
       newTags = [...newTags, newTag]
     }
     setTags(newTags)
-    onUpdated?.()
+    onTicketUpdated?.({ ...ticket, tags: newTags })
   }
 
   const handleContactChange = async (newUserId) => {
@@ -117,18 +117,20 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
       newTags = [...newTags, newTag]
     }
     setTags(newTags)
-    onUpdated?.()
+    onTicketUpdated?.({ ...ticket, tags: newTags })
   }
 
   const toggleCategory = async (cat) => {
+    let newTags
     if (currentCategories.includes(cat)) {
       await zammadApi.removeTicketTag(ticketId, cat).catch(() => {})
-      setTags(prev => prev.filter(t => t !== cat))
+      newTags = tags.filter(t => t !== cat)
     } else {
       await zammadApi.addTicketTag(ticketId, cat).catch(() => {})
-      setTags(prev => [...prev, cat])
+      newTags = [...tags, cat]
     }
-    onUpdated?.()
+    setTags(newTags)
+    onTicketUpdated?.({ ...ticket, tags: newTags })
   }
 
   const saveTitle = () => {
@@ -326,14 +328,6 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
           </div>
         )}
 
-        {/* Customer (read-only) */}
-        {ticket.customer && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Customer</span>
-            <span style={{ fontSize: 12, color: T.navy }}>{ticket.customer}</span>
-          </div>
-        )}
-
         {/* SLA */}
         {sla && slaC && (
           <div style={{
@@ -371,7 +365,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
         <div style={{ display: tab === 'Conversation' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
           <ConversationTab
             ticketId={ticketId}
-            onReplySent={() => { load(); onUpdated?.() }}
+            onReplySent={() => load()}
             isAgent={isAgent}
             insertText={kbInsert}
             onInsertConsumed={() => setKbInsert('')}
