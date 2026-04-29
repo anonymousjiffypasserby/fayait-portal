@@ -83,7 +83,7 @@ function ArticleBubble({ article }) {
   )
 }
 
-export default function ConversationTab({ ticketId, onReplySent, isAgent, insertText, onInsertConsumed }) {
+export default function ConversationTab({ ticketId, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
   const [articles,   setArticles]   = useState([])
   const [loading,    setLoading]    = useState(true)
   const [reply,      setReply]      = useState('')
@@ -107,6 +107,12 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [articles])
+
+  // When the tab becomes visible after being hidden (display:none → flex),
+  // scroll to the bottom so the most recent message is in view.
+  useEffect(() => {
+    if (isActive) requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }))
+  }, [isActive])
 
   useEffect(() => {
     if (!insertText) return

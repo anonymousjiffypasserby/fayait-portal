@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { zammadApi, T, isAdmin, isAgent } from './shared'
+import { zammadApi, T, isAdmin, isAgent, slaStatus } from './shared'
 import TicketSidebar       from './Sidebar'
 import ListView            from './ListView'
 import BoardView           from './BoardView'
@@ -16,64 +16,38 @@ const REPORT_VIEWS = new Set([
   'tk-response', 'tk-resolution', 'tk-agent-perf', 'tk-sla', 'tk-csat',
 ])
 
-// Singleton: fetch the current Zammad user's login once and cache it.
-// "owner.login:me" is NOT valid Zammad search syntax — must use the real login string.
-let _zammadLoginPromise = null
-function getZammadLogin() {
-  if (!_zammadLoginPromise) {
-    _zammadLoginPromise = zammadApi.getCurrentUser()
-      .then(me => me?.login || null)
-      .catch(() => null)
-  }
-  return _zammadLoginPromise
-}
-
 async function fetchView(view) {
   if (REPORT_VIEWS.has(view)) return []
   if (view.startsWith('search:')) return zammadApi.searchTickets(view.slice(7), 50)
 
-  const login = await getZammadLogin()
-  const me = login ? `(owner.login:"${login}" OR customer.login:"${login}")` : null
-
   switch (view) {
-    case 'my_all':
-      if (!me) return zammadApi.getAllTickets(100)
-      return zammadApi.searchTickets(me, 100)
+    // "My" views: in a single-tenant company portal all visible tickets are the
+    // company's. Filtering by Zammad user isn't reliable because the proxy may use
+    // a shared service-account token, making owner.login:"me" return 0 results.
+    case 'my_all':     return zammadApi.getAllTickets(100)
+    case 'my_open':    return zammadApi.searchTickets('state.name:"open"', 100)
+    case 'my_pending': return zammadApi.searchTickets('state.name:"pending reminder"', 100)
+    case 'my_closed':  return zammadApi.searchTickets('state.name:"closed"', 50)
 
-    case 'my_open':
-      if (!me) return zammadApi.searchTickets('state.name:"open"', 100)
-      return zammadApi.searchTickets(`${me} AND state.name:"open"`, 100)
-
-    case 'my_pending':
-      if (!me) return zammadApi.searchTickets('state.name:"pending reminder"', 100)
-      return zammadApi.searchTickets(`${me} AND state.name:"pending reminder"`, 100)
-
-    case 'my_closed':
-      if (!me) return zammadApi.searchTickets('state.name:"closed"', 50)
-      return zammadApi.searchTickets(`${me} AND state.name:"closed"`, 50)
-
-    case 'all':
-      return zammadApi.getAllTickets(100)
+    case 'all':        return zammadApi.getAllTickets(100)
 
     case 'unassigned': {
-      // Zammad search for unassigned uses owner_id:1 (system user) — filter client-side to be safe
       const rows = await zammadApi.searchTickets(
         'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
       ).catch(() => [])
-      return (Array.isArray(rows) ? rows : []).filter(
-        t => !t.owner || t.owner === '-'
-      )
+      return (Array.isArray(rows) ? rows : []).filter(t => !t.owner || t.owner === '-')
     }
 
     case 'overdue': {
-      // escalation_at:<now is not valid Zammad syntax — filter client-side
+      // Use the same slaStatus() logic as the SLA column — this handles both
+      // Zammad-configured escalation_at AND our computed fallback deadline.
       const rows = await zammadApi.searchTickets(
         'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
       ).catch(() => [])
-      const now = Date.now()
-      return (Array.isArray(rows) ? rows : []).filter(
-        t => t.escalation_at && new Date(t.escalation_at).getTime() < now
-      )
+      return (Array.isArray(rows) ? rows : []).filter(t => {
+        const sla = slaStatus(t)
+        return sla && sla.remaining < 0
+      })
     }
 
     case 'by_priority':

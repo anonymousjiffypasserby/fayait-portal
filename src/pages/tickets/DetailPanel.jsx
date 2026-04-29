@@ -67,10 +67,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
 
   const contactTag         = tags.find(t => t.startsWith('contact:'))
   const contactNameFromTag = contactTag ? contactTag.slice(8) : ''
-  const deptUsers          = currentDept
+  // When a dept is selected, filter to its users; otherwise offer all users
+  const contactPool    = currentDept
     ? allUsers.filter(u => String(u.department_id) === String(currentDept.id))
-    : []
-  const currentContact   = deptUsers.find(u => u.name === contactNameFromTag) || null
+    : allUsers
+  const currentContact   = allUsers.find(u => u.name === contactNameFromTag) || null
   const currentContactId = currentContact ? String(currentContact.id) : ''
 
   const currentCategories = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:'))
@@ -79,8 +80,10 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     setSaving(true)
     setError(null)
     try {
-      await zammadApi.updateTicket(ticketId, data)
-      await load()
+      const updated = await zammadApi.updateTicket(ticketId, data)
+      // Use the PUT response directly — avoids a full reload and the loading flash
+      setTicket(updated)
+      setTitleVal(updated.title || '')
       onUpdated?.()
     } catch (err) {
       setError(err.message)
@@ -269,7 +272,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
           </div>
         )}
 
-        {/* Department + Contact */}
+        {/* Department + Customer — both always visible */}
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Dept</span>
           <select
@@ -282,21 +285,17 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
               <option key={d.id} value={String(d.id)}>{d.name}</option>
             ))}
           </select>
-          {currentDeptId && (
-            <>
-              <span style={{ fontSize: 11, color: T.muted }}>Contact</span>
-              <select
-                value={currentContactId}
-                onChange={e => handleContactChange(e.target.value)}
-                style={{ ...dropdownStyle }}
-              >
-                <option value="">— None —</option>
-                {deptUsers.map(u => (
-                  <option key={u.id} value={String(u.id)}>{u.name}</option>
-                ))}
-              </select>
-            </>
-          )}
+          <span style={{ fontSize: 11, color: T.muted }}>Customer</span>
+          <select
+            value={currentContactId}
+            onChange={e => handleContactChange(e.target.value)}
+            style={{ ...dropdownStyle }}
+          >
+            <option value="">— None —</option>
+            {contactPool.map(u => (
+              <option key={u.id} value={String(u.id)}>{u.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Category chips */}
@@ -366,26 +365,28 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Tab content — all three are always mounted; CSS hides the inactive ones.
+           This avoids remounting + reloading data every time the user switches tabs. */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'Conversation' && (
+        <div style={{ display: tab === 'Conversation' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
           <ConversationTab
             ticketId={ticketId}
             onReplySent={() => { load(); onUpdated?.() }}
             isAgent={isAgent}
             insertText={kbInsert}
             onInsertConsumed={() => setKbInsert('')}
+            isActive={tab === 'Conversation'}
           />
-        )}
-        {tab === 'Details' && (
+        </div>
+        <div style={{ display: tab === 'Details' ? 'flex' : 'none', flex: 1, overflow: 'auto', flexDirection: 'column' }}>
           <DetailsTab ticket={ticket} />
-        )}
-        {tab === 'Knowledge Base' && (
+        </div>
+        <div style={{ display: tab === 'Knowledge Base' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
           <KnowledgeBaseTab
             ticketTitle={ticket.title}
             onInsert={text => { setKbInsert(text); setTab('Conversation') }}
           />
-        )}
+        </div>
       </div>
     </PanelShell>
   )
