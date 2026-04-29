@@ -16,6 +16,25 @@ const STATES     = ['open', 'pending reminder', 'closed']
 const PRIORITIES = [{ id: 1, name: 'Low' }, { id: 2, name: 'Normal' }, { id: 3, name: 'High' }, { id: 4, name: 'Emergency' }]
 const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
+// Zammad's individual-ticket GET may return state as a plain string, a capitalised
+// string, or a nested object {id, name}. Normalise to the lowercase name string.
+function resolveState(ticket) {
+  if (!ticket) return ''
+  if (typeof ticket.state === 'string') return ticket.state.toLowerCase()
+  if (ticket.state?.name) return String(ticket.state.name).toLowerCase()
+  // Last-resort: map state_id using Zammad's common defaults
+  const MAP = { 1: 'new', 2: 'open', 3: 'pending reminder', 4: 'closed', 5: 'pending close' }
+  return MAP[ticket.state_id] || ''
+}
+
+// Default pending_time: tomorrow at 8 am local time
+function defaultPendingTime() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(8, 0, 0, 0)
+  return d.toISOString().slice(0, 16) // "YYYY-MM-DDTHH:mm" for datetime-local input
+}
+
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpdated, isAdmin, isAgent }) {
@@ -32,6 +51,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const [error,       setError]       = useState(null)
   const [deleting,    setDeleting]    = useState(false)
   const [kbInsert,    setKbInsert]    = useState('')
+  const [pendingTime, setPendingTime] = useState(defaultPendingTime)
 
   const predefinedCategories = getTicketSettings().predefinedTags
 
@@ -45,6 +65,9 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
         setTicket(t)
         setTitleVal(t.title || '')
         setTags(tagData?.tags || [])
+        if (t.pending_time) {
+          setPendingTime(new Date(t.pending_time).toISOString().slice(0, 16))
+        }
       })
       .catch(() => setError('Failed to load ticket'))
       .finally(() => setLoading(false))
@@ -169,10 +192,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
     )
   }
 
-  const sc          = stateColor(ticket.state)
-  const pc          = priorityColor(ticket.priority_id)
-  const sla         = slaStatus(ticket)
-  const slaC        = sla ? SLA_COLORS[sla.level] : null
+  const ticketState  = resolveState(ticket)
+  const sc           = stateColor(ticketState)
+  const pc           = priorityColor(ticket.priority_id)
+  const sla          = slaStatus({ ...ticket, state: ticketState })
+  const slaC         = sla ? SLA_COLORS[sla.level] : null
   const showNewBadge = isNewTicket(ticket)
 
   return (
@@ -194,7 +218,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           <div style={{ flex: 1 }} />
           {saving && <span style={{ fontSize: 11, color: T.muted }}>Saving…</span>}
           {error && <span style={{ fontSize: 11, color: T.red, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{error}</span>}
-          {ticket.state !== 'closed' ? (
+          {ticketState !== 'closed' ? (
             <button onClick={() => patch({ state: 'closed' })} style={actionBtn('#1D9E75', '#f0fdf4')}>
               Close Ticket
             </button>
@@ -238,11 +262,17 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
         {/* Status + Priority */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select
-            value={STATES.includes(ticket.state) ? ticket.state : ''}
-            onChange={e => patch({ state: e.target.value })}
+            value={STATES.includes(ticketState) ? ticketState : ''}
+            onChange={e => {
+              const s = e.target.value
+              const extra = s === 'pending reminder'
+                ? { pending_time: new Date(pendingTime).toISOString() }
+                : {}
+              patch({ state: s, ...extra })
+            }}
             style={{ ...dropdownStyle, color: sc.color, background: sc.bg, borderColor: sc.color + '44' }}
           >
-            {ticket.state === 'new' && (
+            {ticketState === 'new' && (
               <option value="" disabled>New (auto)</option>
             )}
             {STATES.map(s => <option key={s} value={s}>{stateColor(s).label}</option>)}
@@ -256,6 +286,22 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
             {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
+
+        {/* Pending-until picker — only shown when state is pending reminder */}
+        {ticketState === 'pending reminder' && (
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Pending until</span>
+            <input
+              type="datetime-local"
+              value={pendingTime}
+              onChange={e => {
+                setPendingTime(e.target.value)
+                if (e.target.value) patch({ pending_time: new Date(e.target.value).toISOString() })
+              }}
+              style={{ ...dropdownStyle, fontSize: 12 }}
+            />
+          </div>
+        )}
 
         {/* Assignee */}
         {isAgent && agents.length > 0 && (
