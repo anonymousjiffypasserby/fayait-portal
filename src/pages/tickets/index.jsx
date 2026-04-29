@@ -75,6 +75,18 @@ export default function Tickets() {
 
       knownIds.current = new Set(rows.map(t => t.id))
       setTickets(rows)
+
+      // Zammad search results don't include tags — fetch them in background so
+      // category / dept / contact columns populate after the list is visible.
+      Promise.allSettled(rows.map(t => zammadApi.getTicketTags(t.id))).then(results => {
+        const tagMap = {}
+        rows.forEach((t, i) => {
+          if (results[i]?.status === 'fulfilled') tagMap[t.id] = results[i].value?.tags || []
+        })
+        setTickets(prev => prev.map(t =>
+          tagMap[t.id] !== undefined ? { ...t, tags: tagMap[t.id] } : t
+        ))
+      }).catch(() => {})
     } catch {
       if (!silent) setTickets([])
     } finally {

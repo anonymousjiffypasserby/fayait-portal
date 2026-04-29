@@ -1,33 +1,51 @@
 import { useState, useEffect } from 'react'
 import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
+import { getTicketSettings } from './ticketSettings'
 import ConversationTab   from './tabs/ConversationTab'
 import DetailsTab        from './tabs/DetailsTab'
 import KnowledgeBaseTab  from './tabs/KnowledgeBaseTab'
 
-// 'new' removed — it is set automatically by Zammad on creation, not manually
+const BASE = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
+const apiGet = (path) =>
+  fetch(`${BASE}${path}`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem('faya_token')}` },
+  }).then(r => r.ok ? r.json() : []).catch(() => [])
+
+// 'new' removed — set automatically by Zammad on creation, not manually
 const STATES     = ['open', 'pending reminder', 'closed']
 const PRIORITIES = [{ id: 1, name: 'Low' }, { id: 2, name: 'Normal' }, { id: 3, name: 'High' }, { id: 4, name: 'Emergency' }]
 const TABS       = ['Conversation', 'Details', 'Knowledge Base']
 
-// Role IDs in this Zammad: 1=Admin, 2=Agent, 3=Customer. Only Admin/Agent can own tickets.
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isAgent }) {
-  const [ticket,    setTicket]    = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [tab,       setTab]       = useState('Conversation')
-  const [agents,    setAgents]    = useState([])
-  const [editTitle, setEditTitle] = useState(false)
-  const [titleVal,  setTitleVal]  = useState('')
-  const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState(null)
-  const [deleting,  setDeleting]  = useState(false)
-  const [kbInsert,  setKbInsert]  = useState('')
+  const [ticket,      setTicket]      = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [tab,         setTab]         = useState('Conversation')
+  const [agents,      setAgents]      = useState([])
+  const [departments, setDepartments] = useState([])
+  const [allUsers,    setAllUsers]    = useState([])
+  const [tags,        setTags]        = useState([])
+  const [editTitle,   setEditTitle]   = useState(false)
+  const [titleVal,    setTitleVal]    = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState(null)
+  const [deleting,    setDeleting]    = useState(false)
+  const [kbInsert,    setKbInsert]    = useState('')
+
+  const predefinedCategories = getTicketSettings().predefinedTags
 
   const load = () => {
     setLoading(true)
-    zammadApi.getTicket(ticketId)
-      .then(t => { setTicket(t); setTitleVal(t.title || '') })
+    Promise.all([
+      zammadApi.getTicket(ticketId),
+      zammadApi.getTicketTags(ticketId),
+    ])
+      .then(([t, tagData]) => {
+        setTicket(t)
+        setTitleVal(t.title || '')
+        setTags(tagData?.tags || [])
+      })
       .catch(() => setError('Failed to load ticket'))
       .finally(() => setLoading(false))
   }
@@ -37,14 +55,31 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     zammadApi.getUsers()
       .then(users => setAgents(Array.isArray(users) ? users.filter(isZammadAgent) : []))
       .catch(() => {})
+    apiGet('/api/departments').then(d => setDepartments(Array.isArray(d) ? d : []))
+    apiGet('/api/users').then(u => setAllUsers(Array.isArray(u) ? u : []))
   }, [ticketId])
+
+  // Derive dept/contact/category from tags
+  const deptTag         = tags.find(t => t.startsWith('dept:'))
+  const deptNameFromTag = deptTag ? deptTag.slice(5) : ''
+  const currentDept     = departments.find(d => d.name === deptNameFromTag) || null
+  const currentDeptId   = currentDept ? String(currentDept.id) : ''
+
+  const contactTag         = tags.find(t => t.startsWith('contact:'))
+  const contactNameFromTag = contactTag ? contactTag.slice(8) : ''
+  const deptUsers          = currentDept
+    ? allUsers.filter(u => String(u.department_id) === String(currentDept.id))
+    : []
+  const currentContact   = deptUsers.find(u => u.name === contactNameFromTag) || null
+  const currentContactId = currentContact ? String(currentContact.id) : ''
+
+  const currentCategories = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:'))
 
   const patch = async (data) => {
     setSaving(true)
     setError(null)
     try {
       await zammadApi.updateTicket(ticketId, data)
-      // Re-fetch so the panel always shows real server state (avoids stale owner_id etc.)
       await load()
       onUpdated?.()
     } catch (err) {
@@ -52,6 +87,45 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleDeptChange = async (newDeptId) => {
+    const dept = departments.find(d => String(d.id) === newDeptId)
+    const toRemove = tags.filter(t => t.startsWith('dept:') || t.startsWith('contact:'))
+    await Promise.allSettled(toRemove.map(tag => zammadApi.removeTicketTag(ticketId, tag)))
+    let newTags = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:'))
+    if (dept) {
+      const newTag = `dept:${dept.name}`
+      await zammadApi.addTicketTag(ticketId, newTag).catch(() => {})
+      newTags = [...newTags, newTag]
+    }
+    setTags(newTags)
+    onUpdated?.()
+  }
+
+  const handleContactChange = async (newUserId) => {
+    const user = allUsers.find(u => String(u.id) === newUserId)
+    const toRemove = tags.filter(t => t.startsWith('contact:'))
+    await Promise.allSettled(toRemove.map(tag => zammadApi.removeTicketTag(ticketId, tag)))
+    let newTags = tags.filter(t => !t.startsWith('contact:'))
+    if (user) {
+      const newTag = `contact:${user.name}`
+      await zammadApi.addTicketTag(ticketId, newTag).catch(() => {})
+      newTags = [...newTags, newTag]
+    }
+    setTags(newTags)
+    onUpdated?.()
+  }
+
+  const toggleCategory = async (cat) => {
+    if (currentCategories.includes(cat)) {
+      await zammadApi.removeTicketTag(ticketId, cat).catch(() => {})
+      setTags(prev => prev.filter(t => t !== cat))
+    } else {
+      await zammadApi.addTicketTag(ticketId, cat).catch(() => {})
+      setTags(prev => [...prev, cat])
+    }
+    onUpdated?.()
   }
 
   const saveTitle = () => {
@@ -90,14 +164,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
     )
   }
 
-  const sc   = stateColor(ticket.state)
-  const pc   = priorityColor(ticket.priority_id)
-  const sla  = slaStatus(ticket)
-  const slaC = sla ? SLA_COLORS[sla.level] : null
+  const sc          = stateColor(ticket.state)
+  const pc          = priorityColor(ticket.priority_id)
+  const sla         = slaStatus(ticket)
+  const slaC        = sla ? SLA_COLORS[sla.level] : null
   const showNewBadge = isNewTicket(ticket)
-
-  // Current assignee name from portal agent list (matched by email if available)
-  const currentAgentName = ticket.owner && ticket.owner !== '-' ? ticket.owner : null
 
   return (
     <PanelShell onClose={onClose}>
@@ -159,9 +230,8 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
           </div>
         )}
 
-        {/* Dropdowns row */}
+        {/* Status + Priority */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* State — 'new' excluded; shown read-only if current state is new */}
           <select
             value={STATES.includes(ticket.state) ? ticket.state : ''}
             onChange={e => patch({ state: e.target.value })}
@@ -173,7 +243,6 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
             {STATES.map(s => <option key={s} value={s}>{stateColor(s).label}</option>)}
           </select>
 
-          {/* Priority */}
           <select
             value={ticket.priority_id || ''}
             onChange={e => patch({ priority_id: Number(e.target.value) })}
@@ -181,13 +250,12 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
           >
             {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-
         </div>
 
-        {/* Assignee row — shown for agents and admins */}
+        {/* Assignee */}
         {isAgent && agents.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: T.muted, minWidth: 56 }}>Assigned</span>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Assigned</span>
             <select
               value={ticket.owner_id || ''}
               onChange={e => patch({ owner_id: Number(e.target.value) || undefined })}
@@ -195,11 +263,75 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
             >
               <option value="">Unassigned</option>
               {agents.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.firstname} {a.lastname}
-                </option>
+                <option key={a.id} value={a.id}>{a.firstname} {a.lastname}</option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Department + Contact */}
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Dept</span>
+          <select
+            value={currentDeptId}
+            onChange={e => handleDeptChange(e.target.value)}
+            style={{ ...dropdownStyle }}
+          >
+            <option value="">— None —</option>
+            {departments.map(d => (
+              <option key={d.id} value={String(d.id)}>{d.name}</option>
+            ))}
+          </select>
+          {currentDeptId && (
+            <>
+              <span style={{ fontSize: 11, color: T.muted }}>Contact</span>
+              <select
+                value={currentContactId}
+                onChange={e => handleContactChange(e.target.value)}
+                style={{ ...dropdownStyle }}
+              >
+                <option value="">— None —</option>
+                {deptUsers.map(u => (
+                  <option key={u.id} value={String(u.id)}>{u.name}</option>
+                ))}
+              </select>
+            </>
+          )}
+        </div>
+
+        {/* Category chips */}
+        {predefinedCategories.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 60, paddingTop: 5 }}>Category</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {predefinedCategories.map(cat => {
+                const active = currentCategories.includes(cat)
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategory(cat)}
+                    style={{
+                      padding: '3px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
+                      fontFamily: T.font, fontWeight: active ? 600 : 400,
+                      border: `1px solid ${active ? '#6366f1' : T.border}`,
+                      background: active ? '#eef2ff' : '#fafafa',
+                      color: active ? '#6366f1' : T.muted,
+                    }}
+                  >
+                    {active ? '✓ ' : ''}{cat}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Customer (read-only) */}
+        {ticket.customer && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Customer</span>
+            <span style={{ fontSize: 12, color: T.navy }}>{ticket.customer}</span>
           </div>
         )}
 
@@ -246,7 +378,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, isAdmin, isA
           />
         )}
         {tab === 'Details' && (
-          <DetailsTab ticket={ticket} onTagsChanged={onUpdated} />
+          <DetailsTab ticket={ticket} />
         )}
         {tab === 'Knowledge Base' && (
           <KnowledgeBaseTab
@@ -263,7 +395,7 @@ function PanelShell({ onClose, children }) {
   return (
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 560, minWidth: 360, background: T.card,
+      width: 580, minWidth: 380, background: T.card,
       borderLeft: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column',
       zIndex: 10, boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',

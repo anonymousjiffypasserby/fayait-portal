@@ -29,7 +29,7 @@ const COLUMNS = [
   { field: 'state',       label: 'Status',     w: 90  },
   { field: 'priority_id', label: 'Priority',   w: 90  },
   { field: 'department',  label: 'Dept',       w: 90, noSort: true  },
-  { field: 'customer',    label: 'User',       w: 100 },
+  { field: 'customer',    label: 'Customer',   w: 110, noSort: true },
   { field: 'owner',       label: 'Agent',      w: 100 },
   { field: 'updated_at',  label: 'Updated',    w: 90  },
   { field: 'sla',         label: 'SLA',        w: 120 },
@@ -54,6 +54,11 @@ const getDept = (ticket) => {
   return tag ? tag.slice(5) : null
 }
 
+const getContact = (ticket) => {
+  const tag = parseTags(ticket).find(t => t.startsWith('contact:'))
+  return tag ? tag.slice(8) : null
+}
+
 export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner }) {
   const [search,      setSearch]      = useState('')
   const [filters,     setFilters]     = useState(EMPTY_FILTERS)
@@ -75,7 +80,8 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
       rows = rows.filter(t =>
         t.title?.toLowerCase().includes(q) ||
         String(t.number || t.id).includes(q) ||
-        t.customer?.toLowerCase().includes(q)
+        t.customer?.toLowerCase().includes(q) ||
+        (getContact(t) || '').toLowerCase().includes(q)
       )
     }
     if (filters.status?.length)
@@ -271,8 +277,10 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                       {dept || <span style={{ color: '#ccc' }}>—</span>}
                     </td>
 
-                    {/* User (customer) */}
-                    <td style={{ ...td, color: T.muted, fontSize: 11 }}>{ticket.customer || '—'}</td>
+                    {/* Customer (contact tag, fallback to Zammad customer field) */}
+                    <td style={{ ...td, color: T.muted, fontSize: 11 }}>
+                      {getContact(ticket) || ticket.customer || '—'}
+                    </td>
 
                     {/* Agent */}
                     <td style={{ ...td, color: T.muted, fontSize: 11 }}>
