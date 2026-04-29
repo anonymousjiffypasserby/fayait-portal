@@ -98,7 +98,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const currentContact   = allUsers.find(u => u.name === contactNameFromTag) || null
   const currentContactId = currentContact ? String(currentContact.id) : ''
 
-  const currentCategories = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:'))
+  const currentCategories = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:') && !t.startsWith('gdpr:'))
 
   const patch = async (data) => {
     setSaving(true)

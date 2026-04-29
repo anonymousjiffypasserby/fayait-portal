@@ -43,9 +43,11 @@ const parseTags = (ticket) => {
   return []
 }
 
+const isSystemTag = (t) => t.startsWith('dept:') || t.startsWith('contact:') || t.startsWith('gdpr:')
+
 const getCategory = (ticket) => {
   const tags = parseTags(ticket)
-  const cats = tags.filter(t => !t.startsWith('dept:') && !t.startsWith('contact:'))
+  const cats = tags.filter(t => !isSystemTag(t))
   return cats.length ? cats.join(', ') : null
 }
 
