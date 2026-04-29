@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { zammadApi, T, isAdmin, isAgent, slaStatus } from './shared'
 import TicketSidebar       from './Sidebar'
@@ -16,145 +16,164 @@ const REPORT_VIEWS = new Set([
   'tk-response', 'tk-resolution', 'tk-agent-perf', 'tk-sla', 'tk-csat',
 ])
 
-async function fetchView(view) {
-  if (REPORT_VIEWS.has(view)) return []
-  if (view.startsWith('search:')) return zammadApi.searchTickets(view.slice(7), 50)
+// ── Master fetch ────────────────────────────────────────────────────────────
+// Fetches all ticket states in two parallel requests, returns a flat array.
+async function fetchAllTickets() {
+  const [active, closed] = await Promise.all([
+    zammadApi.searchTickets(
+      'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
+    ).catch(() => []),
+    zammadApi.searchTickets('state.name:closed', 100).catch(() => []),
+  ])
+  return [
+    ...(Array.isArray(active) ? active : []),
+    ...(Array.isArray(closed) ? closed : []),
+  ]
+}
 
-  switch (view) {
-    // "My" views: in a single-tenant company portal all visible tickets are the
-    // company's. Filtering by Zammad user isn't reliable because the proxy may use
-    // a shared service-account token, making owner.login:"me" return 0 results.
-    case 'my_all':     return zammadApi.getAllTickets(100)
-    case 'my_open':    return zammadApi.searchTickets('state.name:"open"', 100)
-    case 'my_pending': return zammadApi.searchTickets('state.name:"pending reminder"', 100)
-    case 'my_closed':  return zammadApi.searchTickets('state.name:"closed"', 50)
+// Batch-fetch tags for every ticket and merge into each ticket object.
+// Run AFTER the list is already visible so tags fill in without blocking.
+async function enrichWithTags(tickets) {
+  const results = await Promise.allSettled(tickets.map(t => zammadApi.getTicketTags(t.id)))
+  return tickets.map((t, i) => ({
+    ...t,
+    tags: results[i]?.status === 'fulfilled' ? (results[i].value?.tags || []) : (t.tags || []),
+  }))
+}
 
-    case 'all':        return zammadApi.getAllTickets(100)
+// Derive all sidebar views from a flat ticket array.
+// meId: the Zammad user ID of the current agent (null → "My" = all).
+function deriveViews(all, meId) {
+  const isMine = (t) => meId != null && Number(t.owner_id) === Number(meId)
+  const active  = (t) => t.state !== 'closed'
 
-    case 'unassigned': {
-      const rows = await zammadApi.searchTickets(
-        'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
-      ).catch(() => [])
-      return (Array.isArray(rows) ? rows : []).filter(t => !t.owner || t.owner === '-')
-    }
+  const my_all     = meId != null ? all.filter(isMine) : all
+  const my_open    = meId != null ? all.filter(t => isMine(t) && t.state === 'open')
+                                  : all.filter(t => t.state === 'open')
+  const my_pending = meId != null ? all.filter(t => isMine(t) && t.state === 'pending reminder')
+                                  : all.filter(t => t.state === 'pending reminder')
+  const my_closed  = meId != null ? all.filter(t => isMine(t) && t.state === 'closed')
+                                  : all.filter(t => t.state === 'closed')
 
-    case 'overdue': {
-      // Use the same slaStatus() logic as the SLA column — this handles both
-      // Zammad-configured escalation_at AND our computed fallback deadline.
-      const rows = await zammadApi.searchTickets(
-        'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
-      ).catch(() => [])
-      return (Array.isArray(rows) ? rows : []).filter(t => {
-        const sla = slaStatus(t)
-        return sla && sla.remaining < 0
-      })
-    }
-
-    case 'by_priority':
-      return zammadApi.getAllTickets(100).then(r => [...(r || [])].sort((a, b) => b.priority_id - a.priority_id))
-
-    case 'closed_team':
-      return zammadApi.getClosedTickets(100)
-
-    default:
-      return []
+  return {
+    my_all,
+    my_open,
+    my_pending,
+    my_closed,
+    all,
+    unassigned:  all.filter(t => active(t) && (!t.owner || t.owner === '-')),
+    overdue:     all.filter(t => { const s = slaStatus(t); return s && s.remaining < 0 }),
+    by_priority: [...all.filter(active)].sort((a, b) => (b.priority_id || 0) - (a.priority_id || 0)),
+    closed_team: all.filter(t => t.state === 'closed'),
   }
 }
 
-async function fetchCounts() {
-  const views = ['my_all', 'my_open', 'my_pending', 'my_closed', 'all', 'unassigned', 'overdue', 'closed_team']
-  const results = await Promise.allSettled(views.map(v => fetchView(v)))
-  return Object.fromEntries(views.map((v, i) => [
-    v,
-    results[i].status === 'fulfilled' ? (Array.isArray(results[i].value) ? results[i].value.length : 0) : 0,
-  ]))
-}
-
 export default function Tickets() {
-  const { user }                    = useAuth()
-  const [view, setView]             = useState('my_open')
-  const [displayMode, setMode]      = useState('list')
-  const [tickets, setTickets]       = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [selectedId, setSelectedId] = useState(null)
-  const [showNew, setShowNew]       = useState(false)
+  const { user } = useAuth()
+
+  const [view,         setView]         = useState('my_open')
+  const [displayMode,  setMode]         = useState('list')
+  const [cache,        setCache]        = useState(null) // null = first load in progress
+  const [selectedId,   setSelectedId]   = useState(null)
+  const [showNew,      setShowNew]      = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [counts, setCounts]         = useState({})
-  const [newBanner, setNewBanner]   = useState(0)
+  const [newBanner,    setNewBanner]    = useState(0)
+  // Live search is kept separate — not cached
+  const [searchRows,   setSearchRows]   = useState([])
+  const [searchLoading,setSearchLoading]= useState(false)
 
-  const knownIds = useRef(new Set())
-  const admin    = isAdmin(user)
-  const agent    = isAgent(user)
+  const admin        = isAdmin(user)
+  const agent        = isAgent(user)
+  const isReport     = REPORT_VIEWS.has(view)
+  const isSearch     = view.startsWith('search:')
 
-  const isReport = REPORT_VIEWS.has(view)
+  const zammadMeRef  = useRef(null)   // Zammad user ID of the current agent
+  const knownIds     = useRef(new Set())
 
-  // Close detail panel when clicking outside of it (mousedown fires before click,
-  // so a click on a ticket row still opens the ticket after this closes the current one)
+  // ── Core refresh ─────────────────────────────────────────────────────────
+  // Phase 1: fetch tickets → update cache immediately (no tags yet)
+  // Phase 2: fetch tags in background → update cache silently
+  const doRefresh = useCallback(async ({ detectNew = false } = {}) => {
+    const me = zammadMeRef.current
+
+    // Phase 1 — tickets without tags
+    const raw = await fetchAllTickets()
+
+    if (detectNew && knownIds.current.size > 0) {
+      const count = raw.filter(t => !knownIds.current.has(t.id)).length
+      if (count > 0) setNewBanner(n => n + count)
+    }
+    knownIds.current = new Set(raw.map(t => t.id))
+
+    setCache(deriveViews(raw, me))
+
+    // Phase 2 — tags fill in (runs after the list is already visible)
+    const enriched = await enrichWithTags(raw)
+    setCache(deriveViews(enriched, me))
+  }, [])
+
+  // ── Initial mount ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+    async function init() {
+      // Resolve who the current agent is in Zammad
+      const me = await zammadApi.getCurrentUser().catch(() => null)
+      if (cancelled) return
+      if (me?.id) zammadMeRef.current = me.id
+
+      await doRefresh()
+    }
+    init()
+
+    // Background poll
+    const timer = setInterval(() => doRefresh({ detectNew: true }), POLL_INTERVAL)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [doRefresh])
+
+  // ── Live search (separate from cache) ────────────────────────────────────
+  useEffect(() => {
+    if (!isSearch) { setSearchRows([]); return }
+    setSearchLoading(true)
+    zammadApi.searchTickets(view.slice(7), 50)
+      .then(r => setSearchRows(Array.isArray(r) ? r : []))
+      .catch(() => setSearchRows([]))
+      .finally(() => setSearchLoading(false))
+  }, [view, isSearch])
+
+  // ── Close panel on outside click / Escape ────────────────────────────────
   useEffect(() => {
     if (!selectedId) return
-    const handle = (e) => {
+    const onMouse = (e) => {
       const panel = document.getElementById('ticket-detail-panel')
       if (panel && !panel.contains(e.target)) setSelectedId(null)
     }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [selectedId])
-
-  // Also close on Escape
-  useEffect(() => {
-    if (!selectedId) return
-    const handle = (e) => { if (e.key === 'Escape') setSelectedId(null) }
-    window.addEventListener('keydown', handle)
-    return () => window.removeEventListener('keydown', handle)
-  }, [selectedId])
-
-  const load = useCallback(async (currentView, silent = false) => {
-    if (REPORT_VIEWS.has(currentView)) return
-    if (!silent) setLoading(true)
-    try {
-      const result = await fetchView(currentView)
-      const rows = Array.isArray(result) ? result : []
-
-      if (silent && knownIds.current.size > 0) {
-        const newOnes = rows.filter(t => !knownIds.current.has(t.id))
-        if (newOnes.length > 0) setNewBanner(n => n + newOnes.length)
-      }
-
-      knownIds.current = new Set(rows.map(t => t.id))
-      setTickets(rows)
-
-      // Zammad search results don't include tags — fetch them in the background so
-      // Category / Dept / Customer columns populate after the list appears.
-      Promise.allSettled(rows.map(t => zammadApi.getTicketTags(t.id))).then(results => {
-        const tagMap = {}
-        rows.forEach((t, i) => {
-          if (results[i]?.status === 'fulfilled') tagMap[t.id] = results[i].value?.tags || []
-        })
-        setTickets(prev => prev.map(t =>
-          tagMap[t.id] !== undefined ? { ...t, tags: tagMap[t.id] } : t
-        ))
-      }).catch(() => {})
-    } catch {
-      if (!silent) setTickets([])
-    } finally {
-      if (!silent) setLoading(false)
+    const onKey = (e) => { if (e.key === 'Escape') setSelectedId(null) }
+    document.addEventListener('mousedown', onMouse)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onMouse)
+      window.removeEventListener('keydown', onKey)
     }
-  }, [])
+  }, [selectedId])
 
-  useEffect(() => {
-    knownIds.current = new Set()
-    setNewBanner(0)
-    load(view)
-    const timer = setInterval(() => load(view, true), POLL_INTERVAL)
-    return () => clearInterval(timer)
-  }, [view, load])
+  // ── Derived data ─────────────────────────────────────────────────────────
+  const tickets = isSearch ? searchRows
+                : isReport ? []
+                : (cache ? (cache[view] || []) : [])
 
-  const refreshCounts = useCallback(() => {
-    fetchCounts().then(setCounts).catch(() => {})
-  }, [])
+  const loading = isSearch ? searchLoading
+                : isReport ? false
+                : cache === null  // only true on very first load
 
-  useEffect(() => { refreshCounts() }, [refreshCounts])
+  // Sidebar counts always come from cache — no extra requests needed
+  const counts = useMemo(() => {
+    if (!cache) return {}
+    return Object.fromEntries(
+      Object.entries(cache).map(([k, v]) => [k, Array.isArray(v) ? v.length : 0])
+    )
+  }, [cache])
 
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleView = (v) => {
     setSelectedId(null)
     setNewBanner(0)
@@ -164,13 +183,12 @@ export default function Tickets() {
   const handleCreated = (ticket) => {
     setShowNew(false)
     setSelectedId(ticket.id)
-    load(view)
-    refreshCounts()
+    // Immediately refresh — silently updates the list so the new ticket appears
+    doRefresh()
   }
 
   const handleUpdated = () => {
-    load(view, true)
-    refreshCounts()
+    doRefresh()
   }
 
   return (
@@ -197,7 +215,7 @@ export default function Tickets() {
           <div style={{ fontSize: 15, fontWeight: 700, color: T.navy }}>
             {viewLabel(view)}
           </div>
-          {view.startsWith('search:') && (
+          {isSearch && (
             <button
               onClick={() => handleView('my_open')}
               style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: 12, cursor: 'pointer', padding: 0 }}
@@ -260,9 +278,9 @@ function viewLabel(view) {
   if (view.startsWith('search:')) return `Search: "${view.slice(7)}"`
   const labels = {
     my_all:          'All My Tickets',
-    my_open:         'Open',
-    my_pending:      'Pending',
-    my_closed:       'Closed',
+    my_open:         'My Open',
+    my_pending:      'My Pending',
+    my_closed:       'My Closed',
     all:             'All Tickets',
     unassigned:      'Unassigned',
     overdue:         'Overdue',
