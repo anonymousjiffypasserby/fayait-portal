@@ -622,6 +622,9 @@ export const api = {
 
   retrySyncEntity: (entity, id) =>
     fetch(`${BASE}/api/sync/retry`, { method: 'POST', headers: headers(), body: JSON.stringify({ entity, id }) }).then(handle),
+
+  getMatrixLoginToken: () =>
+    fetch(`${BASE}/api/matrix/login-token`, { headers: headers() }).then(handle),
 }
 
 export default api
@@ -690,7 +693,4 @@ export const departmentsApi = {
       method: 'DELETE',
       headers: headers()
     }).then(handle),
-
-  getMatrixLoginToken: () =>
-    fetch(`${BASE}/api/matrix/login-token`, { headers: headers() }).then(handle),
 }

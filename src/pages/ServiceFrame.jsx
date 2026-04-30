@@ -148,21 +148,26 @@ export default function ServiceFrame({ service }) {
     if (service !== 'chat' || !isActive) return
     setChatUrl(null)
     setChatError(null)
-    api.getMatrixLoginToken()
-      .then(({ login_token, homeserver }) => {
-        const bridge = `${ELEMENT_WEB}/bridge.html`
-          + `?loginToken=${encodeURIComponent(login_token)}`
-          + `&hs_url=${encodeURIComponent(homeserver)}`
-        setChatUrl(bridge)
-      })
-      .catch(err => {
-        console.error('[chat] login token error:', err.message)
-        // Fall back to plain Element Web — user will see the sign-in page
-        setChatError(err.message)
-        setChatUrl(user?.matrix_homeserver
-          ? `${ELEMENT_WEB}/?hs_url=${encodeURIComponent(user.matrix_homeserver)}`
-          : ELEMENT_WEB)
-      })
+    try {
+      api.getMatrixLoginToken()
+        .then(({ login_token, homeserver }) => {
+          const bridge = `${ELEMENT_WEB}/bridge.html`
+            + `?loginToken=${encodeURIComponent(login_token)}`
+            + `&hs_url=${encodeURIComponent(homeserver)}`
+          setChatUrl(bridge)
+        })
+        .catch(err => {
+          console.error('[chat] login token error:', err.message)
+          setChatError(err.message)
+          setChatUrl(user?.matrix_homeserver
+            ? `${ELEMENT_WEB}/?hs_url=${encodeURIComponent(user.matrix_homeserver)}`
+            : ELEMENT_WEB)
+        })
+    } catch (err) {
+      console.error('[chat] unexpected error:', err.message)
+      setChatError(err.message)
+      setChatUrl(ELEMENT_WEB)
+    }
   }, [service, isActive])
 
   // ── Chat: per-company Synapse homeserver ─────────────────────────────────────
