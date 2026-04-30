@@ -297,13 +297,12 @@ export default function TaskModal({ task, projectId, users, onClose, onSaved }) 
                         </div>
                         {a.filesize && <div style={{ fontSize: 10, color: T.muted }}>{fmtSize(a.filesize)}</div>}
                       </div>
-                      <a
-                        href={api.getTaskAttachmentDownloadUrl(projectId, task.id, a.id)}
-                        download={a.filename}
-                        style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', flexShrink: 0 }}
+                      <button
+                        onClick={() => api.downloadTaskAttachment(projectId, task.id, a.id, a.filename)}
+                        style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, padding: 0 }}
                       >
                         ↓
-                      </a>
+                      </button>
                       <button
                         onClick={() => handleDeleteAttachment(a.id)}
                         style={{ background: 'none', border: 'none', fontSize: 13, color: T.muted, cursor: 'pointer', flexShrink: 0 }}

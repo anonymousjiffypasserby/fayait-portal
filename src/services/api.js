@@ -583,8 +583,14 @@ export const api = {
   deleteProjectAttachment: (projectId, attachmentId) =>
     fetch(`${BASE}/api/projects/${projectId}/attachments/${attachmentId}`, { method: 'DELETE', headers: headers() }).then(handle),
 
-  getProjectAttachmentDownloadUrl: (projectId, attachmentId) =>
-    `${BASE}/api/projects/${projectId}/attachments/${attachmentId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+  downloadProjectAttachment: async (projectId, attachmentId, filename) => {
+    const res = await fetch(`${BASE}/api/projects/${projectId}/attachments/${attachmentId}/download`, { headers: headers() })
+    if (!res.ok) throw new Error('Download failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = filename || 'file'
+    a.click(); URL.revokeObjectURL(url)
+  },
 
   getTaskAttachments: (projectId, taskId) =>
     fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments`, { headers: headers() }).then(handle),
@@ -599,8 +605,14 @@ export const api = {
   deleteTaskAttachment: (projectId, taskId, attachmentId) =>
     fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}`, { method: 'DELETE', headers: headers() }).then(handle),
 
-  getTaskAttachmentDownloadUrl: (projectId, taskId, attachmentId) =>
-    `${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}/download?token=${encodeURIComponent(localStorage.getItem('faya_token') || '')}`,
+  downloadTaskAttachment: async (projectId, taskId, attachmentId, filename) => {
+    const res = await fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}/download`, { headers: headers() })
+    if (!res.ok) throw new Error('Download failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = filename || 'file'
+    a.click(); URL.revokeObjectURL(url)
+  },
 
   getProjectActivity: (projectId) =>
     fetch(`${BASE}/api/projects/${projectId}/activity`, { headers: headers() }).then(handle),

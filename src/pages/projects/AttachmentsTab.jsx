@@ -108,17 +108,16 @@ export default function AttachmentsTab({ project, attachments, onRefresh }) {
                 <span style={{ fontSize: 10, color: T.muted }}>{a.uploaded_by_name}</span>
               </div>
               <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                <a
-                  href={api.getProjectAttachmentDownloadUrl(project.id, a.id)}
-                  download={a.filename}
+                <button
+                  onClick={() => api.downloadProjectAttachment(project.id, a.id, a.filename)}
                   style={{
                     flex: 1, textAlign: 'center', fontSize: 11, padding: '4px 0',
                     background: '#f1f5f9', borderRadius: 5, color: T.navy,
-                    textDecoration: 'none', fontWeight: 500,
+                    border: 'none', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
                   ↓ Download
-                </a>
+                </button>
                 <button
                   onClick={() => handleDelete(a.id)}
                   style={{
