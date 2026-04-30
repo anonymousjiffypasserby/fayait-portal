@@ -690,4 +690,7 @@ export const departmentsApi = {
       method: 'DELETE',
       headers: headers()
     }).then(handle),
+
+  getMatrixLoginToken: () =>
+    fetch(`${BASE}/api/matrix/login-token`, { headers: headers() }).then(handle),
 }

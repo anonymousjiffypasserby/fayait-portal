@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { api } from '../services/api'
 
 const ELEMENT_WEB = 'https://chat.fayait.com'
 
@@ -139,6 +141,30 @@ export default function ServiceFrame({ service }) {
   const isAdmin  = ADMIN_ROLES.includes(user?.role)
   const info     = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
 
+  const [chatUrl, setChatUrl] = useState(null)
+  const [chatError, setChatError] = useState(null)
+
+  useEffect(() => {
+    if (service !== 'chat' || !isActive) return
+    setChatUrl(null)
+    setChatError(null)
+    api.getMatrixLoginToken()
+      .then(({ login_token, homeserver }) => {
+        const bridge = `${ELEMENT_WEB}/bridge.html`
+          + `?loginToken=${encodeURIComponent(login_token)}`
+          + `&hs_url=${encodeURIComponent(homeserver)}`
+        setChatUrl(bridge)
+      })
+      .catch(err => {
+        console.error('[chat] login token error:', err.message)
+        // Fall back to plain Element Web — user will see the sign-in page
+        setChatError(err.message)
+        setChatUrl(user?.matrix_homeserver
+          ? `${ELEMENT_WEB}/?hs_url=${encodeURIComponent(user.matrix_homeserver)}`
+          : ELEMENT_WEB)
+      })
+  }, [service, isActive])
+
   // ── Chat: per-company Synapse homeserver ─────────────────────────────────────
   let url
   if (service === 'chat') {
@@ -150,9 +176,8 @@ export default function ServiceFrame({ service }) {
         return <ChatMobile homeserver={homeserver} />
       }
     }
-    url = homeserver
-      ? `${ELEMENT_WEB}/#/login?defaultHsUrl=${encodeURIComponent(homeserver)}`
-      : ELEMENT_WEB
+    // chatUrl is set async above — show a loading state until ready
+    url = chatUrl
   } else {
     url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
   }
@@ -215,6 +240,18 @@ export default function ServiceFrame({ service }) {
             Contact Faya IT to unlock
           </a>
         </div>
+      </div>
+    )
+  }
+
+  if (service === 'chat' && !url) {
+    return (
+      <div style={{
+        width: '100%', height: '100%', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#15191E', color: '#fff', fontSize: 14,
+      }}>
+        {chatError ? `Chat unavailable: ${chatError}` : 'Signing you in to chat…'}
       </div>
     )
   }
