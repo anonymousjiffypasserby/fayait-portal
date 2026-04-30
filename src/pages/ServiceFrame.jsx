@@ -1,17 +1,18 @@
 import { useAuth } from '../context/AuthContext'
 
+const ELEMENT_WEB = 'https://chat.fayait.com'
+
 const SERVICE_MOBILE_URLS = {
   tickets: 'https://zammad.fayait.com/mobile',
 }
 
 const SERVICE_URLS = {
-  tickets: 'https://zammad.fayait.com',
-  assets: 'https://snipe.fayait.com',
-  chat: 'https://chat.fayait.com',
-  files: 'https://nextcloud.fayait.com',
+  tickets:  'https://zammad.fayait.com',
+  assets:   'https://snipe.fayait.com',
+  files:    'https://nextcloud.fayait.com',
   projects: 'https://plane.fayait.com',
-  status: 'https://uptime.fayait.com',
-  grafana: 'https://grafana.fayait.com',
+  status:   'https://uptime.fayait.com',
+  grafana:  'https://grafana.fayait.com',
 }
 
 const SERVICE_INFO = {
@@ -54,14 +55,107 @@ const SERVICE_INFO = {
 
 const ADMIN_ROLES = ['superadmin', 'admin']
 
+function ChatMobile({ homeserver }) {
+  const deepLink = homeserver
+    ? `element://vector/login?hs_url=${encodeURIComponent(homeserver)}`
+    : 'element://vector/'
+
+  const webUrl = homeserver
+    ? `${ELEMENT_WEB}/#/login?defaultHsUrl=${encodeURIComponent(homeserver)}`
+    : ELEMENT_WEB
+
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#f0f2f5',
+      padding: 24,
+    }}>
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        padding: '40px 28px',
+        maxWidth: 360,
+        width: '100%',
+        textAlign: 'center',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        border: '1px solid rgba(0,0,0,0.06)',
+      }}>
+        <div style={{ fontSize: 52, marginBottom: 16 }}>💬</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1f2e', marginBottom: 8 }}>
+          Team Chat
+        </div>
+        <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6, marginBottom: 28 }}>
+          For the best experience, open chat in the Element app.
+        </div>
+
+        <a href={deepLink} style={{
+          display: 'block',
+          background: '#0dbd8b',
+          color: '#fff',
+          padding: '13px 0',
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          textDecoration: 'none',
+          marginBottom: 12,
+        }}>
+          Open in Element app
+        </a>
+
+        <a href={webUrl} target="_blank" rel="noopener noreferrer" style={{
+          display: 'block',
+          background: '#f5f5f5',
+          color: '#444',
+          padding: '13px 0',
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          textDecoration: 'none',
+          marginBottom: 20,
+        }}>
+          Continue in browser
+        </a>
+
+        <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.5 }}>
+          Don&rsquo;t have Element?{' '}
+          <a href="https://element.io/download" target="_blank" rel="noopener noreferrer" style={{ color: '#0dbd8b' }}>
+            Download free
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ServiceFrame({ service }) {
   const { user } = useAuth()
   const isMobile = window.innerWidth < 768
-  const url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
   const services = user?.services || {}
   const isActive = services[service] === 'active'
-  const isAdmin = ADMIN_ROLES.includes(user?.role)
-  const info = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
+  const isAdmin  = ADMIN_ROLES.includes(user?.role)
+  const info     = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
+
+  // ── Chat: per-company Synapse homeserver ─────────────────────────────────────
+  let url
+  if (service === 'chat') {
+    const homeserver = user?.matrix_homeserver
+    if (isMobile) {
+      if (!isActive) {
+        // Fall through to the inactive gate below
+      } else {
+        return <ChatMobile homeserver={homeserver} />
+      }
+    }
+    url = homeserver
+      ? `${ELEMENT_WEB}/#/login?defaultHsUrl=${encodeURIComponent(homeserver)}`
+      : ELEMENT_WEB
+  } else {
+    url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
+  }
 
   if (!isActive) {
     return (
