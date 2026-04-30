@@ -1,9 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import NotificationBell from './NotificationBell'
 import ServiceFrame from '../pages/ServiceFrame'
+
+class ServiceFrameBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(err) { return { error: err } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', background: '#f0f2f5', color: '#888', fontSize: 13 }}>
+          Service unavailable
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const IFRAME_SERVICES = [
   { key: 'chat',    path: '/chat'    },
@@ -322,7 +338,9 @@ export default function Layout({ children }) {
                 zIndex: 50,
               }}
             >
-              <ServiceFrame service={key} />
+              <ServiceFrameBoundary>
+                <ServiceFrame service={key} />
+              </ServiceFrameBoundary>
             </div>
           )
         })}
