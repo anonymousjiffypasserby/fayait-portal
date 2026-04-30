@@ -8,12 +8,17 @@ import ServiceFrame from '../pages/ServiceFrame'
 class ServiceFrameBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(err) { return { error: err } }
+  componentDidCatch(err) { console.error('[ServiceFrame error]', err) }
   render() {
     if (this.state.error) {
       return (
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', background: '#f0f2f5', color: '#888', fontSize: 13 }}>
-          Service unavailable
+          justifyContent: 'center', background: '#f0f2f5', color: '#888', fontSize: 13,
+          flexDirection: 'column', gap: 8 }}>
+          <div>Service unavailable</div>
+          <div style={{ fontSize: 11, color: '#bbb', maxWidth: 400, textAlign: 'center' }}>
+            {this.state.error?.message}
+          </div>
         </div>
       )
     }
