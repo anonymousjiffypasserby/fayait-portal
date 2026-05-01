@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../services/api'
 
@@ -57,6 +57,7 @@ const SERVICE_INFO = {
 
 const ADMIN_ROLES = ['superadmin', 'admin']
 
+// ── Mobile: show deep-link card instead of iframe ───────────────────────────
 function ChatMobile({ homeserver }) {
   const deepLink = homeserver
     ? `element://vector/login?hs_url=${encodeURIComponent(homeserver)}`
@@ -68,23 +69,14 @@ function ChatMobile({ homeserver }) {
 
   return (
     <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f0f2f5',
-      padding: 24,
+      width: '100%', height: '100%', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      background: '#f0f2f5', padding: 24,
     }}>
       <div style={{
-        background: '#fff',
-        borderRadius: 16,
-        padding: '40px 28px',
-        maxWidth: 360,
-        width: '100%',
-        textAlign: 'center',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-        border: '1px solid rgba(0,0,0,0.06)',
+        background: '#fff', borderRadius: 16, padding: '40px 28px',
+        maxWidth: 360, width: '100%', textAlign: 'center',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.06)',
       }}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>💬</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1f2e', marginBottom: 8 }}>
@@ -95,29 +87,17 @@ function ChatMobile({ homeserver }) {
         </div>
 
         <a href={deepLink} style={{
-          display: 'block',
-          background: '#0dbd8b',
-          color: '#fff',
-          padding: '13px 0',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          textDecoration: 'none',
-          marginBottom: 12,
+          display: 'block', background: '#0dbd8b', color: '#fff',
+          padding: '13px 0', borderRadius: 8, fontSize: 14,
+          fontWeight: 600, textDecoration: 'none', marginBottom: 12,
         }}>
           Open in Element app
         </a>
 
         <a href={webUrl} target="_blank" rel="noopener noreferrer" style={{
-          display: 'block',
-          background: '#f5f5f5',
-          color: '#444',
-          padding: '13px 0',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          textDecoration: 'none',
-          marginBottom: 20,
+          display: 'block', background: '#f5f5f5', color: '#444',
+          padding: '13px 0', borderRadius: 8, fontSize: 14,
+          fontWeight: 600, textDecoration: 'none', marginBottom: 20,
         }}>
           Continue in browser
         </a>
@@ -133,6 +113,118 @@ function ChatMobile({ homeserver }) {
   )
 }
 
+// ── Desktop: launcher card — opens Element Web in a new tab ──────────────────
+// Element Web cannot be embedded in a cross-origin iframe because it depends on
+// localStorage, which Chrome partitions (and in some configs blocks) for iframes.
+// Opening as a top-level tab sidesteps this entirely.
+function ChatLauncher() {
+  const [status, setStatus] = useState('idle') // idle | loading | open | blocked | error
+  const [errorMsg, setErrorMsg] = useState(null)
+  const winRef = useRef(null)
+
+  function openChat() {
+    setStatus('loading')
+    api.getMatrixLoginToken()
+      .then(({ login_token, homeserver }) => {
+        const url = `${ELEMENT_WEB}/bridge.html`
+          + `?loginToken=${encodeURIComponent(login_token)}`
+          + `&hs_url=${encodeURIComponent(homeserver)}`
+        const win = window.open(url, 'faya-chat')
+        if (win) {
+          winRef.current = win
+          setStatus('open')
+        } else {
+          setStatus('blocked')
+        }
+      })
+      .catch(err => {
+        setStatus('error')
+        setErrorMsg(err.message)
+      })
+  }
+
+  function focusOrReset() {
+    if (winRef.current && !winRef.current.closed) {
+      winRef.current.focus()
+    } else {
+      winRef.current = null
+      setStatus('idle')
+    }
+  }
+
+  const card = {
+    width: '100%', height: '100%', display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+    background: '#15191E', padding: 24,
+  }
+  const box = {
+    background: '#21262d', borderRadius: 16, padding: '40px 28px',
+    maxWidth: 360, width: '100%', textAlign: 'center',
+    boxShadow: '0 4px 32px rgba(0,0,0,0.4)',
+    border: '1px solid rgba(255,255,255,0.06)',
+  }
+  const primaryBtn = {
+    display: 'block', width: '100%', background: '#0dbd8b', color: '#fff',
+    padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 600,
+    border: 'none', cursor: 'pointer', marginBottom: 12,
+  }
+  const secondaryBtn = { ...primaryBtn, background: '#2d333b' }
+
+  return (
+    <div style={card}>
+      <div style={box}>
+        <div style={{ fontSize: 52, marginBottom: 16 }}>💬</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#e6edf3', marginBottom: 8 }}>
+          Team Chat
+        </div>
+
+        {status === 'idle' && (
+          <>
+            <div style={{ fontSize: 13, color: '#8d96a0', lineHeight: 1.6, marginBottom: 24 }}>
+              Opens in a new tab — you&rsquo;ll be signed in automatically.
+            </div>
+            <button onClick={openChat} style={primaryBtn}>Open Team Chat</button>
+          </>
+        )}
+
+        {status === 'loading' && (
+          <div style={{ fontSize: 13, color: '#8d96a0', marginTop: 16 }}>
+            Signing you in&hellip;
+          </div>
+        )}
+
+        {status === 'open' && (
+          <>
+            <div style={{ fontSize: 13, color: '#8d96a0', lineHeight: 1.6, marginBottom: 24 }}>
+              Chat is open in another tab.
+            </div>
+            <button onClick={focusOrReset} style={primaryBtn}>Switch to Chat tab</button>
+            <button onClick={openChat} style={secondaryBtn}>Open new session</button>
+          </>
+        )}
+
+        {status === 'blocked' && (
+          <>
+            <div style={{ fontSize: 13, color: '#f85149', lineHeight: 1.6, marginBottom: 24 }}>
+              Your browser blocked the popup. Allow popups for this site and try again.
+            </div>
+            <button onClick={openChat} style={primaryBtn}>Try Again</button>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <div style={{ fontSize: 13, color: '#f85149', lineHeight: 1.6, marginBottom: 24 }}>
+              {errorMsg || 'Could not sign in to chat.'}
+            </div>
+            <button onClick={openChat} style={primaryBtn}>Try Again</button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function ServiceFrame({ service }) {
   const { user } = useAuth()
   const isMobile = window.innerWidth < 768
@@ -141,72 +233,29 @@ export default function ServiceFrame({ service }) {
   const isAdmin  = ADMIN_ROLES.includes(user?.role)
   const info     = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
 
-  const [chatUrl, setChatUrl] = useState(null)
-  const [chatError, setChatError] = useState(null)
-
-  useEffect(() => {
-    if (service !== 'chat' || !isActive) return
-    setChatUrl(null)
-    setChatError(null)
-    try {
-      api.getMatrixLoginToken()
-        .then(({ login_token, homeserver }) => {
-          const bridge = `${ELEMENT_WEB}/bridge.html`
-            + `?loginToken=${encodeURIComponent(login_token)}`
-            + `&hs_url=${encodeURIComponent(homeserver)}`
-          setChatUrl(bridge)
-        })
-        .catch(err => {
-          console.error('[chat] login token error:', err.message)
-          setChatError(err.message)
-          setChatUrl(user?.matrix_homeserver
-            ? `${ELEMENT_WEB}/?hs_url=${encodeURIComponent(user.matrix_homeserver)}`
-            : ELEMENT_WEB)
-        })
-    } catch (err) {
-      console.error('[chat] unexpected error:', err.message)
-      setChatError(err.message)
-      setChatUrl(ELEMENT_WEB)
-    }
-  }, [service, isActive])
-
-  // ── Chat: per-company Synapse homeserver ─────────────────────────────────────
-  let url
+  // ── Chat: launcher card (desktop) or deep-link card (mobile) ────────────────
   if (service === 'chat') {
-    const homeserver = user?.matrix_homeserver
-    if (isMobile) {
-      if (!isActive) {
-        // Fall through to the inactive gate below
-      } else {
-        return <ChatMobile homeserver={homeserver} />
-      }
+    if (!isActive) {
+      // Fall through to inactive gate below
+    } else if (isMobile) {
+      return <ChatMobile homeserver={user?.matrix_homeserver} />
+    } else {
+      return <ChatLauncher />
     }
-    // chatUrl is set async above — show a loading state until ready
-    url = chatUrl
-  } else {
-    url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
   }
 
+  // ── Inactive gate ────────────────────────────────────────────────────────────
   if (!isActive) {
     return (
       <div style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f0f2f5',
-        padding: 40,
+        width: '100%', height: '100%', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#f0f2f5', padding: 40,
       }}>
         <div style={{
-          background: '#fff',
-          borderRadius: 16,
-          padding: '48px 40px',
-          maxWidth: 480,
-          width: '100%',
-          textAlign: 'center',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-          border: '1px solid rgba(0,0,0,0.06)',
+          background: '#fff', borderRadius: 16, padding: '48px 40px',
+          maxWidth: 480, width: '100%', textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)',
         }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>{info.icon}</div>
           <div style={{ fontSize: 11, color: '#ff6b35', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
@@ -220,27 +269,17 @@ export default function ServiceFrame({ service }) {
           </div>
           {isAdmin && (
             <div style={{
-              background: '#fff8f5',
-              border: '1px solid rgba(255,107,53,0.2)',
-              borderRadius: 10,
-              padding: '14px 18px',
-              marginBottom: 24,
-              fontSize: 13,
-              color: '#888',
-              textAlign: 'left',
+              background: '#fff8f5', border: '1px solid rgba(255,107,53,0.2)',
+              borderRadius: 10, padding: '14px 18px', marginBottom: 24,
+              fontSize: 13, color: '#888', textAlign: 'left',
             }}>
               <strong style={{ color: '#1a1f2e' }}>Admin note:</strong> Contact Faya IT to activate this service for your organization.
             </div>
           )}
           <a href="mailto:support@fayait.com" style={{
-            display: 'inline-block',
-            background: '#ff6b35',
-            color: '#fff',
-            padding: '12px 28px',
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            textDecoration: 'none',
+            display: 'inline-block', background: '#ff6b35', color: '#fff',
+            padding: '12px 28px', borderRadius: 8, fontSize: 13,
+            fontWeight: 600, textDecoration: 'none',
           }}>
             Contact Faya IT to unlock
           </a>
@@ -249,17 +288,8 @@ export default function ServiceFrame({ service }) {
     )
   }
 
-  if (service === 'chat' && !url) {
-    return (
-      <div style={{
-        width: '100%', height: '100%', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        background: '#15191E', color: '#fff', fontSize: 14,
-      }}>
-        {chatError ? `Chat unavailable: ${chatError}` : 'Signing you in to chat…'}
-      </div>
-    )
-  }
+  // ── Iframe services (grafana, files, status, etc.) ───────────────────────────
+  const url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
