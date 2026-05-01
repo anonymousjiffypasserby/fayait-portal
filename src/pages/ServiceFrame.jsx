@@ -225,6 +225,73 @@ function ChatLauncher() {
   )
 }
 
+const FILES_URL = 'https://files.fayait.com'
+
+// ── Files: auto-login via nc-bridge.html, then iframe shows Nextcloud ────────
+// Bridge page is same-origin to Nextcloud so it can set session cookies freely.
+function FilesFrame() {
+  const [src, setSrc] = useState(null)
+  const [error, setError] = useState(null)
+
+  function load() {
+    setSrc(null)
+    setError(null)
+    api.getFilesLoginToken()
+      .then(({ token }) => {
+        setSrc(`${FILES_URL}/nc-bridge.html?token=${encodeURIComponent(token)}`)
+      })
+      .catch(err => setError(err.message))
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (error) {
+    return (
+      <div style={{
+        width: '100%', height: '100%', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#0082c9', padding: 24,
+      }}>
+        <div style={{
+          background: '#fff', borderRadius: 16, padding: '40px 28px',
+          maxWidth: 360, width: '100%', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>📁</div>
+          <div style={{ fontSize: 14, color: '#c0392b', marginBottom: 20 }}>{error}</div>
+          <button onClick={load} style={{
+            background: '#0082c9', color: '#fff', border: 'none',
+            padding: '12px 28px', borderRadius: 8, fontSize: 13,
+            fontWeight: 600, cursor: 'pointer',
+          }}>Retry</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!src) {
+    return (
+      <div style={{
+        width: '100%', height: '100%', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#0082c9', color: '#fff', fontSize: 14,
+      }}>
+        Opening Files&hellip;
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <iframe
+        src={src}
+        style={{ flex: 1, width: '100%', border: 'none', display: 'block' }}
+        title="files"
+        allow="fullscreen"
+      />
+    </div>
+  )
+}
+
 export default function ServiceFrame({ service }) {
   const { user } = useAuth()
   const isMobile = window.innerWidth < 768
@@ -288,7 +355,12 @@ export default function ServiceFrame({ service }) {
     )
   }
 
-  // ── Iframe services (grafana, files, status, etc.) ───────────────────────────
+  // ── Files: iframe with bridge-page auto-login ────────────────────────────────
+  if (service === 'files') {
+    return <FilesFrame />
+  }
+
+  // ── Iframe services (grafana, status, etc.) ───────────────────────────────────
   const url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
 
   return (

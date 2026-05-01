@@ -625,6 +625,9 @@ export const api = {
 
   getMatrixLoginToken: () =>
     fetch(`${BASE}/api/matrix/login-token`, { headers: headers() }).then(handle),
+
+  getFilesLoginToken: () =>
+    fetch(`${BASE}/api/files/login-token`, { headers: headers() }).then(handle),
 }
 
 export default api
