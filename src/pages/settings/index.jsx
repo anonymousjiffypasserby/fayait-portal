@@ -6,8 +6,10 @@ import ManufacturersTab from './ManufacturersTab'
 import ModelsTab from './ModelsTab'
 import SuppliersTab from './SuppliersTab'
 import CategoriesTab from './CategoriesTab'
+import ServicesTab from './ServicesTab'
 
 const TABS = [
+  { key: 'services',      label: 'Services' },
   { key: 'locations',     label: 'Locations' },
   { key: 'manufacturers', label: 'Manufacturers' },
   { key: 'models',        label: 'Models' },
@@ -16,6 +18,7 @@ const TABS = [
 ]
 
 const TAB_COMPONENTS = {
+  services:      ServicesTab,
   locations:     LocationsTab,
   manufacturers: ManufacturersTab,
   models:        ModelsTab,
@@ -27,7 +30,7 @@ const ADMIN_ROLES = ['superadmin', 'admin']
 
 export default function Settings() {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('locations')
+  const [activeTab, setActiveTab] = useState('services')
   const [toast, setToast] = useState(null) // { message, type: 'success'|'error' }
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640)
 
