@@ -238,7 +238,7 @@ function FilesFrame() {
     setError(null)
     api.getFilesLoginToken()
       .then(({ token }) => {
-        setSrc(`${FILES_URL}/nc-bridge.html?token=${encodeURIComponent(token)}`)
+        setSrc(`${FILES_URL}/themes/nc-bridge.html?token=${encodeURIComponent(token)}`)
       })
       .catch(err => setError(err.message))
   }
