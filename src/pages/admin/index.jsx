@@ -35,7 +35,13 @@ export default function Admin() {
 
   useEffect(() => {
     api.getAdminCompanies()
-      .then(data => setCompanies(Array.isArray(data) ? data : (data.companies || [])))
+      .then(data => {
+        const rows = Array.isArray(data) ? data : (data.companies || [])
+        setCompanies(rows.map(c => ({
+          ...c,
+          services: Object.fromEntries((c.services || []).map(s => [s.service, s.status])),
+        })))
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
