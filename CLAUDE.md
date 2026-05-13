@@ -1,5 +1,29 @@
 # Faya IT — Portal Frontend (portal.fayait.com)
 
+## Brand Guidelines
+
+### Colors
+| Token | Hex |
+|---|---|
+| Blue (primary) | `#0B3C5D` |
+| Blue dark | `#082D45` |
+| Blue mid | `#1A5A8A` |
+| Blue light | `#2478B5` |
+| Blue pale | `#D6E8F5` |
+| Orange (primary) | `#FF7A00` |
+| Orange dark | `#CC6200` |
+| Orange light | `#FF9A3C` |
+| Orange pale | `#FFF0E0` |
+
+### Typography
+- **Font**: Inter (Google Fonts) — weights 300, 400, 500, 600, 700
+- **Import**: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');`
+- Body: 16px
+- Subtitles: 18px (`text-lg`)
+- Section titles: 30px / 36px on md+ (`text-3xl` / `text-4xl`)
+
+Use these consistently across all Faya IT services (portal, admin, www, etc.).
+
 ## Stack
 - React + Vite
 - Deployed via Coolify → GitHub push to `main` triggers auto-deploy
@@ -125,7 +149,28 @@ Faya IT internal panel (superadmin only). Company list, per-company service acti
 ### Billing / Status / ServiceFrame
 - Billing: plan display, invoice list with download
 - Status: uptime monitoring display
-- ServiceFrame: iframe wrapper for Chat (Matrix), Analytics (Grafana), Files, Status page
+- ServiceFrame: iframe wrapper for Chat (Matrix), Analytics (Grafana), Files (Nextcloud), Status page
+
+### Files (Nextcloud + EuroOffice)
+- Nextcloud runs as a Docker container on the client VPS (managed via central Coolify)
+- EuroOffice Document Server runs as a second Docker container on the same client VPS
+- Nextcloud is configured to use EuroOffice for in-browser editing of .docx, .xlsx, .pptx
+- Users access Files via the portal iframe — auto-login via nc-bridge.html SSO bridge
+- Files URL: `files.acme.fayait.com` | Office URL: `office.acme.fayait.com`
+- Both URLs come from env vars on the VPS, not DB lookups
+
+**Onboarding a new client (Files + Office) — replace `{client}` with client subdomain:**
+1. Central Coolify → Add Server → paste client VPS SSH details
+2. Create new Project for the client (copy from Acme project)
+3. Add Service → Nextcloud → domain: `files.{client}.fayait.com`
+4. Add Service → EuroOffice Document Server → domain: `office.{client}.fayait.com`
+5. Deploy both → Traefik handles SSL automatically
+6. DNS: point `files.{client}.fayait.com` and `office.{client}.fayait.com` → client VPS IP
+7. Nextcloud admin → Apps → install the EuroOffice integration app
+8. Settings → EuroOffice → Document Editing Service address: `https://office.{client}.fayait.com`
+9. Save (Nextcloud tests the connection live)
+
+Test environment uses `files.fayait.com` / `office.fayait.com` (no client subdomain yet).
 
 ### Profile (`src/pages/Profile.jsx`)
 Display name, language (EN/NL), theme (light/dark), password change.
@@ -175,6 +220,38 @@ The portal is a SaaS product sold to companies. Each module is for the client co
 
 Superadmin accounts belong to Faya IT staff only and must not read or write any company's portal data.
 
+## Infrastructure Architecture
+
+**Clone-and-deploy model — one VPS per client, centrally managed via Coolify:**
+- Faya IT runs one central Coolify instance (on Faya IT's own VPS) — this is the single pane of glass for all client infrastructure
+- Each client VPS is added as a **remote server** in that central Coolify — no Coolify installed on client VPS
+- Each client VPS runs the full stack as Docker containers: portal frontend, portal-api, PostgreSQL, Nextcloud + EuroOffice, Zammad, Snipe-IT, Matrix/Element, Grafana
+- To onboard a new client: add their VPS as a server in Coolify, deploy the project template, fill in `.env`, point DNS
+- **There is only one company per installation** — no multi-tenant isolation needed in the code
+- Service URLs are env vars set at deploy time (not looked up from a DB companies table)
+- Faya IT runs centrally (on Faya IT VPS alongside Coolify): admin.fayait.com — for billing and provisioning oversight
+
+**URL pattern per client VPS:**
+- Portal: `acme.fayait.com` — **to implement after EuroOffice/Nextcloud**
+- API: `api.acme.fayait.com` (or internal, same VPS)
+- Files: `files.acme.fayait.com` (Nextcloud)
+- Office: `office.acme.fayait.com` (EuroOffice Document Server)
+- Chat: `chat.acme.fayait.com` (Matrix/Element)
+- Analytics: `grafana.acme.fayait.com`
+- Tickets: `tickets.acme.fayait.com` (Zammad)
+
+**Key implication for portal code:**
+- No company switching, no per-company service URL DB lookups
+- Service URLs come from env vars → portal-api exposes them to frontend via `/api/config`
+- The `companies` table simplifies to a single-row config table (or just env vars)
+- JWT doesn't need company_id for data isolation (single tenant)
+
+**Why this model:**
+- Full data isolation between clients (separate VPS, separate DB, separate everything)
+- GDPR compliance: each client's data never touches another client's machine
+- Simple deployment: copy → configure .env → deploy
+- Failure isolation: one client's VPS going down doesn't affect others
+
 ## Automation Architecture
 
 ### n8n handles (keep these workflows):
@@ -204,19 +281,34 @@ Sync rules: portal DB updated first; failures logged but never block portal; eac
 
 Single login acquires service tokens stored in JWT:
 - Zammad: `POST /api/v1/user_access_tokens` with user credentials → `zammad_token`
-- Snipe-IT: company-level `SNIPE_TOKEN` from env (per-company, not per-user) → `snipe_token`
+- Snipe-IT: `SNIPE_TOKEN` from env → `snipe_token`
+- Nextcloud: nc-bridge.html auto-login via stored NC credentials
 
 All external API calls proxied through portal-api (avoids CORS, hides credentials from browser).
+Service URLs come from env vars on the VPS — no DB lookup needed (single tenant per installation).
 Future: replace with Authentik OAuth2/OIDC.
 
 ## Still To Do
+
+### In Progress
+- **Files + EuroOffice** — get Nextcloud iframe + EuroOffice editing working end-to-end on test VPS
+
+### Tech Cleanup (single-tenant migration)
+- **ServiceFrame.jsx hardcoded URLs** — `files.fayait.com` and `nextcloud.fayait.com` hardcoded at lines 14 and 228; must come from env vars via `/api/config`
+- **Multi-tenant company logic** — companies table, per-company service URL lookups, company_id scoping all assume multi-tenant; simplify for single-tenant per-VPS model
+- **Admin panel** — currently manages multiple companies from one place; needs rethink for central Coolify model
+- **Client subdomain portals** — `acme.fayait.com` per client instead of shared `portal.fayait.com` (do after Files + EuroOffice)
+
+### GDPR
 - **Superadmin portal data access fix** — audit + gate middleware in portal-api (plan written)
 - **HR API gate middleware** — server-side role scoping enforcement (partial: cancel leave + report column names fixed)
-- **Projects anonymize cascade** — scrub deleted user's name from project/task/comment records (GDPR Art. 17)
+- **Projects anonymize cascade** — scrub deleted user's name from project/task/comment records (Art. 17)
 - **Activity log `performed_by_id`** — store user ID alongside name so anonymization works on logs
+
+### Features
+- **Asset file downloads** — still uses token-in-URL pattern (same fix applied to Projects needs doing here)
 - **RBAC custom roles** — UI for custom roles per company (tables exist: hr_roles, hr_role_permissions, hr_user_roles)
 - **Dutch localization** — LangContext + t() helper in place, translations not yet populated
 - **Onboarding flow** — first-login wizard for new companies
 - **Licenses module** — software license tracking (not yet started)
 - **Users module restructure** — merge Users page with HR People view (currently separate)
-- **Asset file downloads** — still uses token-in-URL pattern (same fix applied to Projects needs doing here)
