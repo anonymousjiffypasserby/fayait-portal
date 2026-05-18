@@ -12,6 +12,8 @@ import Notifications from './pages/Notifications'
 import Reports from './pages/reports'
 import Users from './pages/users'
 import Admin from './pages/admin'
+import Whiteboard from './pages/Whiteboard'
+import Meetings from './pages/Meetings'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -20,19 +22,11 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" />
 }
 
-function HRRoute({ children }) {
+function ServiceRoute({ service, children }) {
   const { user, loading } = useAuth()
   if (loading) return null
   if (!user) return <Navigate to="/login" />
-  if (user.services?.hr !== 'active') return <Navigate to="/" />
-  return children
-}
-
-function TicketsRoute({ children }) {
-  const { user, loading } = useAuth()
-  if (loading) return null
-  if (!user) return <Navigate to="/login" />
-  if (user.services?.tickets !== 'active') return <Navigate to="/" />
+  if (user.services?.[service] !== 'active') return <Navigate to="/" />
   return children
 }
 
@@ -64,10 +58,19 @@ function AppRoutes() {
                 <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/projects/*" element={<PrivateRoute><Projects /></PrivateRoute>} />
-                <Route path="/hr/*" element={<HRRoute><HR /></HRRoute>} />
-                <Route path="/tickets/*" element={<TicketsRoute><Tickets /></TicketsRoute>} />
-                {/* iframe services (/chat /grafana /files /status)
-                    are rendered persistently in Layout — no routes needed here */}
+                <Route path="/hr/*" element={<ServiceRoute service="hr"><HR /></ServiceRoute>} />
+                <Route path="/tickets/*" element={<ServiceRoute service="tickets"><Tickets /></ServiceRoute>} />
+                <Route path="/whiteboard" element={<PrivateRoute><Whiteboard /></PrivateRoute>} />
+                <Route path="/meetings" element={<ServiceRoute service="meetings"><Meetings /></ServiceRoute>} />
+                {/* /chat /files /grafana /status /wiki /documents /passwords
+                    rendered as native pages — routes added here as modules are built */}
+                <Route path="/chat"      element={<ServiceFrame service="chat" />} />
+                <Route path="/files"     element={<ServiceFrame service="files" />} />
+                <Route path="/grafana"   element={<ServiceFrame service="grafana" />} />
+                <Route path="/status"    element={<ServiceFrame service="status" />} />
+                <Route path="/wiki"      element={<ServiceFrame service="wiki" />} />
+                <Route path="/documents" element={<ServiceFrame service="documents" />} />
+                <Route path="/passwords" element={<ServiceFrame service="passwords" />} />
               </Routes>
             </Layout>
           </PrivateRoute>

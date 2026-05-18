@@ -1,4 +1,4 @@
-# Faya IT — Portal Frontend (portal.fayait.com)
+# Faya IT — Portal Frontend (per-client VPS template)
 
 ## Brand Guidelines
 
@@ -24,19 +24,141 @@
 
 Use these consistently across all Faya IT services (portal, admin, www, etc.).
 
+## Design System (portal-specific)
+
+The portal uses inline styles and a shared theme object — NOT Tailwind. CSS variables are defined in `src/index.css`:
+```
+--faya-orange: #E85D24
+--faya-navy:   #1B2A4A
+--faya-orange-light: #FDF0EA
+--faya-gray:   #f4f5f7
+```
+
+The `T` (theme) object used across pages:
+```js
+const T = {
+  navy: '#1a1f2e', bg: '#f0f2f5', card: '#fff',
+  border: 'rgba(0,0,0,0.06)', muted: '#888',
+  orange: '#f97316', blue: '#2563eb', green: '#1D9E75',
+  red: '#e74c3c', yellow: '#d97706', purple: '#9b59b6',
+  font: "'DM Sans', 'Helvetica Neue', sans-serif",
+}
+```
+
+**UI patterns to follow for every new native module:**
+- Cards: `background:#fff, border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'16px 20px'`
+- Page header: navy title + muted subtitle, action buttons top-right
+- Tables: full-width, `border-collapse:collapse`, row hover `#f8f9fa`
+- Sidebar is dark navy (`#1B2A4A`), active item uses orange accent
+- Empty states: centered icon + title + subtitle, no loud colors
+- Loading: small spinner or skeleton rows, never full-page spinners
+- Every module must use `T` constants — no random hex values inline
+
+## Architecture Principles (read before building anything)
+
+### No iframes — everything is native UI
+Every backend service (Zammad, Nextcloud, Vaultwarden, Wiki.js, etc.) is an **engine only**.
+Clients never see the backend service UI. The portal is the only frontend.
+Portal-api proxies all calls to backend services using internal API tokens.
+
+### How service URLs work
+- `SERVICES_ENABLED` env var controls which modules appear in the sidebar
+- `/api/companies/config` returns `serviceUrls` built from env vars — portal reads these
+- Backend services are called by portal-api using `{SERVICE}_URL` env vars
+- For iframe-free modules, the backend URL never reaches the browser
+
+### Per-company deployment model
+Same portal GitHub repo deployed to every client. Per-client env vars set in Coolify:
+```
+VITE_API_URL=https://api.{client}.fayait.com     # portal → portal-api
+SERVICES_ENABLED=tickets,assets,hr,projects,...   # controls sidebar visibility
+```
+Portal-api env vars per client:
+```
+ZAMMAD_URL, ELEMENT_URL, NEXTCLOUD_URL, GRAFANA_URL, STATUS_URL   # public service URLs (returned in /api/config for any iframe fallbacks)
+VAULTWARDEN_URL, WIKIJS_URL, PAPERLESS_URL, METABASE_URL, JITSI_URL, EXCALIDRAW_URL  # proxied by portal-api, never exposed to browser
+COMPANY_SUBDOMAIN, SERVICES_ENABLED, JWT_SECRET
+DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+ZAMMAD_TOKEN, SNIPE_TOKEN, MATRIX_ADMIN_TOKEN, NEXTCLOUD_ADMIN_TOKEN
+```
+
+## Scope
+
+This repo and its portal-api concern **client portal functionality only**.
+
+**Out of scope — do not touch:**
+- `www.fayait.com` — Faya IT marketing website
+- `cms.fayait.com` — CMS backing www.fayait.com
+
+These live in `website-api` (separate repo). Split is complete.
+
 ## Stack
 - React + Vite
-- Deployed via Coolify → GitHub push to `main` triggers auto-deploy
+- Deployed via Coolify → GitHub push to `main` triggers auto-deploy on each client VPS
 - Traefik reverse proxy (10-15s to pick up new container after deploy)
 
 ## Deploy
-- Portal (portal.fayait.com): `git push origin main` (this repo)
-- API (api.fayait.com): `git push origin master` (portal-api repo)
+
+**Per-client VPS model (active transition):**
+- Same GitHub repo (`main`) is used for all client portal deployments
+- Each client VPS has its own Coolify deployment with different env vars
+- `git push origin main` → Coolify auto-deploys to all client VPS portals simultaneously
+- Set `VITE_API_URL=https://api.{client}.fayait.com` in Coolify per deployment
+
+**Central Faya IT services (on Faya IT VPS):**
+- API dev/test (api.fayait.com): `git push origin master` (portal-api repo)
 - Admin (admin.fayait.com): `git push origin master` (admin-portal repo)
 - Coolify auto-deploys on push → Traefik picks up new container in 10–15s
 
+**Onboarding a new client (portal + API):**
+1. Central Coolify → Add Server → paste client VPS SSH details
+2. Create new Project for the client (copy from Acme project)
+3. Add Application → portal (this repo) → domain: `{client}.fayait.com`
+4. Add Application → portal-api → domain: `api.{client}.fayait.com`
+5. Set env vars: `VITE_API_URL`, `DATABASE_URL`, service URLs (`NC_URL`, `ZAMMAD_URL`, `GRAFANA_URL`, etc.)
+6. DNS: point `{client}.fayait.com` and `api.{client}.fayait.com` → client VPS IP
+7. Deploy both → Traefik handles SSL
+
+## Backend Services Registry
+
+Every service runs as a separate Coolify service (own container/compose) within the client's Coolify project. Portal-api proxies all calls — services are never directly exposed to the browser.
+
+| Service | Purpose | Portal module | portal-api env var | Status |
+|---|---|---|---|---|
+| Zammad | Tickets engine | Tickets (native) | `ZAMMAD_URL` + `ZAMMAD_TOKEN` | ✅ running |
+| Nextcloud + EuroOffice | File storage + office editing | Files (native — build) | `NEXTCLOUD_URL` + `NEXTCLOUD_ADMIN_TOKEN` | ✅ running |
+| Matrix/Synapse + Element | Team chat | Chat (native — build) | `MATRIX_URL` + `MATRIX_ADMIN_TOKEN` | ✅ running |
+| Snipe-IT | Asset tracking (backend sync) | Assets (native ✅) | `SNIPE_URL` + `SNIPE_TOKEN` | ✅ running |
+| Grafana + Prometheus | Infrastructure monitoring | Analytics (native — build) | `GRAFANA_URL` | ✅ running |
+| Uptime Kuma | Service uptime | Status (native — build) | `STATUS_URL` | ✅ running |
+| Vaultwarden | Password manager | Passwords (native — build) | `VAULTWARDEN_URL` + `VAULTWARDEN_TOKEN` | ✅ running |
+| n8n | Workflow automation | Internal only | `N8N_WEBHOOK_URL` | ✅ running |
+| RustDesk server | Remote desktop relay | Assets → remote commands | internal | ✅ running |
+| OCS Inventory | Network device discovery | Assets → network discovery | `OCS_URL` | ✅ running |
+| Paperless-ngx | Document management + OCR | Documents (native — build) | `PAPERLESS_URL` + `PAPERLESS_TOKEN` | 🔲 install |
+| Wiki.js | Internal knowledge base | Wiki (native — build) | `WIKIJS_URL` + `WIKIJS_TOKEN` | 🔲 install |
+| Jitsi Meet | Video conferencing | Meetings (native — build) | `JITSI_URL` | 🔲 install |
+| Metabase | Business intelligence | BI / Analytics (native — build) | `METABASE_URL` + `METABASE_TOKEN` | 🔲 install |
+| Excalidraw | Collaborative whiteboard | Whiteboard (native — build) | `EXCALIDRAW_URL` | 🔲 install |
+
+## Inter-service Integration Map
+
+Planned integrations (to build progressively — note here when implemented):
+- **Tickets ↔ Assets**: ticket auto-created when asset goes offline 3× (done via n8n + Zammad)
+- **Tickets ↔ HR**: tickets scoped to department; employee offboarding creates access-revoke ticket
+- **Documents ↔ HR**: employee contracts, payslips, ID docs stored in Paperless; linked from HR profile
+- **Documents ↔ Assets**: warranty docs, manuals attached to asset records via Paperless
+- **Wiki ↔ Projects**: project documentation links; project detail shows related wiki pages
+- **Meetings ↔ Projects**: "Start meeting" button on project/task detail; Jitsi room per project
+- **Meetings ↔ HR**: scheduled team meetings visible in HR calendar
+- **BI ↔ Portal DB**: Metabase reads portal PostgreSQL for business dashboards (assets, HR, projects)
+- **Passwords ↔ Users**: Vaultwarden org synced with portal users; department-based collections
+- **Passwords ↔ Assets**: service credentials for assets stored in Vaultwarden
+- **Status ↔ Tickets**: Uptime Kuma alert → n8n → Zammad ticket (already wired)
+- **Chat ↔ All**: Matrix notifications for ticket updates, asset alerts, HR leave approvals
+
 ## API
-- Base URL: https://api.fayait.com
+- Base URL: `VITE_API_URL` env var (falls back to `https://api.fayait.com` in dev)
 - Auth: JWT via POST /api/auth/login
 - Assets: GET /api/assets (returns flat DB records via LATERAL join — see field names below)
 - HR: all calls via `hrApi` helper (src/pages/hr/shared.jsx), base path /api/hr/
@@ -176,13 +298,15 @@ Test environment uses `files.fayait.com` / `office.fayait.com` (no client subdom
 Display name, language (EN/NL), theme (light/dark), password change.
 
 ## Key Business Rules
-- Services shown based on company_services status per company
+- Services shown/hidden based on env vars exposed via `/api/config` (single-tenant per VPS — no DB company_services lookup needed)
 - Locked services: admins see "contact Faya IT", regular users don't see locked services
-- iframe services: Chat (Matrix), Analytics (Grafana)
+- iframe services: Chat (Matrix), Analytics (Grafana), Files (Nextcloud)
+- All service URLs (chat, files, grafana, tickets, etc.) come from `/api/config` — never hardcoded
 - All other services have native UI built
-- **Superadmin (Faya IT staff) has NO access to client data in portal.fayait.com**
+- **Superadmin (Faya IT staff) has NO access to client data on any client VPS**
   — Superadmin operates exclusively via admin.fayait.com
   — Portal routes must return 403 for superadmin role (fix pending — see Still To Do)
+  — On per-client VPS, superadmin role should not exist at all
 
 ## Assets API Field Names
 The assets API returns flat DB records (not Snipe-IT nested objects). Use:
@@ -216,9 +340,15 @@ The assets API returns flat DB records (not Snipe-IT nested objects). Use:
 - Activity log `performed_by_id`: currently stores only name — needs user ID so anonymization can scrub logs
 
 ## Business Model
-The portal is a SaaS product sold to companies. Each module is for the client company's internal use. Faya IT is the provider — not a participant in client workflows. admin.fayait.com is for provisioning and billing only, never for viewing client data.
+The portal is a SaaS product sold to companies. Each module is for the client company's internal use. Faya IT is the provider — not a participant in client workflows.
 
-Superadmin accounts belong to Faya IT staff only and must not read or write any company's portal data.
+**Original model (being replaced):** One shared instance of each service (Zammad, Snipe-IT, Nextcloud, etc.) serving all companies, separated by `company_id` in the data.
+
+**Target model (in transition):** Each client gets their own VPS with fully dedicated service instances — their own Zammad, their own Snipe-IT, their own Nextcloud. No shared infrastructure, no `company_id` scoping, no multi-tenant data isolation needed in code.
+
+admin.fayait.com is for provisioning and billing oversight only — it manages each client's VPS via Coolify and each client's portal-api, but never reads client data directly.
+
+Superadmin accounts belong to Faya IT staff only and must not exist on a client VPS.
 
 ## Infrastructure Architecture
 
@@ -232,8 +362,8 @@ Superadmin accounts belong to Faya IT staff only and must not read or write any 
 - Faya IT runs centrally (on Faya IT VPS alongside Coolify): admin.fayait.com — for billing and provisioning oversight
 
 **URL pattern per client VPS:**
-- Portal: `acme.fayait.com` — **to implement after EuroOffice/Nextcloud**
-- API: `api.acme.fayait.com` (or internal, same VPS)
+- Portal: `acme.fayait.com` — **transition in progress**
+- API: `api.acme.fayait.com` (same VPS)
 - Files: `files.acme.fayait.com` (Nextcloud)
 - Office: `office.acme.fayait.com` (EuroOffice Document Server)
 - Chat: `chat.acme.fayait.com` (Matrix/Element)
@@ -290,14 +420,33 @@ Future: replace with Authentik OAuth2/OIDC.
 
 ## Still To Do
 
-### In Progress
-- **Files + EuroOffice** — get Nextcloud iframe + EuroOffice editing working end-to-end on test VPS
+### Phase 2 — Native modules (replace iframes, build new services)
+Build native portal UI for every backend service. Each module = portal-api proxy routes + React page using the T theme object. Order by priority:
+- **Files** — native Nextcloud UI (file browser, upload, share, office editing trigger)
+- **Chat** — native Matrix UI (rooms list, message thread, presence)
+- **Passwords** — native Vaultwarden UI (vault items, collections, sharing)
+- **Wiki** — native Wiki.js UI (page tree, editor, search)
+- **Documents** — native Paperless-ngx UI (inbox, documents, tags, search)
+- **Meetings** — native Jitsi UI (room creation, join, schedule)
+- **BI** — native Metabase UI (dashboards, charts from portal DB)
+- **Status** — native Uptime Kuma UI (monitors, uptime history)
+- **Analytics** — native Grafana UI (infrastructure dashboards)
+- **Whiteboard** — native Excalidraw UI (canvas, collaboration)
 
-### Tech Cleanup (single-tenant migration)
-- **ServiceFrame.jsx hardcoded URLs** — `files.fayait.com` and `nextcloud.fayait.com` hardcoded at lines 14 and 228; must come from env vars via `/api/config`
-- **Multi-tenant company logic** — companies table, per-company service URL lookups, company_id scoping all assume multi-tenant; simplify for single-tenant per-VPS model
-- **Admin panel** — currently manages multiple companies from one place; needs rethink for central Coolify model
-- **Client subdomain portals** — `acme.fayait.com` per client instead of shared `portal.fayait.com` (do after Files + EuroOffice)
+### Phase 3 — Provisioning engine (admin.fayait.com)
+One-click client provisioning via Coolify API:
+- Admin wizard: company info → service selection → target server → provision button
+- Coolify API integration in portal-api admin routes
+- Shared pool support (lightweight clients share a VPS)
+- DNS checklist output post-provisioning
+
+### Tech Cleanup (legacy multi-tenant removal)
+The codebase was originally built for a shared-instance multi-tenant model. Now that every client gets their own VPS and dedicated service instances, this legacy must be removed:
+- **`company_id` scoping** — remove from all DB queries and JWT; meaningless when only one company exists per VPS
+- **`companies` table / per-company service URL lookups** — remove; service URLs come from env vars
+- **Zammad/Snipe/Nextcloud tokens per company** — remove per-company token logic; one token per service per VPS, from env vars
+- **Admin panel in portal** (`src/pages/admin/`) — existed to manage multiple companies on a shared instance; remove from portal entirely; admin.fayait.com (admin-portal repo) handles provisioning via Coolify
+- **admin-portal API routing** — admin.fayait.com currently hits a single `api.fayait.com`; must be updated to call each client's `api.{client}.fayait.com` as clients move to their own VPS
 
 ### GDPR
 - **Superadmin portal data access fix** — audit + gate middleware in portal-api (plan written)

@@ -26,13 +26,8 @@ class ServiceFrameBoundary extends Component {
   }
 }
 
-const IFRAME_SERVICES = [
-  { key: 'chat',    path: '/chat'    },
-  { key: 'grafana', path: '/grafana' },
-  { key: 'files',   path: '/files'   },
-  { key: 'status',  path: '/status'  },
-  // tickets and hr are custom React modules — not iframe services
-]
+// All services now have native React UI — no iframe services
+const IFRAME_SERVICES = []
 
 const SERVICES = [
   {
@@ -42,21 +37,36 @@ const SERVICES = [
     ]
   },
   {
-    section: 'Workspace',
+    section: 'Work',
     items: [
-      { key: 'tickets',  label: 'Tickets',  icon: '🎫', path: '/tickets' },
-      { key: 'assets',   label: 'Assets',   icon: '💻', path: '/assets',   permissionModule: 'assets' },
-      { key: 'chat',     label: 'Chat',     icon: '💬', path: '/chat' },
-      { key: 'files',    label: 'Files',    icon: '📁', path: '/files' },
-      { key: 'projects', label: 'Projects', icon: '📋', path: '/projects', permissionModule: 'projects' },
-      { key: 'hr',       label: 'HR',       icon: '👔', path: '/hr',       permissionModule: 'hr_employees' },
+      { key: 'tickets',   label: 'Tickets',    icon: '🎫', path: '/tickets' },
+      { key: 'projects',  label: 'Projects',   icon: '📋', path: '/projects',  permissionModule: 'projects' },
+      { key: 'hr',        label: 'HR',         icon: '👔', path: '/hr',        permissionModule: 'hr_employees' },
+      { key: 'assets',    label: 'Assets',     icon: '💻', path: '/assets',    permissionModule: 'assets' },
     ]
   },
   {
-    section: 'Monitoring',
+    section: 'Collaborate',
     items: [
-      { key: 'status',  label: 'Status',    icon: '🟢', path: '/status' },
+      { key: 'chat',       label: 'Chat',       icon: '💬', path: '/chat' },
+      { key: 'meetings',   label: 'Meetings',   icon: '📹', path: '/meetings' },
+      { key: 'whiteboard', label: 'Whiteboard', icon: '✏️',  path: '/whiteboard' },
+      { key: 'wiki',       label: 'Wiki',       icon: '📖', path: '/wiki' },
+    ]
+  },
+  {
+    section: 'Storage',
+    items: [
+      { key: 'files',      label: 'Files',      icon: '📁', path: '/files' },
+      { key: 'documents',  label: 'Documents',  icon: '🗂️',  path: '/documents' },
+      { key: 'passwords',  label: 'Passwords',  icon: '🔑', path: '/passwords' },
+    ]
+  },
+  {
+    section: 'Insights',
+    items: [
       { key: 'grafana', label: 'Analytics', icon: '📊', path: '/grafana' },
+      { key: 'status',  label: 'Status',    icon: '🟢', path: '/status' },
     ]
   },
   {
