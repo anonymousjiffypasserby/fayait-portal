@@ -8,14 +8,16 @@ export function AuthProvider({ children }) {
   const [permissions, setPermissions] = useState([])
   const [zammadToken, setZammadToken] = useState(null)
   const [snipeToken, setSnipeToken]   = useState(null)
+  const [serviceUrls, setServiceUrls] = useState({})
   const [loading, setLoading]         = useState(true)
 
   useEffect(() => {
-    const stored     = localStorage.getItem('faya_user')
-    const token      = localStorage.getItem('faya_token')
-    const storedPerms = localStorage.getItem('faya_permissions')
+    const stored       = localStorage.getItem('faya_user')
+    const token        = localStorage.getItem('faya_token')
+    const storedPerms  = localStorage.getItem('faya_permissions')
     const storedZammad = localStorage.getItem('faya_zammad_token')
     const storedSnipe  = localStorage.getItem('faya_snipe_token')
+    const storedUrls   = localStorage.getItem('faya_service_urls')
 
     if (stored && token) {
       const parsedUser = JSON.parse(stored)
@@ -25,14 +27,20 @@ export function AuthProvider({ children }) {
       }
       if (storedZammad) setZammadToken(storedZammad)
       if (storedSnipe)  setSnipeToken(storedSnipe)
+      if (storedUrls) {
+        try { setServiceUrls(JSON.parse(storedUrls)) } catch {}
+      }
 
-      // Refresh services from API
+      // Refresh services + URLs from API
       api.getCompanyConfig()
         .then(data => {
           const services = {}
           Object.entries(data.services).forEach(([k, v]) => {
             services[k] = v.status
           })
+          const urls = data.serviceUrls || {}
+          localStorage.setItem('faya_service_urls', JSON.stringify(urls))
+          setServiceUrls(urls)
           const updated = { ...parsedUser, services }
           localStorage.setItem('faya_user', JSON.stringify(updated))
           setUser(updated)
@@ -66,10 +74,12 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('faya_permissions')
     localStorage.removeItem('faya_zammad_token')
     localStorage.removeItem('faya_snipe_token')
+    localStorage.removeItem('faya_service_urls')
     setUser(null)
     setPermissions([])
     setZammadToken(null)
     setSnipeToken(null)
+    setServiceUrls({})
   }
 
   const updateUser = (updates) => {
@@ -79,7 +89,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, permissions, login, logout, loading, updateUser, zammadToken, snipeToken }}>
+    <AuthContext.Provider value={{ user, permissions, login, logout, loading, updateUser, zammadToken, snipeToken, serviceUrls }}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,21 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../services/api'
 
-const ELEMENT_WEB = 'https://chat.fayait.com'
-
-const SERVICE_MOBILE_URLS = {
-  tickets: 'https://zammad.fayait.com/mobile',
-}
-
-const SERVICE_URLS = {
-  tickets:  'https://zammad.fayait.com',
-  assets:   'https://snipe.fayait.com',
-  files:    'https://nextcloud.fayait.com',
-  projects: 'https://plane.fayait.com',
-  status:   'https://uptime.fayait.com',
-  grafana:  'https://grafana.fayait.com',
-}
-
 const SERVICE_INFO = {
   tickets: {
     name: 'Helpdesk & Ticketing',
@@ -58,14 +43,14 @@ const SERVICE_INFO = {
 const ADMIN_ROLES = ['superadmin', 'admin']
 
 // ── Mobile: show deep-link card instead of iframe ───────────────────────────
-function ChatMobile({ homeserver }) {
+function ChatMobile({ homeserver, elementUrl }) {
   const deepLink = homeserver
     ? `element://vector/login?hs_url=${encodeURIComponent(homeserver)}`
     : 'element://vector/'
 
   const webUrl = homeserver
-    ? `${ELEMENT_WEB}/#/login?defaultHsUrl=${encodeURIComponent(homeserver)}`
-    : ELEMENT_WEB
+    ? `${elementUrl}/#/login?defaultHsUrl=${encodeURIComponent(homeserver)}`
+    : elementUrl
 
   return (
     <div style={{
@@ -117,7 +102,7 @@ function ChatMobile({ homeserver }) {
 // Element Web cannot be embedded in a cross-origin iframe because it depends on
 // localStorage, which Chrome partitions (and in some configs blocks) for iframes.
 // Opening as a top-level tab sidesteps this entirely.
-function ChatLauncher() {
+function ChatLauncher({ elementUrl }) {
   const [status, setStatus] = useState('idle') // idle | loading | open | blocked | error
   const [errorMsg, setErrorMsg] = useState(null)
   const winRef = useRef(null)
@@ -126,7 +111,7 @@ function ChatLauncher() {
     setStatus('loading')
     api.getMatrixLoginToken()
       .then(({ login_token, homeserver }) => {
-        const url = `${ELEMENT_WEB}/bridge.html`
+        const url = `${elementUrl}/bridge.html`
           + `?loginToken=${encodeURIComponent(login_token)}`
           + `&hs_url=${encodeURIComponent(homeserver)}`
         const win = window.open(url, 'faya-chat')
@@ -225,11 +210,9 @@ function ChatLauncher() {
   )
 }
 
-const FILES_URL = 'https://files.fayait.com'
-
 // ── Files: auto-login via nc-bridge.html, then iframe shows Nextcloud ────────
 // Bridge page is same-origin to Nextcloud so it can set session cookies freely.
-function FilesFrame() {
+function FilesFrame({ filesUrl }) {
   const [src, setSrc] = useState(null)
   const [error, setError] = useState(null)
 
@@ -238,7 +221,7 @@ function FilesFrame() {
     setError(null)
     api.getFilesLoginToken()
       .then(({ token }) => {
-        setSrc(`${FILES_URL}/themes/nc-bridge.html?token=${encodeURIComponent(token)}`)
+        setSrc(`${filesUrl}/themes/nc-bridge.html?token=${encodeURIComponent(token)}`)
       })
       .catch(err => setError(err.message))
   }
@@ -293,21 +276,24 @@ function FilesFrame() {
 }
 
 export default function ServiceFrame({ service }) {
-  const { user } = useAuth()
+  const { user, serviceUrls } = useAuth()
   const isMobile = window.innerWidth < 768
   const services = user?.services || {}
   const isActive = services[service] === 'active'
   const isAdmin  = ADMIN_ROLES.includes(user?.role)
   const info     = SERVICE_INFO[service] || { name: service, description: '', icon: '⚙️' }
 
+  const elementUrl = serviceUrls.chat    || 'https://chat.fayait.com'
+  const filesUrl   = serviceUrls.files   || 'https://files.fayait.com'
+
   // ── Chat: launcher card (desktop) or deep-link card (mobile) ────────────────
   if (service === 'chat') {
     if (!isActive) {
       // Fall through to inactive gate below
     } else if (isMobile) {
-      return <ChatMobile homeserver={user?.matrix_homeserver} />
+      return <ChatMobile homeserver={user?.matrix_homeserver} elementUrl={elementUrl} />
     } else {
-      return <ChatLauncher />
+      return <ChatLauncher elementUrl={elementUrl} />
     }
   }
 
@@ -357,11 +343,35 @@ export default function ServiceFrame({ service }) {
 
   // ── Files: iframe with bridge-page auto-login ────────────────────────────────
   if (service === 'files') {
-    return <FilesFrame />
+    return <FilesFrame filesUrl={filesUrl} />
   }
 
   // ── Iframe services (grafana, status, etc.) ───────────────────────────────────
-  const url = (isMobile && SERVICE_MOBILE_URLS[service]) || SERVICE_URLS[service]
+  const url = serviceUrls[service] || null
+
+  if (!url) {
+    return (
+      <div style={{
+        width: '100%', height: '100%', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#f0f2f5', padding: 40,
+      }}>
+        <div style={{
+          background: '#fff', borderRadius: 16, padding: '48px 40px',
+          maxWidth: 480, width: '100%', textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)',
+        }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>{info.icon}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1f2e', marginBottom: 12 }}>
+            {info.name}
+          </div>
+          <div style={{ fontSize: 14, color: '#888', lineHeight: 1.6 }}>
+            Service URL not configured. Contact Faya IT.
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
