@@ -16,6 +16,7 @@ import Whiteboard from './pages/Whiteboard'
 import Meetings from './pages/Meetings'
 import Wiki from './pages/Wiki'
 import Documents from './pages/Documents'
+import Chat from './pages/Chat'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -66,7 +67,7 @@ function AppRoutes() {
                 <Route path="/meetings" element={<ServiceRoute service="meetings"><Meetings /></ServiceRoute>} />
                 {/* /chat /files /grafana /status /wiki /documents /passwords
                     rendered as native pages — routes added here as modules are built */}
-                <Route path="/chat"      element={<ServiceFrame service="chat" />} />
+                <Route path="/chat"      element={<ServiceRoute service="chat"><Chat /></ServiceRoute>} />
                 <Route path="/files"     element={<ServiceFrame service="files" />} />
                 <Route path="/grafana"   element={<ServiceFrame service="grafana" />} />
                 <Route path="/status"    element={<ServiceFrame service="status" />} />
