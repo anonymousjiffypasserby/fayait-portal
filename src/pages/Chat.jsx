@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import api from '../api'
+import api from '../services/api'
 
 const T = {
   navy: '#1a1f2e', bg: '#f0f2f5', card: '#fff',
