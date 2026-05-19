@@ -14,6 +14,8 @@ import Users from './pages/users'
 import Admin from './pages/admin'
 import Whiteboard from './pages/Whiteboard'
 import Meetings from './pages/Meetings'
+import Wiki from './pages/Wiki'
+import Documents from './pages/Documents'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -68,8 +70,8 @@ function AppRoutes() {
                 <Route path="/files"     element={<ServiceFrame service="files" />} />
                 <Route path="/grafana"   element={<ServiceFrame service="grafana" />} />
                 <Route path="/status"    element={<ServiceFrame service="status" />} />
-                <Route path="/wiki"      element={<ServiceFrame service="wiki" />} />
-                <Route path="/documents" element={<ServiceFrame service="documents" />} />
+                <Route path="/wiki"      element={<ServiceRoute service="wiki"><Wiki /></ServiceRoute>} />
+                <Route path="/documents" element={<ServiceRoute service="documents"><Documents /></ServiceRoute>} />
                 <Route path="/passwords" element={<ServiceFrame service="passwords" />} />
               </Routes>
             </Layout>
