@@ -135,11 +135,11 @@ Every service runs as a separate Coolify service (own container/compose) within 
 | n8n | Workflow automation | Internal only | `N8N_WEBHOOK_URL` | ✅ running |
 | RustDesk server | Remote desktop relay | Assets → remote commands | internal | ✅ running |
 | OCS Inventory | Network device discovery | Assets → network discovery | `OCS_URL` | ✅ running |
-| Paperless-ngx | Document management + OCR | Documents (native — build) | `PAPERLESS_URL` + `PAPERLESS_TOKEN` | 🔲 install |
-| Wiki.js | Internal knowledge base | Wiki (native — build) | `WIKIJS_URL` + `WIKIJS_TOKEN` | 🔲 install |
-| Jitsi Meet | Video conferencing | Meetings (native — build) | `JITSI_URL` | 🔲 install |
-| Metabase | Business intelligence | BI / Analytics (native — build) | `METABASE_URL` + `METABASE_TOKEN` | 🔲 install |
-| Excalidraw | Collaborative whiteboard | Whiteboard (native — build) | `EXCALIDRAW_URL` | 🔲 install |
+| Paperless-ngx | Document management + OCR | Documents (native ✅) | `PAPERLESS_URL` + `PAPERLESS_TOKEN` | ✅ running |
+| Wiki.js | Internal knowledge base | Wiki (native ✅) | `WIKIJS_URL` + `WIKIJS_TOKEN` | ✅ running |
+| Jitsi Meet | Video conferencing | Meetings (native ✅) | `JITSI_URL` | ✅ running |
+| Metabase | Business intelligence | BI / Analytics (native — build) | `METABASE_URL` + `METABASE_TOKEN` | ✅ running |
+| Excalidraw | Collaborative whiteboard | Whiteboard (native ✅ — npm pkg) | — (uses `@excalidraw/excalidraw` npm, no server calls) | ✅ running |
 
 ## Inter-service Integration Map
 
@@ -164,6 +164,8 @@ Planned integrations (to build progressively — note here when implemented):
 - HR: all calls via `hrApi` helper (src/pages/hr/shared.jsx), base path /api/hr/
 - Reports: base path /api/reports/, supports ?format=csv and ?format=pdf on all endpoints
 - Tickets: proxied through portal-api to Zammad; token passed via JWT payload
+- Wiki: GET/POST/PUT/DELETE /api/wiki/pages, GET /api/wiki/pages/:id, GET /api/wiki/search?q=
+- Documents: GET /api/documents, GET /api/documents/:id, GET /api/documents/:id/preview|download|thumb, POST /api/documents/upload, PATCH /api/documents/:id, DELETE /api/documents/:id, GET /api/documents/tags|types|correspondents
 
 ## Modules Built
 
@@ -294,15 +296,48 @@ Faya IT internal panel (superadmin only). Company list, per-company service acti
 
 Test environment uses `files.fayait.com` / `office.fayait.com` (no client subdomain yet).
 
+### Whiteboard (`src/pages/Whiteboard.jsx`)
+- Uses `@excalidraw/excalidraw` npm package — no backend API calls, no server required
+- Auto-saves canvas to `localStorage` keyed by `whiteboard_{userId}_{boardName}`
+- Inline board renaming (click title to edit)
+- No portal-api route needed — fully client-side
+
+### Meetings (`src/pages/Meetings.jsx`)
+- Lobby: enter a room name (or leave blank for a timestamped slug) → Start Meeting; Join by name
+- Room view: loads `JitsiMeetExternalAPI` from `https://{jitsiDomain}/external_api.js` at runtime
+- `jitsiDomain` from `serviceUrls.meetings` (returned by `/api/companies/config` from `JITSI_URL` env var)
+- Jitsi is running with `ENABLE_AUTH=1` / `ENABLE_GUESTS=0` — users must be authenticated
+- Leave button + auto-slug room names; `onLeave` callback returns to lobby
+
+### Wiki (`src/pages/Wiki.jsx`)
+- Sidebar: full page list + search box; "New Page" button (admin only)
+- Content area: Markdown rendered in-browser (custom renderer — no extra deps)
+- Edit: inline editor with title, Markdown textarea, save/cancel
+- New page: requires title + URL path; creates via portal-api → Wiki.js GraphQL
+- Delete: admin-only, with confirmation
+- portal-api routes: `GET /api/wiki/pages`, `GET /api/wiki/pages/:id`, `POST`, `PUT`, `DELETE`, `GET /api/wiki/search?q=`
+- **Setup notes**: Wiki.js API must be enabled via Admin UI or `setApiState(enabled: true)` GraphQL mutation before API keys work; permanent API key stored in `WIKIJS_TOKEN` env var (expires ~2036)
+
+### Documents (`src/pages/Documents.jsx`)
+- Sidebar: Upload button, document types filter, tags filter (pill chips)
+- Grid: card per document with icon, title, filename, tags, date; click to preview
+- Preview: fetches via portal-api as blob → iframe with `blobUrl` (bypasses CORS/auth)
+- Upload modal: file picker, title, type, correspondent dropdowns
+- Search: full-text search via Paperless query param
+- Pagination: 24 per page
+- portal-api routes: `GET /api/documents`, `GET /api/documents/:id`, `GET /api/documents/:id/preview`, `GET /api/documents/:id/download`, `GET /api/documents/:id/thumb`, `POST /api/documents/upload`, `PATCH /api/documents/:id`, `DELETE /api/documents/:id`, `GET /api/documents/tags`, `GET /api/documents/types`, `GET /api/documents/correspondents`
+- **Setup notes**: `PAPERLESS_ALLOWED_HOSTS` must include `paperless,localhost` (container name) so portal-api can reach it — Node.js 18 `fetch` cannot override the `Host` header, so Django must allow the Docker container hostname
+
 ### Profile (`src/pages/Profile.jsx`)
 Display name, language (EN/NL), theme (light/dark), password change.
 
 ## Key Business Rules
-- Services shown/hidden based on env vars exposed via `/api/config` (single-tenant per VPS — no DB company_services lookup needed)
-- Locked services: admins see "contact Faya IT", regular users don't see locked services
-- iframe services: Chat (Matrix), Analytics (Grafana), Files (Nextcloud)
-- All service URLs (chat, files, grafana, tickets, etc.) come from `/api/config` — never hardcoded
-- All other services have native UI built
+- Services shown/hidden based on `SERVICES_ENABLED` env var → `/api/companies/config` → `user.services` in JWT
+- Current test env `SERVICES_ENABLED`: `tickets,assets,projects,hr,chat,files,billing,wiki,documents,meetings,whiteboard`
+- Locked services: admins see them dimmed with 🔒, regular users don't see them at all
+- **Still using ServiceFrame (iframe)**: Chat (Matrix/Element), Files (Nextcloud), Analytics (Grafana), Status (Uptime Kuma), Passwords
+- **Native UI built**: Dashboard, Assets, Accessories, Components, Consumables, Kits, Requests, Projects, HR, Tickets, Reports, Notifications, Users, Settings, Admin, Billing, Whiteboard, Meetings, Wiki, Documents
+- All service URLs (chat, files, grafana, meetings, etc.) come from `/api/companies/config` → `serviceUrls` — never hardcoded in the frontend
 - **Superadmin (Faya IT staff) has NO access to client data on any client VPS**
   — Superadmin operates exclusively via admin.fayait.com
   — Portal routes must return 403 for superadmin role (fix pending — see Still To Do)
@@ -369,6 +404,13 @@ Superadmin accounts belong to Faya IT staff only and must not exist on a client 
 - Chat: `chat.acme.fayait.com` (Matrix/Element)
 - Analytics: `grafana.acme.fayait.com`
 - Tickets: `tickets.acme.fayait.com` (Zammad)
+- Meetings: `meet.acme.fayait.com` (Jitsi)
+- Wiki: `wiki.acme.fayait.com` (Wiki.js)
+- Documents: `docs.acme.fayait.com` (Paperless-ngx)
+- BI: `bi.acme.fayait.com` (Metabase)
+
+**Test environment URLs (fayait.com VPS, no client subdomain):**
+- meet.fayait.com, wiki.fayait.com, docs.fayait.com, bi.fayait.com, draw.fayait.com
 
 **Key implication for portal code:**
 - No company switching, no per-company service URL DB lookups
@@ -418,20 +460,59 @@ All external API calls proxied through portal-api (avoids CORS, hides credential
 Service URLs come from env vars on the VPS — no DB lookup needed (single tenant per installation).
 Future: replace with Authentik OAuth2/OIDC.
 
+## Service-Specific Gotchas
+
+### Coolify env var updates
+- Env vars set via Coolify UI/API **override** `.env` file values (Docker env takes priority over dotenv)
+- `dotenv.config()` does **not** override existing process env — `.env` changes only take effect if the Docker env var is absent
+- After updating env vars via Coolify API (`PATCH /api/v1/applications/:uuid/envs/bulk`), a **full redeploy** is needed — `docker restart` alone does not pick them up
+- Trigger redeploy: `GET http://localhost:8000/api/v1/applications/:uuid/restart` queues a restart; for env var changes use `POST /api/v1/deploy?uuid=:uuid&force=true`
+- When Coolify rebuilds are slow, copy files directly to the running container with `docker cp` + `docker restart`
+
+### Portal-api — Coolify container
+- Coolify-managed container name prefix: `ojxxjzrvdho7iiogyxow2zqm-*` (suffix changes on each redeploy)
+- Local dev container (NOT behind Traefik): `portal-api-portal-api-1` — do not confuse with the live one
+- After each Coolify redeploy, copy any files changed locally: `docker cp src/routes/foo.js <new-container>:/app/src/routes/foo.js`
+- Coolify DB container: `x3w1zn886yxa0cm52hq4720d` — separate from `portal-api-portal-db-1`
+
+### Wiki.js
+- After first-time setup (POST /finalize), the GraphQL API must be explicitly enabled: `mutation { authentication { setApiState(enabled: true) { responseResult { succeeded } } } }`
+- Without enabling the API, all requests return: `"API is disabled. You must enable it from the Administration Area first."`
+- Admin credentials: `admin@fayait.com` / `WikiAdmin2024!`
+- Permanent API key stored in `WIKIJS_TOKEN` env var (created with `expiration: "3650d"`, expires ~2036)
+- Wiki.js container: `wikijs` on coolify network; reachable from portal-api at `http://wikijs:3000`
+
+### Paperless-ngx
+- `PAPERLESS_ALLOWED_HOSTS` must include the Docker container name (`paperless`) and `localhost` in addition to the public domain — otherwise internal requests from portal-api get Django `DisallowedHost` 400 errors
+- Node.js 18+ `fetch` (undici-based) **cannot override the `Host` header** — it always sends the URL host; do not attempt `headers: { Host: '...' }` in routes calling Paperless
+- Admin API token: `ee134e7cc8c9727e0783df7e4ca72da63a1085d0` (reset via Django shell if lost: `python3 /app/paperless/src/manage.py shell -c "from django.contrib.auth.models import User; u=User.objects.get(username='admin'); u.set_password('...')..."`)
+- OCR language must only list installed Tesseract languages — `nld` (Dutch) is not in the linuxserver image by default; use `eng` only unless the language pack is installed
+
+### Jitsi Meet
+- All 4 containers must be running: `jitsi-web`, `jitsi-prosody`, `jitsi-jicofo`, `jitsi-jvb`
+- `JVB_ADVERTISE_IPS` must be the public VPS IP (194.163.158.34) — needed for WebRTC ICE candidates
+- UDP port 10000 must be open on the firewall
+- `ENABLE_AUTH=1` + `ENABLE_GUESTS=0` means only authenticated Jitsi users can join rooms
+- The portal loads `external_api.js` from the Jitsi server at runtime — no npm package needed
+
 ## Still To Do
 
 ### Phase 2 — Native modules (replace iframes, build new services)
-Build native portal UI for every backend service. Each module = portal-api proxy routes + React page using the T theme object. Order by priority:
+Build native portal UI for every backend service. Each module = portal-api proxy routes + React page using the T theme object.
+
+**Done:**
+- ✅ **Whiteboard** — `@excalidraw/excalidraw` npm package, localStorage autosave
+- ✅ **Meetings** — Jitsi ExternalAPI loaded from `JITSI_URL`, lobby + room view
+- ✅ **Wiki** — Wiki.js GraphQL proxy, page list/search/editor/delete
+- ✅ **Documents** — Paperless-ngx REST proxy, grid/preview/upload/tag filter
+
+**Still to build (priority order):**
 - **Files** — native Nextcloud UI (file browser, upload, share, office editing trigger)
 - **Chat** — native Matrix UI (rooms list, message thread, presence)
-- **Passwords** — native Vaultwarden UI (vault items, collections, sharing)
-- **Wiki** — native Wiki.js UI (page tree, editor, search)
-- **Documents** — native Paperless-ngx UI (inbox, documents, tags, search)
-- **Meetings** — native Jitsi UI (room creation, join, schedule)
-- **BI** — native Metabase UI (dashboards, charts from portal DB)
+- **Passwords** — native Vaultwarden UI (vault items, collections, sharing) — Vaultwarden not installed yet
+- **BI** — native Metabase iframe/embed (Metabase running at bi.fayait.com; needs embed token setup)
 - **Status** — native Uptime Kuma UI (monitors, uptime history)
 - **Analytics** — native Grafana UI (infrastructure dashboards)
-- **Whiteboard** — native Excalidraw UI (canvas, collaboration)
 
 ### Phase 3 — Provisioning engine (admin.fayait.com)
 One-click client provisioning via Coolify API:
