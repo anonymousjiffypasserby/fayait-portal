@@ -39,7 +39,11 @@ const zammadApi = {
 
   // ── Articles (replies) ────────────────────────────────────────────────────
   getTicketArticles: (ticketId) =>
-    fetch(`${BASE}/api/proxy/zammad/ticket_articles/by_ticket/${ticketId}`, { headers: headers() }).then(handle),
+    fetch(`${BASE}/api/proxy/zammad/ticket_articles/by_ticket/${ticketId}?expand=true`, { headers: headers() }).then(handle),
+
+  // Returns raw Response (not parsed) for blob download
+  downloadAttachment: (ticketId, articleId, attachmentId) =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_attachment/${ticketId}/${articleId}/${attachmentId}`, { headers: headers() }),
 
   createArticle: (data) =>
     fetch(`${BASE}/api/proxy/zammad/ticket_articles`, {
@@ -130,6 +134,9 @@ const zammadApi = {
 
   deleteTicket: (id) =>
     fetch(`${BASE}/api/proxy/zammad/tickets/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  mergeTickets: (sourceId, targetId) =>
+    fetch(`${BASE}/api/proxy/zammad/ticket_merge/${sourceId}/${targetId}`, { method: 'GET', headers: headers() }).then(handle),
 
   // ── Search ────────────────────────────────────────────────────────────────
   searchTickets: (query, limit = 50) =>

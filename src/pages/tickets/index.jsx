@@ -293,6 +293,7 @@ export default function Tickets() {
               isAdmin={admin}
               newBanner={newBanner}
               onDismissBanner={() => setNewBanner(0)}
+              onBulkUpdated={handleUpdated}
             />
           )}
 

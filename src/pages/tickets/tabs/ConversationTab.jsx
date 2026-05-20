@@ -1,14 +1,36 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { T, zammadApi, fmtDateTime } from '../shared'
+
+async function downloadAttachment(ticketId, articleId, att) {
+  try {
+    const res = await zammadApi.downloadAttachment(ticketId, articleId, att.id)
+    if (!res.ok) return
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.filename || `attachment-${att.id}`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {}
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 const CHANNEL_ICONS = { email: '✉', phone: '📞', chat: '💬', web: '🌐', note: '📝' }
 
 function ArticleBubble({ article }) {
-  const isAgent    = article.sender === 'Agent'
-  const isInternal = article.internal
-  const channel    = CHANNEL_ICONS[article.type] || '📝'
-
-  const attachments = article.attachments || []
+  const isAgent     = article.sender === 'Agent'
+  const isInternal  = article.internal
+  const channel     = CHANNEL_ICONS[article.type] || '📝'
+  const attachments = (article.attachments || []).filter(a => !a.preferences?.['Content-Disposition']?.includes('inline'))
 
   return (
     <div style={{
@@ -61,20 +83,18 @@ function ArticleBubble({ article }) {
         {attachments.length > 0 && (
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {attachments.map((att, i) => (
-              <a
+              <button
                 key={i}
-                href={att.url || '#'}
-                target="_blank"
-                rel="noreferrer"
+                onClick={() => downloadAttachment(article.ticket_id, article.id, att)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '3px 10px', borderRadius: 6,
                   background: '#f1f5f9', border: `1px solid ${T.border}`,
-                  fontSize: 11, color: '#6366f1', textDecoration: 'none', fontWeight: 500,
+                  fontSize: 11, color: '#6366f1', cursor: 'pointer', fontWeight: 500,
                 }}
               >
                 📎 {att.filename || `Attachment ${i + 1}`}
-              </a>
+              </button>
             ))}
           </div>
         )}
@@ -126,16 +146,18 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
     setSending(true)
     setError(null)
     try {
-      if (file) {
-        await zammadApi.uploadAttachment(file)
-      }
-      await zammadApi.createArticle({
+      const payload = {
         ticket_id: ticketId,
         body: reply.trim(),
         type: internal ? 'note' : 'web',
         internal,
         sender: isAgent ? 'Agent' : 'Customer',
-      })
+      }
+      if (file) {
+        const data = await readFileAsBase64(file)
+        payload.attachments = [{ filename: file.name, data, 'mime-type': file.type || 'application/octet-stream' }]
+      }
+      await zammadApi.createArticle(payload)
       setReply('')
       setFile(null)
       load()

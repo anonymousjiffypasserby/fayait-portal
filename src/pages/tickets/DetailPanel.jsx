@@ -55,6 +55,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const [anonymizing,  setAnonymizing]  = useState(false)
   const [kbInsert,     setKbInsert]     = useState('')
   const [pendingTime,  setPendingTime]  = useState(defaultPendingTime)
+  const [showMerge,    setShowMerge]    = useState(false)
+  const [mergeQuery,   setMergeQuery]   = useState('')
+  const [mergeResults, setMergeResults] = useState([])
+  const [mergeWorking, setMergeWorking] = useState(false)
+  const [mergeError,   setMergeError]   = useState(null)
 
   const predefinedCategories = getTicketSettings().predefinedTags
 
@@ -248,6 +253,30 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
     }
   }
 
+  const searchMergeTarget = async (q) => {
+    setMergeQuery(q)
+    if (!q.trim()) { setMergeResults([]); return }
+    try {
+      const results = await zammadApi.searchTickets(q.trim(), 10)
+      setMergeResults(Array.isArray(results) ? results.filter(t => t.id !== ticketId) : [])
+    } catch { setMergeResults([]) }
+  }
+
+  const handleMerge = async (targetId) => {
+    if (!window.confirm(`Merge #${ticketId} into #${targetId}?\n\nThis ticket will be closed and its articles moved to ticket #${targetId}. This cannot be undone.`)) return
+    setMergeWorking(true)
+    setMergeError(null)
+    try {
+      await zammadApi.mergeTickets(ticketId, targetId)
+      setShowMerge(false)
+      onClose()
+      onUpdated?.()
+    } catch (err) {
+      setMergeError(err.message)
+      setMergeWorking(false)
+    }
+  }
+
   if (loading) {
     return (
       <PanelShell>
@@ -324,6 +353,11 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           ) : (
             <button onClick={() => patch({ state: 'open' })} style={actionBtn('#3b82f6', '#eff6ff')}>
               Reopen
+            </button>
+          )}
+          {isAgent && (
+            <button onClick={() => { setShowMerge(true); setMergeQuery(''); setMergeResults([]) }} style={actionBtn('#8b5cf6', '#f5f3ff')}>
+              Merge
             </button>
           )}
           {isAdmin && (
@@ -559,6 +593,64 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           />
         </div>
       </div>
+      {/* Merge modal */}
+      {showMerge && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, fontFamily: T.font, padding: 20,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 12, width: '100%', maxWidth: 440,
+            padding: 24, boxShadow: '0 8px 40px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.navy, marginBottom: 4 }}>
+              Merge Ticket #{ticketId}
+            </div>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 14, lineHeight: 1.5 }}>
+              Search for the target ticket. Articles from this ticket will move there and this ticket will be closed.
+            </div>
+            <input
+              autoFocus
+              value={mergeQuery}
+              onChange={e => searchMergeTarget(e.target.value)}
+              placeholder="Search by title or #number…"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '8px 11px',
+                borderRadius: 7, border: `1px solid ${T.border}`,
+                fontSize: 13, fontFamily: T.font, color: T.navy, outline: 'none', marginBottom: 10,
+              }}
+            />
+            {mergeResults.length > 0 && (
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 7, overflow: 'hidden', marginBottom: 10 }}>
+                {mergeResults.map(t => (
+                  <div
+                    key={t.id}
+                    onClick={() => !mergeWorking && handleMerge(t.id)}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer', fontSize: 13, color: T.navy,
+                      borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 8, alignItems: 'center',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={e => e.currentTarget.style.background = ''}
+                  >
+                    <span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>#{t.number || t.id}</span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                    <span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>{t.state}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {mergeError && <div style={{ fontSize: 12, color: T.red, marginBottom: 8 }}>{mergeError}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setShowMerge(false)}
+                style={{ padding: '7px 16px', borderRadius: 7, border: `1px solid ${T.border}`, background: '#fff', color: T.navy, fontSize: 13, cursor: 'pointer', fontFamily: T.font }}
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </PanelShell>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { T, zammadApi, stateColor, priorityColor, fmtDate, fmtDateTime, slaStatus, isNewTicket } from './shared'
 import SlaIndicator from './SlaIndicator'
 import FilterPanel from './FilterPanel'
@@ -23,7 +23,8 @@ const EMPTY_FILTERS = {
 }
 
 const COLUMNS = [
-  { field: 'created_at',  label: 'Date',      w: 90  },
+  { field: '_check',      label: '',           w: 32,  noSort: true },
+  { field: 'created_at',  label: 'Date',       w: 90  },
   { field: 'number',      label: '#',          w: 55  },
   { field: 'title',       label: 'Title',      w: null },
   { field: 'category',    label: 'Category',   w: 110, noSort: true },
@@ -139,7 +140,7 @@ ${ticketBlocks || '<p style="color:#aaa">No tickets found for this customer.</p>
 </body></html>`
 }
 
-export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner }) {
+export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner, onBulkUpdated }) {
   const isMobile = useIsMobile()
   const [search,      setSearch]      = useState('')
   const [filters,     setFilters]     = useState(EMPTY_FILTERS)
@@ -149,6 +150,8 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
   const [sarCustomer, setSarCustomer] = useState('')
   const [sarLoading,  setSarLoading]  = useState(false)
   const [sarError,    setSarError]    = useState(null)
+  const [selected,    setSelected]    = useState(new Set())
+  const [bulkWorking, setBulkWorking] = useState(false)
 
   const activeFilterCount = [
     (filters.status || []).length,
@@ -206,6 +209,31 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
   }
 
   const sortArrow = (field) => sort.field === field ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''
+
+  // Clear selection whenever the ticket list changes
+  useEffect(() => { setSelected(new Set()) }, [tickets])
+
+  const toggleSelect = (e, id) => {
+    e.stopPropagation()
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelected(prev => prev.size === sorted.length ? new Set() : new Set(sorted.map(t => t.id)))
+  }
+
+  const bulkUpdate = async (updateFn) => {
+    setBulkWorking(true)
+    const ids = [...selected]
+    await Promise.allSettled(ids.map(updateFn))
+    setSelected(new Set())
+    setBulkWorking(false)
+    onBulkUpdated?.()
+  }
 
   const generateSar = async () => {
     if (!sarCustomer.trim()) return
@@ -337,6 +365,51 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
         <div style={{ fontSize: 12, color: T.muted, whiteSpace: 'nowrap' }}>{sorted.length} tickets</div>
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div style={{
+          background: '#1a1f2e', color: '#fff', padding: '8px 16px',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>{selected.size} selected</span>
+          <button
+            onClick={() => bulkUpdate(id => zammadApi.updateTicket(id, { state: 'closed' }))}
+            disabled={bulkWorking}
+            style={bulkBtn('#1D9E75')}
+          >Close</button>
+          <button
+            onClick={() => bulkUpdate(id => zammadApi.updateTicket(id, { state: 'open' }))}
+            disabled={bulkWorking}
+            style={bulkBtn('#3b82f6')}
+          >Reopen</button>
+          <button
+            onClick={() => bulkUpdate(id => zammadApi.updateTicket(id, { priority_id: 3 }))}
+            disabled={bulkWorking}
+            style={bulkBtn('#f59e0b')}
+          >→ High</button>
+          <button
+            onClick={() => bulkUpdate(id => zammadApi.updateTicket(id, { priority_id: 2 }))}
+            disabled={bulkWorking}
+            style={bulkBtn('#6b7280')}
+          >→ Normal</button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (!window.confirm(`Delete ${selected.size} tickets? This cannot be undone.`)) return
+                bulkUpdate(id => zammadApi.deleteTicket(id))
+              }}
+              disabled={bulkWorking}
+              style={bulkBtn('#e74c3c')}
+            >Delete</button>
+          )}
+          {bulkWorking && <span style={{ fontSize: 11, color: '#9ca3af' }}>Working…</span>}
+          <button
+            onClick={() => setSelected(new Set())}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12 }}
+          >✕ Clear</button>
+        </div>
+      )}
+
       {/* Table */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
         {sorted.length === 0 ? (
@@ -351,9 +424,12 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                   <th
                     key={col.field}
                     style={{ ...th, width: col.w || undefined, cursor: col.noSort ? 'default' : 'pointer' }}
-                    onClick={() => !col.noSort && toggleSort(col.field)}
+                    onClick={() => col.field === '_check' ? toggleSelectAll() : !col.noSort && toggleSort(col.field)}
                   >
-                    {col.label}{!col.noSort && sortArrow(col.field)}
+                    {col.field === '_check'
+                      ? <input type="checkbox" checked={sorted.length > 0 && selected.size === sorted.length} onChange={toggleSelectAll} style={{ cursor: 'pointer' }} />
+                      : <>{col.label}{!col.noSort && sortArrow(col.field)}</>
+                    }
                   </th>
                 ))}
               </tr>
@@ -369,10 +445,14 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
                   <tr
                     key={ticket.id}
                     onClick={() => onSelect(ticket)}
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseLeave={e => e.currentTarget.style.background = ''}
+                    style={{ cursor: 'pointer', background: selected.has(ticket.id) ? '#f0f4ff' : '' }}
+                    onMouseEnter={e => { if (!selected.has(ticket.id)) e.currentTarget.style.background = '#f8fafc' }}
+                    onMouseLeave={e => { if (!selected.has(ticket.id)) e.currentTarget.style.background = '' }}
                   >
+                    {/* Checkbox */}
+                    <td style={{ ...td, width: 32 }} onClick={e => toggleSelect(e, ticket.id)}>
+                      <input type="checkbox" checked={selected.has(ticket.id)} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                    </td>
                     {/* Date */}
                     <td style={{ ...td, color: T.muted, whiteSpace: 'nowrap' }}>
                       {dt ? (
@@ -535,6 +615,12 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
     </div>
   )
 }
+
+const bulkBtn = (color) => ({
+  padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+  border: `1px solid ${color}55`, background: `${color}22`, color,
+  cursor: 'pointer', fontFamily: T.font,
+})
 
 function MobileCard({ ticket, onSelect }) {
   const sc      = stateColor(ticket.state)
