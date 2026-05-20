@@ -66,6 +66,7 @@ const SERVICES = [
     section: 'Insights',
     items: [
       { key: 'grafana', label: 'Analytics', icon: '📊', path: '/grafana' },
+      { key: 'bi',      label: 'BI',        icon: '📈', path: '/bi' },
       { key: 'status',  label: 'Status',    icon: '🟢', path: '/status' },
     ]
   },

@@ -333,10 +333,10 @@ Display name, language (EN/NL), theme (light/dark), password change.
 
 ## Key Business Rules
 - Services shown/hidden based on `SERVICES_ENABLED` env var → `/api/companies/config` → `user.services` in JWT
-- Current test env `SERVICES_ENABLED`: `tickets,assets,projects,hr,chat,files,billing,wiki,documents,meetings,whiteboard`
+- Current test env `SERVICES_ENABLED`: `tickets,assets,projects,hr,chat,files,billing,wiki,documents,meetings,whiteboard,passwords,grafana,status,bi`
 - Locked services: admins see them dimmed with 🔒, regular users don't see them at all
-- **Still using ServiceFrame (iframe)**: Chat (Matrix/Element), Files (Nextcloud), Analytics (Grafana), Status (Uptime Kuma), Passwords
-- **Native UI built**: Dashboard, Assets, Accessories, Components, Consumables, Kits, Requests, Projects, HR, Tickets, Reports, Notifications, Users, Settings, Admin, Billing, Whiteboard, Meetings, Wiki, Documents
+- **Still using ServiceFrame (iframe)**: Passwords (Vaultwarden — client-side crypto prevents native item decrypt)
+- **Native UI built**: Dashboard, Assets, Accessories, Components, Consumables, Kits, Requests, Projects, HR, Tickets, Reports, Notifications, Users, Settings, Admin, Billing, Whiteboard, Meetings, Wiki, Documents, Chat, Status, Analytics (Grafana), BI (Metabase), Files (Nextcloud WebDAV)
 - All service URLs (chat, files, grafana, meetings, etc.) come from `/api/companies/config` → `serviceUrls` — never hardcoded in the frontend
 - **Superadmin (Faya IT staff) has NO access to client data on any client VPS**
   — Superadmin operates exclusively via admin.fayait.com
@@ -500,19 +500,22 @@ Future: replace with Authentik OAuth2/OIDC.
 ### Phase 2 — Native modules (replace iframes, build new services)
 Build native portal UI for every backend service. Each module = portal-api proxy routes + React page using the T theme object.
 
-**Done:**
+**All modules complete (2026-05-20):**
 - ✅ **Whiteboard** — `@excalidraw/excalidraw` npm package, localStorage autosave
 - ✅ **Meetings** — Jitsi ExternalAPI loaded from `JITSI_URL`, lobby + room view
 - ✅ **Wiki** — Wiki.js GraphQL proxy, page list/search/editor/delete
 - ✅ **Documents** — Paperless-ngx REST proxy, grid/preview/upload/tag filter
+- ✅ **Chat** — Matrix/Synapse proxy, rooms list + message thread
+- ✅ **Status** — Uptime Kuma Socket.IO proxy (`socket.io-client` in portal-api), monitors table with uptime %
+- ✅ **Analytics** — Grafana REST API proxy, dashboard list + iframe embed (anonymous viewer access enabled)
+- ✅ **BI** — Metabase session proxy, dashboard list + signed embed token iframe
+- ✅ **Files** — Nextcloud WebDAV proxy (`PROPFIND`/`PUT`/`DELETE`/`MKCOL`), file browser with upload/download/mkdir/delete
+- ✅ **Passwords** — Vaultwarden iframe (client-side Bitwarden crypto prevents native item decryption; iframe is intentional)
 
-**Still to build (priority order):**
-- **Files** — native Nextcloud UI (file browser, upload, share, office editing trigger)
-- **Chat** — native Matrix UI (rooms list, message thread, presence)
-- **Passwords** — native Vaultwarden UI (vault items, collections, sharing) — Vaultwarden not installed yet
-- **BI** — native Metabase iframe/embed (Metabase running at bi.fayait.com; needs embed token setup)
-- **Status** — native Uptime Kuma UI (monitors, uptime history)
-- **Analytics** — native Grafana UI (infrastructure dashboards)
+**Grafana setup note**: `GF_AUTH_ANONYMOUS_ENABLED=true` + `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer` required for iframe embed without auth tokens.
+**Status route note**: Uses `socket.io-client@4` (added to package.json). Connects to Kuma at `STATUS_URL`/`STATUS_USER`/`STATUS_PASS` env vars.
+**BI note**: `METABASE_SECRET_KEY` env var enables signed embed tokens. Without it, falls back to direct dashboard URL.
+**Files note**: Uses admin credentials (`NEXTCLOUD_ADMIN_USER`/`NEXTCLOUD_ADMIN_TOKEN`) to browse files. Per-user file spaces can be added if nextcloud_username/password provisioning is implemented.
 
 ### Phase 3 — Provisioning engine (admin.fayait.com)
 One-click client provisioning via Coolify API:

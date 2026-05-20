@@ -17,6 +17,11 @@ import Meetings from './pages/Meetings'
 import Wiki from './pages/Wiki'
 import Documents from './pages/Documents'
 import Chat from './pages/Chat'
+import Status from './pages/Status'
+import Analytics from './pages/Analytics'
+import BI from './pages/BI'
+import Files from './pages/Files'
+import Passwords from './pages/Passwords'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -65,15 +70,14 @@ function AppRoutes() {
                 <Route path="/tickets/*" element={<ServiceRoute service="tickets"><Tickets /></ServiceRoute>} />
                 <Route path="/whiteboard" element={<PrivateRoute><Whiteboard /></PrivateRoute>} />
                 <Route path="/meetings" element={<ServiceRoute service="meetings"><Meetings /></ServiceRoute>} />
-                {/* /chat /files /grafana /status /wiki /documents /passwords
-                    rendered as native pages — routes added here as modules are built */}
-                <Route path="/chat"      element={<ServiceRoute service="chat"><Chat /></ServiceRoute>} />
-                <Route path="/files"     element={<ServiceFrame service="files" />} />
-                <Route path="/grafana"   element={<ServiceFrame service="grafana" />} />
-                <Route path="/status"    element={<ServiceFrame service="status" />} />
-                <Route path="/wiki"      element={<ServiceRoute service="wiki"><Wiki /></ServiceRoute>} />
-                <Route path="/documents" element={<ServiceRoute service="documents"><Documents /></ServiceRoute>} />
-                <Route path="/passwords" element={<ServiceFrame service="passwords" />} />
+                <Route path="/chat"       element={<ServiceRoute service="chat"><Chat /></ServiceRoute>} />
+                <Route path="/files"      element={<ServiceRoute service="files"><Files /></ServiceRoute>} />
+                <Route path="/grafana"    element={<ServiceRoute service="grafana"><Analytics /></ServiceRoute>} />
+                <Route path="/status"     element={<ServiceRoute service="status"><Status /></ServiceRoute>} />
+                <Route path="/wiki"       element={<ServiceRoute service="wiki"><Wiki /></ServiceRoute>} />
+                <Route path="/documents"  element={<ServiceRoute service="documents"><Documents /></ServiceRoute>} />
+                <Route path="/passwords"  element={<ServiceRoute service="passwords"><Passwords /></ServiceRoute>} />
+                <Route path="/bi"         element={<ServiceRoute service="bi"><BI /></ServiceRoute>} />
               </Routes>
             </Layout>
           </PrivateRoute>
