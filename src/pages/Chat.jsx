@@ -1,6 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+
+const BASE = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
+const token = () => localStorage.getItem('faya_token')
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+})
+async function chatFetch(method, path, body, params) {
+  let url = `${BASE}/api${path}`
+  if (params) {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null))
+    if (q.toString()) url += `?${q}`
+  }
+  const res = await fetch(url, {
+    method,
+    headers: authHeaders(),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+  return data
+}
 
 const T = {
   navy: '#1a1f2e', bg: '#f0f2f5', card: '#fff',
@@ -49,10 +70,10 @@ function CreateRoomModal({ onClose, onCreated }) {
     setLoading(true)
     setError('')
     try {
-      await api.post('/chat/rooms', { name: name.trim(), topic: topic.trim() })
+      await chatFetch('POST', '/chat/rooms', { name: name.trim(), topic: topic.trim() })
       onCreated()
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create room')
+      setError(err.message || 'Failed to create room')
     } finally {
       setLoading(false)
     }
@@ -143,12 +164,12 @@ export default function Chat() {
 
   const loadRooms = useCallback(async () => {
     try {
-      const res = await api.get('/chat/rooms')
-      setRooms(res.data.rooms || [])
-      setNextBatch(prev => prev || res.data.nextBatch)
+      const data = await chatFetch('GET', '/chat/rooms')
+      setRooms(data.rooms || [])
+      setNextBatch(prev => prev || data.nextBatch)
       setLoadingRooms(false)
     } catch (err) {
-      const msg = err.response?.data?.error || err.message
+      const msg = err.message
       if (msg?.includes('Matrix account') || msg?.includes('not provisioned')) {
         setNoAccount(true)
       } else {
@@ -161,11 +182,9 @@ export default function Chat() {
   const loadMessages = useCallback(async (roomId, since) => {
     setLoadingMessages(true)
     try {
-      const res = await api.get(`/chat/rooms/${encodeURIComponent(roomId)}/messages`, {
-        params: { from: since, limit: 50 },
-      })
-      setMessages(res.data.messages || [])
-      setMessagesEnd(res.data.end)
+      const data = await chatFetch('GET', `/chat/rooms/${encodeURIComponent(roomId)}/messages`, undefined, { from: since, limit: 50 })
+      setMessages(data.messages || [])
+      setMessagesEnd(data.end)
     } catch (err) {
       console.error('[chat] load messages:', err.message)
     } finally {
@@ -204,8 +223,7 @@ export default function Chat() {
     if (!nextBatch) return
     const poll = async () => {
       try {
-        const res = await api.get('/chat/sync', { params: { since: nextBatch } })
-        const { nextBatch: nb, rooms: roomUpdates } = res.data
+        const { nextBatch: nb, rooms: roomUpdates } = await chatFetch('GET', '/chat/sync', undefined, { since: nextBatch })
         if (nb) setNextBatch(nb)
         if (roomUpdates && Object.keys(roomUpdates).length) {
           const currentRoom = selectedRoomRef.current
@@ -241,10 +259,10 @@ export default function Chat() {
     const body = draft.trim()
     setDraft('')
     try {
-      const res = await api.post(`/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/send`, { body })
+      const data = await chatFetch('POST', `/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/send`, { body })
       // Optimistically add message
       const optimistic = {
-        eventId: res.data.eventId,
+        eventId: data.eventId,
         sender: myMxid || '',
         senderName: user.name || 'You',
         body,
@@ -272,12 +290,10 @@ export default function Chat() {
   async function loadMore() {
     if (!messagesEnd || !selectedRoom) return
     try {
-      const res = await api.get(`/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/messages`, {
-        params: { from: messagesEnd, limit: 50 },
-      })
-      const older = res.data.messages || []
+      const data = await chatFetch('GET', `/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/messages`, undefined, { from: messagesEnd, limit: 50 })
+      const older = data.messages || []
       setMessages(prev => [...older, ...prev])
-      setMessagesEnd(res.data.end)
+      setMessagesEnd(data.end)
     } catch (err) {
       console.error('[chat] load more:', err.message)
     }
