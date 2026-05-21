@@ -25,7 +25,9 @@ export default function TeamTimesheets() {
   const act = async (id, action, notes) => {
     setActing(id)
     try {
-      await hrApi.updateTimesheet(id, { action, notes })
+      if (action === 'approve') await hrApi.approveTimesheet(id)
+      else if (action === 'reject') await hrApi.rejectTimesheet(id, notes)
+      else await hrApi.updateTimesheet(id, { action, notes })
       load()
       setSelected(s => { const n = new Set(s); n.delete(id); return n })
     } catch (e) { setErr(e.message) }
@@ -35,7 +37,7 @@ export default function TeamTimesheets() {
   const bulkApprove = async () => {
     setActing('bulk')
     try {
-      await Promise.all([...selected].map(id => hrApi.updateTimesheet(id, { action: 'approve' })))
+      await Promise.all([...selected].map(id => hrApi.approveTimesheet(id)))
       load(); setSelected(new Set())
     } catch (e) { setErr(e.message) }
     finally { setActing(null) }

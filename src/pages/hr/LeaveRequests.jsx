@@ -36,7 +36,7 @@ export default function LeaveRequests() {
 
   const approve = async (id) => {
     setActing(id)
-    try { await hrApi.updateLeaveRequest(id, { action: 'approve' }); load() }
+    try { await hrApi.approveLeaveRequest(id); load() }
     catch (e) { setErr(e.message) }
     finally { setActing(null) }
   }
@@ -45,7 +45,7 @@ export default function LeaveRequests() {
     if (!denyModal) return
     setActing(denyModal.id)
     try {
-      await hrApi.updateLeaveRequest(denyModal.id, { action: 'deny', reason: denyReason })
+      await hrApi.denyLeaveRequest(denyModal.id, denyReason)
       setDenyModal(null); setDenyReason('')
       load()
     } catch (e) { setErr(e.message) }

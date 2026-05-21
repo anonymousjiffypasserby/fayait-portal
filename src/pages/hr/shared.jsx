@@ -62,12 +62,14 @@ export const hrApi = {
   respondSwap:     (id, b)  => hr('PUT',  `/shift-swaps/${id}`, b),
 
   // Leave
-  getLeaveTypes:      ()        => hr('GET',  '/leave-types'),
-  getLeaveBalances:   (q = '')  => hr('GET',  `/leave-balances${q}`),
-  getLeaveRequests:   (q = '')  => hr('GET',  `/leave-requests${q}`),
-  createLeaveRequest: (b)       => hr('POST', '/leave-requests', b),
-  updateLeaveRequest: (id, b)   => hr('PUT',  `/leave-requests/${id}`, b),
-  getLeaveCalendar:   (q)       => hr('GET',  `/leave-calendar${q}`),
+  getLeaveTypes:        ()           => hr('GET',  '/leave-types'),
+  getLeaveBalances:     (q = '')     => hr('GET',  `/leave-balances${q}`),
+  getLeaveRequests:     (q = '')     => hr('GET',  `/leave-requests${q}`),
+  createLeaveRequest:   (b)          => hr('POST', '/leave-requests', b),
+  updateLeaveRequest:   (id, b)      => hr('PUT',  `/leave-requests/${id}`, b),
+  approveLeaveRequest:  (id)         => hr('PUT',  `/leave-requests/${id}/approve`, {}),
+  denyLeaveRequest:     (id, reason) => hr('PUT',  `/leave-requests/${id}/deny`, { denial_reason: reason }),
+  getLeaveCalendar:     (q)          => hr('GET',  `/leave-calendar${q}`),
 
   // Timesheets
   getTimesheets:       (q = '') => hr('GET',  `/timesheets${q}`),
@@ -76,6 +78,8 @@ export const hrApi = {
   clockOut:            (b)      => hr('POST', '/timesheets/clock-out', b),
   submitTimesheet:     (id)     => hr('PUT',  `/timesheets/${id}/submit`, {}),
   updateTimesheet:     (id, b)  => hr('PUT',  `/timesheets/${id}`, b),
+  approveTimesheet:    (id)     => hr('PUT',  `/timesheets/${id}/approve`, {}),
+  rejectTimesheet:     (id, notes) => hr('PUT', `/timesheets/${id}/reject`, { notes }),
 
   // Goals
   getGoals:    (q = '') => hr('GET',    `/goals${q}`),

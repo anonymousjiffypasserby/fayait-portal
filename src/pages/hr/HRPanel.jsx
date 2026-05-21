@@ -82,7 +82,7 @@ export default function HRPanel({ onNavigate }) {
 
   const approveLeave = async (id) => {
     setActing(id)
-    try { await hrApi.updateLeaveRequest(id, { action: 'approve' }); load() }
+    try { await hrApi.approveLeaveRequest(id); load() }
     catch {} finally { setActing(null) }
   }
 
@@ -90,14 +90,14 @@ export default function HRPanel({ onNavigate }) {
     if (!denyModal) return
     setActing(denyModal.id)
     try {
-      await hrApi.updateLeaveRequest(denyModal.id, { action: 'deny', reason: denyReason })
+      await hrApi.denyLeaveRequest(denyModal.id, denyReason)
       setDenyModal(null); setDenyReason(''); load()
     } catch {} finally { setActing(null) }
   }
 
   const approveTs = async (id) => {
     setActing(id)
-    try { await hrApi.updateTimesheet(id, { action: 'approve' }); load() }
+    try { await hrApi.approveTimesheet(id); load() }
     catch {} finally { setActing(null) }
   }
 
