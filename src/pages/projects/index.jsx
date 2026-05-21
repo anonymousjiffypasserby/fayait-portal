@@ -119,6 +119,7 @@ export default function Projects() {
   const [filters, setFilters]     = useState({ priority: '', assigned_to: '' })
   const [selectedId, setSelectedId] = useState(null)
   const [showNew, setShowNew]     = useState(false)
+  const [search, setSearch]       = useState('')
   const [isMobile, setIsMobile]   = useState(() => window.innerWidth <= 768)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showSar, setShowSar]     = useState(false)
@@ -266,7 +267,10 @@ export default function Projects() {
 
   // ── Derive visible projects from current view ────────────────────────────────
 
-  const visibleProjects = filterProjectsByView(projects, view, user)
+  const viewProjects = filterProjectsByView(projects, view, user)
+  const visibleProjects = search.trim()
+    ? viewProjects.filter(p => p.title.toLowerCase().includes(search.toLowerCase()))
+    : viewProjects
 
   const mainView = view === 'my_tasks'
     ? 'my_tasks'
@@ -340,6 +344,18 @@ export default function Projects() {
                 {visibleProjects.length}
               </span>
             )}
+            {view !== 'my_tasks' && (
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search projects…"
+                style={{
+                  padding: '5px 10px', borderRadius: 7, border: `1px solid ${T.border}`,
+                  fontSize: 12, fontFamily: T.font, outline: 'none', width: 180,
+                  background: search ? '#fff' : '#fafbfc', color: T.navy,
+                }}
+              />
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isAdmin(user) && (
@@ -391,14 +407,14 @@ export default function Projects() {
             <CalendarView
               projects={visibleProjects}
               tasks={tasks}
-              onSelectProject={setSelectedId}
+              onProjectClick={setSelectedId}
             />
           ) : mainView === 'my_tasks' ? (
             <MyTasksView
               tasks={tasks}
               projects={projects}
               user={user}
-              onRefresh={loadTasks}
+              onTaskUpdated={loadTasks}
             />
           ) : null}
         </div>

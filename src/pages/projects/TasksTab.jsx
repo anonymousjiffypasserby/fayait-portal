@@ -49,7 +49,7 @@ function TaskCard({ task, onDragStart, onEdit }) {
   )
 }
 
-export default function TasksTab({ project, tasks: initialTasks, users, onRefresh }) {
+export default function TasksTab({ project, tasks: initialTasks, users, user, onRefresh }) {
   const [tasks, setTasks] = useState(initialTasks)
   const [dragTaskId, setDragTaskId] = useState(null)
   const [overCol, setOverCol] = useState(null)
@@ -192,8 +192,10 @@ export default function TasksTab({ project, tasks: initialTasks, users, onRefres
           task={editTask}
           projectId={project.id}
           users={users}
+          user={user}
           onClose={() => setEditTask(null)}
           onSaved={() => { setEditTask(null); onRefresh() }}
+          onDeleted={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setEditTask(null); onRefresh() }}
         />
       )}
     </>

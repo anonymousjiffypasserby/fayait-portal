@@ -573,6 +573,24 @@ export const api = {
   createComment: (projectId, data) =>
     fetch(`${BASE}/api/projects/${projectId}/comments`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
 
+  updateComment: (projectId, commentId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/comments/${commentId}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteComment: (projectId, commentId) =>
+    fetch(`${BASE}/api/projects/${projectId}/comments/${commentId}`, { method: 'DELETE', headers: headers() }).then(handle),
+
+  getTaskComments: (projectId, taskId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/comments`, { headers: headers() }).then(handle),
+
+  createTaskComment: (projectId, taskId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/comments`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  updateTaskComment: (projectId, taskId, commentId, data) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, { method: 'PUT', headers: headers(), body: JSON.stringify(data) }).then(handle),
+
+  deleteTaskComment: (projectId, taskId, commentId) =>
+    fetch(`${BASE}/api/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE', headers: headers() }).then(handle),
+
   uploadProjectAttachment: (projectId, formData) =>
     fetch(`${BASE}/api/projects/${projectId}/attachments`, {
       method: 'POST',

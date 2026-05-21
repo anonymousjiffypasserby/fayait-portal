@@ -256,13 +256,23 @@ export default function DetailPanel({ projectId, users, user, onClose, onProject
             {/* Tab content */}
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {tab === 'Overview' && (
-                <OverviewTab project={project} />
+                <OverviewTab
+                  project={project}
+                  onProgressChange={async (val) => {
+                    try {
+                      await api.updateProject(project.id, { progress: val })
+                      setProject(p => ({ ...p, progress: val }))
+                      onProjectUpdated()
+                    } catch {}
+                  }}
+                />
               )}
               {tab === 'Tasks' && (
                 <TasksTab
                   project={project}
                   tasks={project.tasks || []}
                   users={users}
+                  user={user}
                   onRefresh={() => { load(); onProjectUpdated() }}
                 />
               )}
@@ -271,6 +281,7 @@ export default function DetailPanel({ projectId, users, user, onClose, onProject
                   project={project}
                   comments={project.comments || []}
                   user={user}
+                  users={users}
                   onRefresh={load}
                 />
               )}
@@ -300,7 +311,10 @@ export default function DetailPanel({ projectId, users, user, onClose, onProject
   )
 }
 
-function OverviewTab({ project }) {
+function OverviewTab({ project, onProgressChange }) {
+  const [manualProgress, setManualProgress] = useState(project.progress || 0)
+  const hasNoTasks = !project.task_count || project.task_count === 0
+
   return (
     <div style={{ padding: '16px 20px', overflowY: 'auto', height: '100%' }}>
       {/* Description */}
@@ -315,12 +329,26 @@ function OverviewTab({ project }) {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.7 }}>Progress</div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.navy }}>{project.progress || 0}%</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.navy }}>{hasNoTasks ? manualProgress : (project.progress || 0)}%</span>
         </div>
-        <ProgressBar value={project.progress || 0} height={8} />
-        <div style={{ fontSize: 11, color: T.muted, marginTop: 5 }}>
-          {project.completed_task_count || 0} of {project.task_count || 0} tasks complete
-        </div>
+        <ProgressBar value={hasNoTasks ? manualProgress : (project.progress || 0)} height={8} />
+        {hasNoTasks ? (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range" min={0} max={100} step={5}
+              value={manualProgress}
+              onChange={e => setManualProgress(Number(e.target.value))}
+              onMouseUp={e => onProgressChange(Number(e.target.value))}
+              onTouchEnd={e => onProgressChange(manualProgress)}
+              style={{ flex: 1, accentColor: '#6366f1', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 11, color: T.muted, whiteSpace: 'nowrap' }}>No tasks — drag to set</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: T.muted, marginTop: 5 }}>
+            {project.completed_task_count || 0} of {project.task_count || 0} tasks complete
+          </div>
+        )}
       </div>
 
       {/* Timeline bar */}
