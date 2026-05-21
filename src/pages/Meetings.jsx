@@ -12,7 +12,7 @@ function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-function MeetingRoom({ domain, roomName, displayName, onLeave }) {
+function MeetingRoom({ domain, roomName, displayName, jwt, onLeave }) {
   const containerRef = useRef(null)
   const apiRef = useRef(null)
 
@@ -23,6 +23,7 @@ function MeetingRoom({ domain, roomName, displayName, onLeave }) {
       roomName,
       parentNode: containerRef.current,
       userInfo: { displayName },
+      ...(jwt ? { jwt } : {}),
       configOverwrite: {
         startWithAudioMuted: true,
         startWithVideoMuted: false,
@@ -54,7 +55,7 @@ function MeetingRoom({ domain, roomName, displayName, onLeave }) {
 }
 
 export default function Meetings() {
-  const { user, serviceUrls } = useAuth()
+  const { user, serviceUrls, jitsiToken } = useAuth()
   const [view, setView] = useState('lobby') // lobby | room
   const [roomInput, setRoomInput] = useState('')
   const [activeRoom, setActiveRoom] = useState(null)
@@ -111,6 +112,7 @@ export default function Meetings() {
             domain={jitsiDomain}
             roomName={activeRoom}
             displayName={user?.name || 'User'}
+            jwt={jitsiToken}
             onLeave={() => { setView('lobby'); setActiveRoom(null) }}
           />
         </div>

@@ -1,6 +1,45 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useAuth } from '../context/AuthContext'
 
+// ── MeetingRoomEmbed — Jitsi panel used inside Chat ────────────────────────────
+function MeetingRoomEmbed({ domain, roomName, displayName, jwt, audioOnly, onLeave }) {
+  const containerRef = useRef(null)
+  const apiRef = useRef(null)
+
+  useEffect(() => {
+    if (!containerRef.current || !window.JitsiMeetExternalAPI) return
+    const toolbarButtons = audioOnly
+      ? ['microphone', 'hangup', 'raisehand', 'settings', 'fodeviceselection']
+      : ['microphone', 'camera', 'desktop', 'fullscreen', 'hangup', 'raisehand', 'settings', 'tileview', 'fodeviceselection']
+
+    apiRef.current = new window.JitsiMeetExternalAPI(domain, {
+      roomName,
+      parentNode: containerRef.current,
+      userInfo: { displayName },
+      ...(jwt ? { jwt } : {}),
+      configOverwrite: {
+        startWithAudioMuted: false,
+        startWithVideoMuted: audioOnly,
+        disableDeepLinking: true,
+        prejoinPageEnabled: false,
+      },
+      interfaceConfigOverwrite: {
+        TOOLBAR_BUTTONS: toolbarButtons,
+        SHOW_JITSI_WATERMARK: false,
+        SHOW_BRAND_WATERMARK: false,
+        SHOW_POWERED_BY: false,
+        MOBILE_APP_PROMO: false,
+      },
+      width: '100%',
+      height: '100%',
+    })
+    apiRef.current.addEventListener('videoConferenceLeft', onLeave)
+    return () => { apiRef.current?.dispose() }
+  }, [domain, roomName, displayName, jwt, audioOnly, onLeave])
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+}
+
 const BASE     = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
 const getToken = () => localStorage.getItem('faya_token')
 const authHdr  = () => ({ 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) })
@@ -35,6 +74,10 @@ const GROUP_MS   = 5 * 60 * 1000
 const QUICK_EMOJIS = ['👍','👎','❤️','😂','🎉','😮','😢','😡','🔥','✅','🙏','💯','🚀','🤔','👏','💪']
 
 // ── utils ──────────────────────────────────────────────────────────────────────
+function slugifyRoom(name) {
+  return 'chat-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
 function ts2time(ts) {
   if (!ts) return ''
   const d = new Date(ts), now = new Date()
@@ -535,11 +578,12 @@ function MessageList({ messages, myMxid, onReply, onEdit, onDelete, onReact, onU
 
 // ── Main Chat component ───────────────────────────────────────────────────────
 export default function Chat() {
-  const { user, serviceUrls } = useAuth()
+  const { user, serviceUrls, jitsiToken } = useAuth()
   const isAdmin      = ['admin', 'superadmin'].includes(user?.role)
   const matrixServer = serviceUrls?.matrixServerName || 'matrix.fayait.com'
   const myMxid       = user?.matrix_username ? `@${user.matrix_username}:${matrixServer}` : null
   const workspaceName = serviceUrls?.companyName || 'Chat'
+  const jitsiDomain   = (serviceUrls?.meetings || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
 
   // ─── core state ────────────────────────────────────────────────────────────
   const [rooms, setRooms]               = useState([])
@@ -591,6 +635,10 @@ export default function Chat() {
   const [searchQ, setSearchQ]         = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching]     = useState(false)
+
+  // ─── call ────────────────────────────────────────────────────────────────────
+  const [activeCall, setActiveCall]   = useState(null)  // null | { slug, mode }
+  const [jitsiLoaded, setJitsiLoaded] = useState(!!window.JitsiMeetExternalAPI)
 
   // ─── refs ───────────────────────────────────────────────────────────────────
   const bottomRef       = useRef(null)
@@ -694,11 +742,22 @@ export default function Chat() {
     n.onclick = () => window.focus()
   }
 
+  // ─── load Jitsi script ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!jitsiDomain || window.JitsiMeetExternalAPI) return
+    const script = document.createElement('script')
+    script.src = `https://${jitsiDomain}/external_api.js`
+    script.async = true
+    script.onload = () => setJitsiLoaded(true)
+    document.head.appendChild(script)
+    return () => { if (document.head.contains(script)) document.head.removeChild(script) }
+  }, [jitsiDomain])
+
   // ─── init ────────────────────────────────────────────────────────────────────
   useEffect(() => { loadRooms() }, [loadRooms])
   useEffect(() => { if (rooms.length && !selectedRoom) setSelectedRoom(rooms[0]) }, [rooms, selectedRoom])
   useEffect(() => {
-    if (selectedRoom?.roomId) { setShowMembers(false); loadMessages(selectedRoom.roomId) }
+    if (selectedRoom?.roomId) { setShowMembers(false); setActiveCall(null); loadMessages(selectedRoom.roomId) }
   }, [selectedRoom?.roomId, loadMessages])
 
   // ─── sync poll ───────────────────────────────────────────────────────────────
@@ -939,6 +998,17 @@ export default function Chat() {
     })
   }
 
+  // ─── call ────────────────────────────────────────────────────────────────────
+  function startCall(mode) {
+    if (!selectedRoom || !jitsiDomain) return
+    const slug = slugifyRoom(selectedRoom.name)
+    setActiveCall({ slug, mode })
+    const body = mode === 'video'
+      ? `📹 Video call started — click the call button to join`
+      : `📞 Voice call started — click the call button to join`
+    cx('POST', `/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/send`, { body }).catch(() => {})
+  }
+
   // ─── load older ──────────────────────────────────────────────────────────────
   async function loadOlder() {
     if (!msgsEnd || !selectedRoom) return
@@ -1138,6 +1208,25 @@ export default function Chat() {
                   👥 {selectedRoom.member_count}
                 </button>
               )}
+              {/* Call buttons — only when Jitsi is configured */}
+              {jitsiDomain && (
+                <>
+                  <button
+                    onClick={() => activeCall ? setActiveCall(null) : startCall('audio')}
+                    title={activeCall?.mode === 'audio' ? 'End voice call' : 'Start voice call'}
+                    style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'audio' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'audio' ? '#fff' : T.muted }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+                  </button>
+                  <button
+                    onClick={() => activeCall ? setActiveCall(null) : startCall('video')}
+                    title={activeCall?.mode === 'video' ? 'End video call' : 'Start video call'}
+                    style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'video' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'video' ? '#fff' : T.muted }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                  </button>
+                </>
+              )}
               {/* ⋯ dropdown */}
               <div style={{ position: 'relative' }}>
                 <button onClick={e => { e.stopPropagation(); setShowRoomMenu(v => !v) }}
@@ -1164,8 +1253,36 @@ export default function Chat() {
             </div>
           </div>
 
+          {/* Active call panel */}
+          {activeCall && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000' }}>
+              <div style={{ padding: '0 16px', height: 40, background: T.navy, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <span style={{ color: '#fff', fontSize: 13, fontWeight: 500, flex: 1 }}>
+                  {activeCall.mode === 'video' ? '📹' : '📞'} {selectedRoom.name}
+                </span>
+                <button onClick={() => setActiveCall(null)}
+                  style={{ background: T.red, color: '#fff', border: 'none', padding: '4px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.font }}>
+                  Leave
+                </button>
+              </div>
+              <div style={{ flex: 1 }}>
+                {jitsiLoaded
+                  ? <MeetingRoomEmbed
+                      domain={jitsiDomain}
+                      roomName={activeCall.slug}
+                      displayName={user?.name || 'User'}
+                      jwt={jitsiToken}
+                      audioOnly={activeCall.mode === 'audio'}
+                      onLeave={() => setActiveCall(null)}
+                    />
+                  : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13, fontFamily: T.font }}>Connecting to call server…</div>
+                }
+              </div>
+            </div>
+          )}
+
           {/* Messages area */}
-          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: 'auto', display: activeCall ? 'none' : 'flex', flexDirection: 'column', position: 'relative' }}>
             {msgsEnd && (
               <div style={{ textAlign: 'center', padding: '12px 20px 0' }}>
                 <button onClick={loadOlder} style={{ padding: '4px 14px', border: `1px solid ${T.border}`, borderRadius: 20, background: 'none', cursor: 'pointer', fontSize: 11, color: T.muted }}>Load older messages</button>
@@ -1214,7 +1331,7 @@ export default function Chat() {
           )}
 
           {/* Edit mode banner */}
-          {editingMsg && (
+          {!activeCall && editingMsg && (
             <div style={{ padding: '8px 16px', borderTop: `1px solid ${T.border}`, background: '#fffbeb', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: T.yellow, fontWeight: 500 }}>✏️ Editing message</span>
@@ -1231,7 +1348,7 @@ export default function Chat() {
           )}
 
           {/* Input area */}
-          {!editingMsg && (
+          {!activeCall && !editingMsg && (
             <div style={{ padding: '8px 16px 12px', borderTop: `1px solid ${T.border}`, flexShrink: 0, position: 'relative' }}>
               {/* Reply bar */}
               {replyTo && (
