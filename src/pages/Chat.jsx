@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 const T = {
   navy: '#1a1f2e', bg: '#f0f2f5', card: '#fff',
@@ -10,7 +11,7 @@ const T = {
 }
 
 const SIDEBAR_W = 260
-const POLL_MS = 3000
+const POLL_MS = 5000
 
 function formatTime(ts) {
   if (!ts) return ''
@@ -112,9 +113,10 @@ function CreateRoomModal({ onClose, onCreated }) {
 }
 
 export default function Chat() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
-  const isAdmin = ['admin', 'superadmin'].includes(user.role)
-  const myMxid = user.matrix_username ? `@${user.matrix_username}:${window.location.hostname}` : null
+  const { user, serviceUrls } = useAuth()
+  const isAdmin = ['admin', 'superadmin'].includes(user?.role)
+  const matrixServer = serviceUrls?.matrixServerName || window.location.hostname
+  const myMxid = user?.matrix_username ? `@${user.matrix_username}:${matrixServer}` : null
 
   const [rooms, setRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState(null)
