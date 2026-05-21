@@ -100,6 +100,12 @@ export const hrApi = {
   getPayslips:        (q = '') => hr('GET',  `/payslips${q}`),
   getPayslip:         (id)     => hr('GET',  `/payslips/${id}`),
   payslipPdfUrl:      (id)     => `${BASE}/api/hr/payslips/${id}/pdf?token=${encodeURIComponent(tok() || '')}`,
+  downloadPayslipPdf: async (id) => {
+    const res = await fetch(`${BASE}/api/hr/payslips/${id}/pdf`, { headers: hdrs(false) })
+    if (!res.ok) throw new Error('Download failed')
+    return res.blob()
+  },
+  deletePayrollRun:   (id)     => hr('DELETE', `/payroll-runs/${id}`),
   downloadDoc: async (empId, docId) => {
     const res = await fetch(`${BASE}/api/hr/employees/${empId}/documents/${docId}/download`, { headers: hdrs(false) })
     if (!res.ok) throw new Error('Download failed')
