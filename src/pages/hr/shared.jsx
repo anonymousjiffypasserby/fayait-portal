@@ -103,7 +103,6 @@ export const hrApi = {
   finalizePayrollRun: (id)     => hr('POST', `/payroll-runs/${id}/finalize`, {}),
   getPayslips:        (q = '') => hr('GET',  `/payslips${q}`),
   getPayslip:         (id)     => hr('GET',  `/payslips/${id}`),
-  payslipPdfUrl:      (id)     => `${BASE}/api/hr/payslips/${id}/pdf?token=${encodeURIComponent(tok() || '')}`,
   downloadPayslipPdf: async (id) => {
     const res = await fetch(`${BASE}/api/hr/payslips/${id}/pdf`, { headers: hdrs(false) })
     if (!res.ok) throw new Error('Download failed')
@@ -145,7 +144,7 @@ export const fmtTime = (t) => {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
 }
 export const fmtHours = (h) => (h == null ? '—' : `${parseFloat(h).toFixed(1)}h`)
-export const fmtMoney = (n) => (n == null ? '—' : `$${parseFloat(n).toFixed(2)}`)
+export const fmtMoney = (n) => (n == null ? '—' : `€${parseFloat(n).toFixed(2)}`)
 
 export const isoMonday = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00Z')

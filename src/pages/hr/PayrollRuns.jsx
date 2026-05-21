@@ -27,6 +27,7 @@ export default function PayrollRuns() {
   const [deleting, setDeleting]       = useState(false)
   const [expandedPayslip, setExpandedPayslip] = useState(null)
   const [downloadingPdf, setDownloadingPdf]   = useState(null)
+  const [confirmModal, setConfirmModal]       = useState(null) // { title, message, onConfirm }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -58,9 +59,15 @@ export default function PayrollRuns() {
     finally { setSaving(false) }
   }
 
-  const closePeriod = async (id) => {
-    if (!window.confirm('Close this pay period? It cannot be reopened.')) return
-    try { await hrApi.closePayPeriod(id); load() } catch (e) { setErr(e.message) }
+  const closePeriod = (id) => {
+    setConfirmModal({
+      title: 'Close Pay Period',
+      message: 'Close this pay period? It cannot be reopened.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try { await hrApi.closePayPeriod(id); load() } catch (e) { setErr(e.message) }
+      },
+    })
   }
 
   const createRun = async () => {
@@ -68,37 +75,51 @@ export default function PayrollRuns() {
     setSaving(true); setErr(null)
     try {
       const run = await hrApi.createPayrollRun(runForm)
-      setShowNewRun(false); load()
-      // load the new run — API returns run_id not the full run object
+      setShowNewRun(false)
       const runId = run.run_id || run.id
-      if (runId) {
-        const fullRun = runs.find(r => r.id === runId) || { id: runId, status: 'draft' }
-        setSelectedRun(fullRun)
-      }
+      // reload list first so the new run is in state, then select it
+      const [pp, pr] = await Promise.all([hrApi.getPayPeriods(), hrApi.getPayrollRuns()])
+      if (pp) setPeriods(Array.isArray(pp) ? pp : (pp?.rows || []))
+      const freshRuns = Array.isArray(pr) ? pr : (pr?.rows || [])
+      setRuns(freshRuns)
+      if (runId) setSelectedRun(freshRuns.find(r => r.id === runId) || { id: runId, status: 'draft' })
     } catch (e) { setErr(e.message) }
-    finally { setSaving(false) }
+    finally { setSaving(false); setLoading(false) }
   }
 
-  const finalize = async (id) => {
-    if (!window.confirm('Finalize this payroll run and notify all employees?')) return
-    setFinalizing(true)
-    try {
-      await hrApi.finalizePayrollRun(id)
-      load()
-      hrApi.getPayrollRun(id).then(setRunDetail)
-      setSelectedRun(r => r ? { ...r, status: 'finalized' } : r)
-    } catch (e) { setErr(e.message) }
-    finally { setFinalizing(false) }
+  const finalize = (id) => {
+    setConfirmModal({
+      title: 'Finalize Payroll Run',
+      message: 'Finalize this run and send payslip notifications to all employees? This cannot be undone.',
+      variant: 'primary',
+      confirmLabel: 'Finalize & Notify',
+      onConfirm: async () => {
+        setFinalizing(true)
+        try {
+          await hrApi.finalizePayrollRun(id)
+          load()
+          hrApi.getPayrollRun(id).then(setRunDetail)
+          setSelectedRun(r => r ? { ...r, status: 'finalized' } : r)
+        } catch (e) { setErr(e.message) }
+        finally { setFinalizing(false) }
+      },
+    })
   }
 
-  const deleteRun = async (id) => {
-    if (!window.confirm('Delete this draft payroll run? All generated payslips will be removed.')) return
-    setDeleting(true)
-    try {
-      await hrApi.deletePayrollRun(id)
-      setSelectedRun(null); setRunDetail(null); load()
-    } catch (e) { setErr(e.message) }
-    finally { setDeleting(false) }
+  const deleteRun = (id) => {
+    setConfirmModal({
+      title: 'Delete Draft Run',
+      message: 'Delete this draft payroll run? All generated payslips will be removed.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setDeleting(true)
+        try {
+          await hrApi.deletePayrollRun(id)
+          setSelectedRun(null); setRunDetail(null); load()
+        } catch (e) { setErr(e.message) }
+        finally { setDeleting(false) }
+      },
+    })
   }
 
   const downloadPdf = async (ps) => {
@@ -394,6 +415,18 @@ export default function PayrollRuns() {
         </Modal>
       )}
 
+      {/* ── Confirm modal ───────────────────────────────────────────────────── */}
+      {confirmModal && (
+        <ConfirmModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          confirmLabel={confirmModal.confirmLabel}
+          onConfirm={async () => { setConfirmModal(null); await confirmModal.onConfirm() }}
+          onClose={() => setConfirmModal(null)}
+        />
+      )}
+
       {/* ── New Run modal ────────────────────────────────────────────────────── */}
       {showNewRun && (
         <Modal title="New Payroll Run" onClose={() => setShowNewRun(false)}>
@@ -434,5 +467,17 @@ function SumBox({ label, val, highlight }) {
       <div style={{ fontSize: 15, fontWeight: 700, color: highlight ? T.green : T.navy }}>{val}</div>
       <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{label}</div>
     </div>
+  )
+}
+
+function ConfirmModal({ title, message, variant = 'danger', confirmLabel = 'Confirm', onConfirm, onClose }) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 20 }}>{message}</p>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn variant={variant} onClick={onConfirm}>{confirmLabel}</Btn>
+      </div>
+    </Modal>
   )
 }

@@ -81,24 +81,24 @@ export default function HRPanel({ onNavigate }) {
   useEffect(() => { load() }, [load])
 
   const approveLeave = async (id) => {
-    setActing(id)
+    setActing(id); setErr(null)
     try { await hrApi.approveLeaveRequest(id); load() }
-    catch {} finally { setActing(null) }
+    catch (e) { setErr(e.message) } finally { setActing(null) }
   }
 
   const denyLeave = async () => {
     if (!denyModal) return
-    setActing(denyModal.id)
+    setActing(denyModal.id); setErr(null)
     try {
       await hrApi.denyLeaveRequest(denyModal.id, denyReason)
       setDenyModal(null); setDenyReason(''); load()
-    } catch {} finally { setActing(null) }
+    } catch (e) { setErr(e.message) } finally { setActing(null) }
   }
 
   const approveTs = async (id) => {
-    setActing(id)
+    setActing(id); setErr(null)
     try { await hrApi.approveTimesheet(id); load() }
-    catch {} finally { setActing(null) }
+    catch (e) { setErr(e.message) } finally { setActing(null) }
   }
 
   if (loading && !data) return (
@@ -122,6 +122,7 @@ export default function HRPanel({ onNavigate }) {
         </div>
         <Btn variant="ghost" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</Btn>
       </div>
+      <ErrMsg msg={err} />
 
       {/* Stats row */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>

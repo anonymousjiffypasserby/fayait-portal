@@ -65,11 +65,14 @@ export default function MyLeave() {
     finally { setSaving(false) }
   }
 
+  const [actionErr, setActionErr] = useState(null)
+
   const cancelRequest = async (id) => {
+    setActionErr(null)
     try {
       await hrApi.updateLeaveRequest(id, { action: 'cancel' })
       load()
-    } catch {}
+    } catch (e) { setActionErr(e.message) }
   }
 
   // Build calendar grid
@@ -160,31 +163,42 @@ export default function MyLeave() {
 
       {/* Requests list */}
       <div style={{ fontSize: 14, fontWeight: 600, color: T.navy, marginBottom: 12 }}>My Requests</div>
+      {actionErr && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: T.red }}>
+          {actionErr}
+        </div>
+      )}
       {requests.length === 0
         ? <EmptyState icon="🌴" title="No leave requests" sub="Your leave requests will appear here." />
         : (
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
             {requests.map((r, i) => (
               <div key={r.id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 20px',
                 borderBottom: i < requests.length - 1 ? `1px solid ${T.border}` : 'none',
               }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: T.navy }}>
-                    {r.leave_type_name} · {r.days} day{r.days !== 1 ? 's' : ''}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: T.navy }}>
+                      {r.leave_type_name} · {r.days} day{r.days !== 1 ? 's' : ''}
+                    </div>
+                    <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
+                      {fmtDateShort(r.start_date)} – {fmtDateShort(r.end_date)}
+                      {r.reason && ` · ${r.reason}`}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
-                    {fmtDateShort(r.start_date)} – {fmtDateShort(r.end_date)}
-                    {r.reason && ` · ${r.reason}`}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <LeaveStatusBadge status={r.status} />
+                    {r.status === 'pending' && (
+                      <Btn variant="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => cancelRequest(r.id)}>Cancel</Btn>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <LeaveStatusBadge status={r.status} />
-                  {r.status === 'pending' && (
-                    <Btn variant="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => cancelRequest(r.id)}>Cancel</Btn>
-                  )}
-                </div>
+                {r.status === 'denied' && r.denial_reason && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: T.red, background: '#fef2f2', borderRadius: 6, padding: '5px 10px' }}>
+                    Denied: {r.denial_reason}
+                  </div>
+                )}
               </div>
             ))}
           </div>

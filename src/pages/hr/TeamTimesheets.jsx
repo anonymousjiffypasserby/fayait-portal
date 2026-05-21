@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { T, hrApi, fmtDate, fmtHours, Avatar, Spinner, EmptyState, TsBadge, Btn, ErrMsg } from './shared'
+import { T, hrApi, fmtDate, fmtHours, Avatar, Spinner, EmptyState, TsBadge, Btn, ErrMsg, Modal, Field, Textarea } from './shared'
 import PermissionGate from '../../components/PermissionGate'
 
 export default function TeamTimesheets() {
@@ -10,6 +10,8 @@ export default function TeamTimesheets() {
   const [selected, setSelected]     = useState(new Set())
   const [acting, setActing]         = useState(null)
   const [err, setErr]               = useState(null)
+  const [rejectModal, setRejectModal] = useState(null)
+  const [rejectNotes, setRejectNotes] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -78,7 +80,7 @@ export default function TeamTimesheets() {
           {selected.size > 0 && (
             <PermissionGate module="hr_timesheets" action="approve">
               <Btn variant="primary" loading={acting === 'bulk'} onClick={bulkApprove}>
-                Approve {selected.size} Selected
+                Approve {selected.size} selected
               </Btn>
             </PermissionGate>
           )}
@@ -144,7 +146,7 @@ export default function TeamTimesheets() {
                               Approve
                             </Btn>
                             <Btn variant="danger" style={{ fontSize: 11, padding: '4px 10px' }}
-                              loading={acting === ts.id} onClick={() => act(ts.id, 'reject')}>
+                              onClick={() => { setRejectModal(ts); setRejectNotes('') }}>
                               Reject
                             </Btn>
                           </PermissionGate>
@@ -195,6 +197,31 @@ export default function TeamTimesheets() {
           </div>
         )
       }
+
+      {rejectModal && (
+        <Modal title="Reject Timesheet" onClose={() => setRejectModal(null)}>
+          <div style={{ fontSize: 13, color: T.muted, marginBottom: 16 }}>
+            <strong>{rejectModal.employee_name}</strong> — week of {fmtDate(rejectModal.week_start)} ({fmtHours(rejectModal.total_hours)})
+          </div>
+          <Field label="Reason for rejection (optional)">
+            <Textarea
+              value={rejectNotes}
+              onChange={e => setRejectNotes(e.target.value)}
+              placeholder="Explain why this timesheet is being rejected…"
+            />
+          </Field>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
+            <Btn variant="danger" loading={acting === rejectModal.id}
+              onClick={async () => {
+                await act(rejectModal.id, 'reject', rejectNotes)
+                setRejectModal(null)
+              }}>
+              Reject
+            </Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
