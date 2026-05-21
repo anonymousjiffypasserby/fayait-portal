@@ -5,6 +5,7 @@ import PermissionGate from '../../components/PermissionGate'
 export default function TeamTimesheets() {
   const [timesheets, setTimesheets] = useState([])
   const [loading, setLoading]       = useState(true)
+  const [statusFilter, setStatusFilter] = useState('submitted')
   const [expanded, setExpanded]     = useState(null)
   const [selected, setSelected]     = useState(new Set())
   const [acting, setActing]         = useState(null)
@@ -12,11 +13,12 @@ export default function TeamTimesheets() {
 
   const load = useCallback(() => {
     setLoading(true)
-    hrApi.getTimesheets('?status=submitted')
+    const q = statusFilter === 'all' ? '' : `?status=${statusFilter}`
+    hrApi.getTimesheets(q)
       .then(d => setTimesheets(Array.isArray(d) ? d : (d?.rows || [])))
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [statusFilter])
 
   useEffect(() => { load() }, [load])
 
@@ -53,23 +55,38 @@ export default function TeamTimesheets() {
           Team Timesheets
           {timesheets.length > 0 && (
             <span style={{ fontSize: 13, color: T.muted, fontWeight: 400, marginLeft: 8 }}>
-              {timesheets.length} pending
+              {timesheets.length} {statusFilter === 'all' ? 'total' : statusFilter}
             </span>
           )}
         </div>
-        {selected.size > 0 && (
-          <PermissionGate module="hr_timesheets" action="approve">
-            <Btn variant="primary" loading={acting === 'bulk'} onClick={bulkApprove}>
-              Approve {selected.size} Selected
-            </Btn>
-          </PermissionGate>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select
+            value={statusFilter}
+            onChange={e => { setStatusFilter(e.target.value); setSelected(new Set()) }}
+            style={{
+              padding: '6px 10px', borderRadius: 7, border: `1px solid ${T.border}`,
+              fontSize: 12, color: T.navy, fontFamily: T.font, background: '#fff', cursor: 'pointer',
+            }}
+          >
+            <option value="submitted">Pending Approval</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">All</option>
+          </select>
+          {selected.size > 0 && (
+            <PermissionGate module="hr_timesheets" action="approve">
+              <Btn variant="primary" loading={acting === 'bulk'} onClick={bulkApprove}>
+                Approve {selected.size} Selected
+              </Btn>
+            </PermissionGate>
+          )}
+        </div>
       </div>
 
       <ErrMsg msg={err} />
 
       {timesheets.length === 0
-        ? <EmptyState icon="✅" title="No pending timesheets" sub="All timesheets have been reviewed." />
+        ? <EmptyState icon="✅" title={`No ${statusFilter === 'submitted' ? 'pending' : statusFilter === 'all' ? '' : statusFilter} timesheets`} sub={statusFilter === 'submitted' ? 'All timesheets have been reviewed.' : 'No matching timesheets.'} />
         : (
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

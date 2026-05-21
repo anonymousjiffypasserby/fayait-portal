@@ -1,11 +1,30 @@
 import { useState, useEffect } from 'react'
-import { T, hrApi, fmtDate, Avatar, Spinner, EmptyState, EmpStatusBadge, ContractBadge, Btn } from './shared'
+import { T, hrApi, fmtDate, Avatar, Spinner, EmptyState, EmpStatusBadge, ContractBadge, GoalStatusBadge, Btn } from './shared'
 
 const TABS = ['Profile', 'Documents', 'Goals', 'Reviews']
+
+const ProgressBar = ({ value }) => (
+  <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden', marginTop: 6 }}>
+    <div style={{
+      height: '100%', borderRadius: 3,
+      width: `${value || 0}%`,
+      background: value >= 100 ? T.green : T.orange,
+      transition: 'width 0.3s',
+    }} />
+  </div>
+)
+
+const Stars = ({ rating }) => (
+  <span style={{ color: T.yellow, fontSize: 14, letterSpacing: 1 }}>
+    {Array.from({ length: 5 }, (_, i) => i < rating ? '★' : '☆').join('')}
+  </span>
+)
 
 export default function MyProfile({ user }) {
   const [profile, setProfile] = useState(null)
   const [docs, setDocs]       = useState([])
+  const [goals, setGoals]     = useState([])
+  const [reviews, setReviews] = useState([])
   const [tab, setTab]         = useState('Profile')
   const [loading, setLoading] = useState(true)
   const [err, setErr]         = useState(null)
@@ -18,9 +37,22 @@ export default function MyProfile({ user }) {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'Documents' || !profile) return
-    hrApi.getDocs(profile.id).then(setDocs).catch(() => {})
+    if (!profile) return
+    if (tab === 'Documents') hrApi.getDocs(profile.id).then(setDocs).catch(() => {})
+    if (tab === 'Goals')     hrApi.getGoals(`?employee_id=${profile.id}`).then(d => setGoals(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
+    if (tab === 'Reviews')   hrApi.getReviews(`?employee_id=${profile.id}`).then(d => setReviews(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
   }, [tab, profile])
+
+  const handleDocDownload = async (doc) => {
+    try {
+      const blob = await hrApi.downloadDoc(profile.id, doc.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = doc.name || doc.file_name || 'document'
+      document.body.appendChild(a); a.click()
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 100)
+    } catch {}
+  }
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
@@ -37,6 +69,8 @@ export default function MyProfile({ user }) {
     color: tab === t ? T.navy : T.muted, borderBottom: tab === t ? `2px solid ${T.orange}` : '2px solid transparent',
     background: 'none', border: 'none', fontFamily: T.font, transition: 'color 0.1s',
   })
+
+  const today = new Date().toISOString().slice(0, 10)
 
   return (
     <div style={{ padding: 24 }}>
@@ -108,13 +142,13 @@ export default function MyProfile({ user }) {
                 <tbody>
                   {docs.map(doc => (
                     <tr key={doc.id} style={{ borderBottom: `1px solid ${T.border}` }}>
-                      <td style={{ padding: '10px 12px', fontSize: 13 }}>📄 {doc.file_name}</td>
-                      <td style={{ padding: '10px 12px', fontSize: 12, color: T.muted }}>{doc.document_type}</td>
+                      <td style={{ padding: '10px 12px', fontSize: 13 }}>📄 {doc.name || doc.file_name}</td>
+                      <td style={{ padding: '10px 12px', fontSize: 12, color: T.muted }}>{doc.document_type || doc.type}</td>
                       <td style={{ padding: '10px 12px', fontSize: 12, color: T.muted }}>{fmtDate(doc.created_at)}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        <a href={hrApi.docDownloadUrl(profile.id, doc.id)} target="_blank" rel="noreferrer">
-                          <Btn variant="ghost" style={{ fontSize: 11, padding: '4px 10px' }}>Download</Btn>
-                        </a>
+                        <Btn variant="ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => handleDocDownload(doc)}>
+                          Download
+                        </Btn>
                       </td>
                     </tr>
                   ))}
@@ -127,13 +161,69 @@ export default function MyProfile({ user }) {
 
       {tab === 'Goals' && (
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${T.border}`, padding: 24 }}>
-          <EmptyState icon="🎯" title="Goals" sub="Goals management coming soon." />
+          {goals.length === 0
+            ? <EmptyState icon="🎯" title="No goals" sub="No goals have been set yet." />
+            : goals.map(g => {
+              const overdue = g.due_date && g.due_date.slice(0, 10) < today && g.status === 'active'
+              return (
+                <div key={g.id} style={{ padding: '12px 0', borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: T.navy, flex: 1 }}>{g.title}</div>
+                    <GoalStatusBadge status={g.status} />
+                  </div>
+                  <ProgressBar value={g.progress} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+                    <span style={{ fontSize: 11, color: T.muted }}>{g.progress ?? 0}% complete</span>
+                    {g.due_date && (
+                      <span style={{ fontSize: 11, color: overdue ? T.red : T.muted, fontWeight: overdue ? 600 : 400 }}>
+                        {overdue ? 'Overdue · ' : 'Due '}{fmtDate(g.due_date)}
+                      </span>
+                    )}
+                  </div>
+                  {g.description && (
+                    <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>{g.description}</div>
+                  )}
+                </div>
+              )
+            })
+          }
         </div>
       )}
 
       {tab === 'Reviews' && (
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${T.border}`, padding: 24 }}>
-          <EmptyState icon="⭐" title="Reviews" sub="Performance reviews coming soon." />
+          {reviews.length === 0
+            ? <EmptyState icon="📋" title="No reviews" sub="No performance reviews yet." />
+            : reviews.map(r => (
+              <div key={r.id} style={{ padding: '12px 0', borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.navy }}>{r.period}</div>
+                  <Stars rating={r.rating} />
+                </div>
+                {r.strengths && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.green, marginBottom: 2 }}>Strengths</div>
+                    <div style={{ fontSize: 12, color: '#374151' }}>{r.strengths}</div>
+                  </div>
+                )}
+                {r.improvements && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.orange, marginBottom: 2 }}>Areas for Improvement</div>
+                    <div style={{ fontSize: 12, color: '#374151' }}>{r.improvements}</div>
+                  </div>
+                )}
+                {r.notes && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 2 }}>Notes</div>
+                    <div style={{ fontSize: 12, color: '#374151' }}>{r.notes}</div>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
+                  {fmtDate(r.created_at)}{r.reviewer_name ? ` · by ${r.reviewer_name}` : ''}
+                </div>
+              </div>
+            ))
+          }
         </div>
       )}
     </div>

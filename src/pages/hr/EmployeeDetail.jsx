@@ -217,13 +217,26 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
 
   const handleUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    const type = window.prompt('Document type:', 'General')
+    if (type === null) { fileRef.current.value = ''; return }
     setUploading(true)
     const fd = new FormData()
     fd.append('file', file)
-    fd.append('document_type', 'General')
+    fd.append('document_type', type.trim() || 'General')
     try { await hrApi.uploadDoc(employee.id, fd); hrApi.getDocs(employee.id).then(setDocs) }
     catch {}
     finally { setUploading(false); fileRef.current.value = '' }
+  }
+
+  const handleDocDownload = async (doc) => {
+    try {
+      const blob = await hrApi.downloadDoc(employee.id, doc.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = doc.name || 'document'
+      document.body.appendChild(a); a.click()
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 100)
+    } catch {}
   }
 
   const deleteDoc = async (docId) => {
@@ -380,9 +393,7 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
                     <div style={{ fontSize: 11, color: T.muted }}>{doc.document_type} · {fmtDate(doc.created_at)}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <a href={hrApi.docDownloadUrl(employee.id, doc.id)} target="_blank" rel="noreferrer">
-                      <Btn variant="ghost" style={{ fontSize: 11, padding: '3px 8px' }}>↓</Btn>
-                    </a>
+                    <Btn variant="ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDocDownload(doc)}>↓</Btn>
                     {canEdit && (
                       <Btn variant="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => deleteDoc(doc.id)}>✕</Btn>
                     )}

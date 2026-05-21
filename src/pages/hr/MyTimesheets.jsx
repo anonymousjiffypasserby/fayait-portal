@@ -8,6 +8,7 @@ export default function MyTimesheets() {
   const [expanded, setExpanded] = useState(null)
   const [err, setErr]         = useState(null)
   const [action, setAction]   = useState(null) // 'clockin' | 'clockout' | 'submit'
+  const [clockOutNotes, setClockOutNotes] = useState('')
 
   const load = useCallback(() => {
     setLoading(true); setErr(null)
@@ -35,7 +36,7 @@ export default function MyTimesheets() {
 
   const clockOut = async () => {
     setAction('clockout'); setErr(null)
-    try { await hrApi.clockOut({}); load() }
+    try { await hrApi.clockOut({ notes: clockOutNotes.trim() || undefined }); setClockOutNotes(''); load() }
     catch (e) { setErr(e.message) }
     finally { setAction(null) }
   }
@@ -91,10 +92,21 @@ export default function MyTimesheets() {
               </Btn>
             )}
             {isClockedIn && (
-              <Btn variant="danger" loading={action === 'clockout'} onClick={clockOut}
-                style={{ padding: '12px 28px', fontSize: 15 }}>
-                ⏹ Clock Out
-              </Btn>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <input
+                  value={clockOutNotes}
+                  onChange={e => setClockOutNotes(e.target.value)}
+                  placeholder="Notes for this session (optional)"
+                  style={{
+                    padding: '8px 12px', borderRadius: 7, border: `1px solid ${T.border}`,
+                    fontSize: 12, fontFamily: T.font, width: 260, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                <Btn variant="danger" loading={action === 'clockout'} onClick={clockOut}
+                  style={{ padding: '12px 28px', fontSize: 15 }}>
+                  ⏹ Clock Out
+                </Btn>
+              </div>
             )}
             {current && current.status === 'draft' && !isClockedIn && (current.total_hours || 0) > 0 && (
               <Btn variant="outline" loading={action === 'submit'} onClick={() => submit(current.id)}>

@@ -9,6 +9,7 @@ export default function LeaveRequests() {
   const [calendar, setCalendar] = useState([])
   const [loading, setLoading]   = useState(true)
   const [view, setView]         = useState('list')
+  const [statusFilter, setStatusFilter] = useState('pending')
   const [calYear, setCalYear]   = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1)
   const [denyModal, setDenyModal] = useState(null)
@@ -18,11 +19,12 @@ export default function LeaveRequests() {
 
   const load = useCallback(() => {
     setLoading(true)
-    hrApi.getLeaveRequests('?status=pending')
+    const q = statusFilter === 'all' ? '' : `?status=${statusFilter}`
+    hrApi.getLeaveRequests(q)
       .then(d => setRequests(Array.isArray(d) ? d : (d?.rows || [])))
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [statusFilter])
 
   const loadCalendar = useCallback(() => {
     hrApi.getLeaveCalendar(`?year=${calYear}&month=${calMonth}`)
@@ -67,10 +69,23 @@ export default function LeaveRequests() {
         <div style={{ fontSize: 20, fontWeight: 700, color: T.navy }}>
           Leave Requests
           {requests.length > 0 && (
-            <span style={{ fontSize: 13, color: T.muted, fontWeight: 400, marginLeft: 8 }}>{requests.length} pending</span>
+            <span style={{ fontSize: 13, color: T.muted, fontWeight: 400, marginLeft: 8 }}>{requests.length} {statusFilter === 'all' ? 'total' : statusFilter}</span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            style={{
+              padding: '6px 10px', borderRadius: 7, border: `1px solid ${T.border}`,
+              fontSize: 12, color: T.navy, fontFamily: T.font, background: '#fff', cursor: 'pointer',
+            }}
+          >
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
+            <option value="all">All</option>
+          </select>
           <Btn variant={view === 'list' ? 'primary' : 'ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('list')}>≡ List</Btn>
           <Btn variant={view === 'calendar' ? 'primary' : 'ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('calendar')}>📅 Calendar</Btn>
         </div>
@@ -82,7 +97,7 @@ export default function LeaveRequests() {
         loading
           ? <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spinner size={28} /></div>
           : requests.length === 0
-            ? <EmptyState icon="🌴" title="No pending requests" sub="All leave requests have been reviewed." />
+            ? <EmptyState icon="🌴" title={`No ${statusFilter === 'all' ? '' : statusFilter + ' '}requests`} sub={statusFilter === 'pending' ? 'All leave requests have been reviewed.' : 'No matching leave requests.'} />
             : (
               <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
                 {requests.map((r, i) => (
