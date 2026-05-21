@@ -564,6 +564,7 @@ export default function Chat() {
   const [collapsed, setCollapsed]       = useState({ dms: false, channels: false })
   const [mutedRooms, setMutedRooms]     = useState(() => new Set(JSON.parse(localStorage.getItem('chat_muted') || '[]')))
   const [atBottom, setAtBottom]         = useState(true)
+  const atBottomRef = useRef(true)
 
   // ─── message interactions ───────────────────────────────────────────────────
   const [replyTo, setReplyTo]       = useState(null)  // { eventId, senderName, body }
@@ -607,7 +608,9 @@ export default function Chat() {
   function handleScroll() {
     const el = scrollRef.current
     if (!el) return
-    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+    const ab = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    atBottomRef.current = ab
+    setAtBottom(ab)
   }
 
   // ─── load users for mentions + typing ───────────────────────────────────────
@@ -743,7 +746,7 @@ export default function Chat() {
                   const ids = new Set(prev.map(m => m.eventId))
                   const fresh = newMsgs.filter(m => !ids.has(m.eventId))
                   if (!fresh.length) return prev
-                  setTimeout(() => { if (atBottom) scrollBottom(true) }, 40)
+                  setTimeout(() => { if (atBottomRef.current) scrollBottom(true) }, 40)
                   for (const m of fresh) {
                     if (m.sender !== myMxid) showNotif(m, cur.name)
                   }
@@ -796,7 +799,7 @@ export default function Chat() {
     }
     syncRef.current = setInterval(poll, POLL_MS)
     return () => clearInterval(syncRef.current)
-  }, [nextBatch, myMxid, atBottom, userMap])
+  }, [nextBatch, myMxid, userMap])
 
   // ─── send message ────────────────────────────────────────────────────────────
   async function send() {
