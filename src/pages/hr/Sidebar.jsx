@@ -9,6 +9,7 @@ const MY_HR = [
 ]
 
 const TEAM = [
+  { key: 'hr_panel',        label: 'HR Overview',       icon: '📊' },
   { key: 'employees',       label: 'Employees',         icon: '👥' },
   { key: 'schedule_builder',label: 'Schedule Builder',  icon: '🗓' },
   { key: 'team_timesheets', label: 'Timesheets',        icon: '✅' },

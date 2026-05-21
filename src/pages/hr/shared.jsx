@@ -18,6 +18,9 @@ const hr = async (method, path, body) => {
 }
 
 export const hrApi = {
+  // Dashboard
+  getDashboard: () => hr('GET', '/dashboard'),
+
   // Employees
   getMe:           ()        => hr('GET',    '/employees/me'),
   getEmployees:    (q = '')  => hr('GET',    `/employees${q}`),
