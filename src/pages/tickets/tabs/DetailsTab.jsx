@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { T, zammadApi, fmtDateTime } from '../shared'
 
-export default function DetailsTab({ ticket }) {
+export default function DetailsTab({ ticket, customerUser }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -21,7 +21,34 @@ export default function DetailsTab({ ticket }) {
 
       {/* Customer */}
       <Section label="Customer">
-        <div style={{ fontSize: 13, color: T.navy, fontWeight: 500 }}>{ticket.customer || '—'}</div>
+        <div style={{ fontSize: 13, color: T.navy, fontWeight: 500, marginBottom: 4 }}>
+          {ticket.customer || '—'}
+        </div>
+        {customerUser ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {customerUser.email && (
+              <a
+                href={`mailto:${customerUser.email}`}
+                style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}
+              >
+                ✉ {customerUser.email}
+              </a>
+            )}
+            {(customerUser.phone || customerUser.mobile) && (
+              <a
+                href={`tel:${customerUser.phone || customerUser.mobile}`}
+                style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}
+              >
+                📞 {customerUser.phone || customerUser.mobile}
+              </a>
+            )}
+            {customerUser.organization && (
+              <span style={{ fontSize: 12, color: T.muted }}>{customerUser.organization}</span>
+            )}
+          </div>
+        ) : ticket.customer_id ? (
+          <div style={{ fontSize: 11, color: T.muted }}>Loading contact details…</div>
+        ) : null}
       </Section>
 
       {/* Organization */}

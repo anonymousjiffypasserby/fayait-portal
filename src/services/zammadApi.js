@@ -74,6 +74,9 @@ const zammadApi = {
   getCurrentUser: () =>
     fetch(`${BASE}/api/proxy/zammad/users/me`, { headers: headers() }).then(handle),
 
+  getUser: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/users/${id}`, { headers: headers() }).then(handle),
+
   // ── States / Priorities / Groups ──────────────────────────────────────────
   getTicketStates: () =>
     fetch(`${BASE}/api/proxy/zammad/ticket_states`, { headers: headers() }).then(handle),

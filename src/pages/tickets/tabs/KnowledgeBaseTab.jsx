@@ -1,15 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { T, zammadApi } from '../shared'
 
 // Extract body from Zammad 7 answer — body lives inside translations array
 function answerBody(a) {
   if (!a) return ''
-  // Zammad 7: translations[].content.body or translations[].body
   if (Array.isArray(a.translations) && a.translations.length > 0) {
     const t = a.translations[0]
     return t?.content?.body || t?.body || ''
   }
-  // Fallback for older formats
   return a.body || a.content || ''
 }
 
@@ -21,49 +19,80 @@ function answerTitle(a) {
   return a.title || '(untitled)'
 }
 
-export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
-  const [kb,       setKb]       = useState(null)  // first KB object, or null
-  const [answers,  setAnswers]  = useState([])
-  const [search,   setSearch]   = useState(ticketTitle || '')
-  const [loading,  setLoading]  = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [expanded, setExpanded] = useState(null)
-  const [error,    setError]    = useState(null)
+// Zammad KB search endpoint — empty query returns all published answers.
+// Tries locale_default first, falls back to 'en'.
+async function fetchAnswers(kbObj, query = '') {
+  const locales = [
+    kbObj?.locale_default,
+    kbObj?.locales?.[0],
+    'en-us',
+    'en',
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
-  const loadAnswers = async (kbObj) => {
-    const locale = kbObj?.locale_default || kbObj?.locales?.[0] || 'en-us'
+  for (const locale of locales) {
     try {
-      const ans = await zammadApi.getKBAnswers(kbObj.id, locale).catch(() =>
-        // Try without locale if the locale-based path 404s
-        zammadApi.getKBAnswers(kbObj.id, 'en').catch(() => [])
-      )
-      setAnswers(Array.isArray(ans) ? ans : [])
-    } catch {
-      setAnswers([])
-    }
+      const r = await zammadApi.searchKBAnswers(kbObj.id, query, locale)
+      const list = Array.isArray(r) ? r
+        : r?.result ? r.result
+        : r?.answers ? r.answers
+        : []
+      if (list.length > 0 || query) return list  // trust empty-query result if no query
+    } catch { /* try next locale */ }
   }
+  return []
+}
 
+export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
+  const [kb,        setKb]        = useState(null)
+  const [answers,   setAnswers]   = useState([])
+  const [search,    setSearch]    = useState(ticketTitle || '')
+  const [loading,   setLoading]   = useState(true)
+  const [searching, setSearching] = useState(false)
+  const [creating,  setCreating]  = useState(false)
+  const [expanded,  setExpanded]  = useState(null)
+  const [error,     setError]     = useState(null)
+  const kbRef       = useRef(null)
+  const searchTimer = useRef(null)
+
+  // Initial load — fetch KB then answers
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+
     zammadApi.getKnowledgeBases()
-      .then(data => {
+      .then(async data => {
         if (cancelled) return
-        // Handle various response shapes
         const list = Array.isArray(data) ? data
           : data?.assets?.KnowledgeBase ? Object.values(data.assets.KnowledgeBase)
           : []
-        if (list.length > 0) {
-          setKb(list[0])
-          return loadAnswers(list[0])
-        }
-        setKb(null)
+
+        if (list.length === 0) { setKb(null); return }
+
+        const first = list[0]
+        setKb(first)
+        kbRef.current = first
+        const ans = await fetchAnswers(first, search)
+        if (!cancelled) setAnswers(ans)
       })
       .catch(() => { if (!cancelled) setKb(null) })
       .finally(() => { if (!cancelled) setLoading(false) })
+
     return () => { cancelled = true }
   }, [])
+
+  // Debounced server-side search whenever the query changes (after KB loaded)
+  useEffect(() => {
+    if (!kbRef.current) return
+    clearTimeout(searchTimer.current)
+    setSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      const results = await fetchAnswers(kbRef.current, search)
+      setAnswers(results)
+      setSearching(false)
+    }, 320)
+    return () => clearTimeout(searchTimer.current)
+  }, [search])
 
   const handleCreateKB = async () => {
     setCreating(true)
@@ -77,6 +106,7 @@ export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
         color_header_link: '#ffffff',
       })
       setKb(newKb)
+      kbRef.current = newKb
       setAnswers([])
     } catch (err) {
       setError(err.message || 'Failed to create knowledge base')
@@ -84,14 +114,6 @@ export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
       setCreating(false)
     }
   }
-
-  const filtered = answers.filter(a => {
-    const q = search.toLowerCase()
-    if (!q) return true
-    const title = answerTitle(a).toLowerCase()
-    const body  = answerBody(a).toLowerCase()
-    return title.includes(q) || body.includes(q)
-  })
 
   if (loading) return <div style={{ padding: 24, color: T.muted, fontSize: 13 }}>Loading…</div>
 
@@ -141,23 +163,20 @@ export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
 
       {/* Results */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
-        {answers.length === 0 ? (
+        {searching ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: T.muted, fontSize: 13 }}>Searching…</div>
+        ) : answers.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: T.muted, fontSize: 13 }}>
-            No articles in this knowledge base yet.
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '24px 0', textAlign: 'center', color: T.muted, fontSize: 13 }}>
-            No articles match "{search}"
+            {search ? `No articles match "${search}"` : 'No articles in this knowledge base yet.'}
           </div>
         ) : (
-          filtered.map(a => {
+          answers.map(a => {
             const title = answerTitle(a)
             const body  = answerBody(a)
             return (
               <div key={a.id} style={{
                 border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 10, overflow: 'hidden',
               }}>
-                {/* Article header */}
                 <div
                   onClick={() => setExpanded(expanded === a.id ? null : a.id)}
                   style={{
@@ -170,7 +189,6 @@ export default function KnowledgeBaseTab({ ticketTitle, onInsert, isAdmin }) {
                   <span style={{ fontSize: 11, color: T.muted }}>{expanded === a.id ? '▲' : '▼'}</span>
                 </div>
 
-                {/* Expanded body */}
                 {expanded === a.id && (
                   <div style={{ padding: '10px 14px', borderTop: `1px solid ${T.border}` }}>
                     {body ? (

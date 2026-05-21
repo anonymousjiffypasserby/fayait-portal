@@ -71,16 +71,13 @@ export const fmtCountdown = (ms) => {
   return `${fmtDuration(ms)} remaining`
 }
 
-// Returns SLA deadline as timestamp. Uses Zammad's escalation_at when present,
-// otherwise computes from created_at + configured hours per priority.
+// Only use Zammad's own escalation_at — it already accounts for business hours,
+// calendars, and pending-state pauses. If absent, there is no SLA to show.
 const getSlaDeadline = (ticket) => {
-  if (!ticket?.created_at) return null
-  if (ticket.escalation_at) return new Date(ticket.escalation_at).getTime()
+  if (!ticket?.escalation_at) return null
   const state = (ticket.state || '').toLowerCase()
   if (state === 'closed') return null
-  const settings = getTicketSettings()
-  const hours = settings.slaHours[ticket.priority_id] ?? 8
-  return new Date(ticket.created_at).getTime() + hours * 3600000
+  return new Date(ticket.escalation_at).getTime()
 }
 
 export const slaStatus = (ticket) => {

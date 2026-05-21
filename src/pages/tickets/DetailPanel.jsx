@@ -58,8 +58,9 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const [showMerge,    setShowMerge]    = useState(false)
   const [mergeQuery,   setMergeQuery]   = useState('')
   const [mergeResults, setMergeResults] = useState([])
-  const [mergeWorking, setMergeWorking] = useState(false)
-  const [mergeError,   setMergeError]   = useState(null)
+  const [mergeWorking,  setMergeWorking]  = useState(false)
+  const [mergeError,    setMergeError]    = useState(null)
+  const [customerUser,  setCustomerUser]  = useState(null)
 
   const predefinedCategories = getTicketSettings().predefinedTags
 
@@ -75,6 +76,12 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
         setTags(tagData?.tags || [])
         if (t.pending_time) {
           setPendingTime(new Date(t.pending_time).toISOString().slice(0, 16))
+        }
+        // Fetch customer details (non-blocking — best effort)
+        if (t.customer_id) {
+          zammadApi.getUser(t.customer_id)
+            .then(u => setCustomerUser(u))
+            .catch(() => {})
         }
       })
       .catch(() => setError('Failed to load ticket'))
@@ -577,6 +584,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           <ConversationTab
             ticketId={ticketId}
             ticket={ticket}
+            customerUser={customerUser}
             onReplySent={() => load()}
             isAgent={isAgent}
             insertText={kbInsert}
@@ -585,7 +593,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           />
         </div>
         <div style={{ display: tab === 'Details' ? 'flex' : 'none', flex: 1, overflow: 'auto', flexDirection: 'column' }}>
-          <DetailsTab ticket={ticket} />
+          <DetailsTab ticket={ticket} customerUser={customerUser} />
         </div>
         <div style={{ display: tab === 'Knowledge Base' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
           <KnowledgeBaseTab

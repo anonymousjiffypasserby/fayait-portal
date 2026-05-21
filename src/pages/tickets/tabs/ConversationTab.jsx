@@ -120,7 +120,7 @@ const REPLY_TYPES = [
   { key: 'internal', label: 'Internal Note',  active: '#f59e0b', activeText: '#fff' },
 ]
 
-export default function ConversationTab({ ticketId, ticket, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
+export default function ConversationTab({ ticketId, ticket, customerUser, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
   const [articles,    setArticles]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [reply,       setReply]       = useState('')
@@ -131,19 +131,29 @@ export default function ConversationTab({ ticketId, ticket, onReplySent, isAgent
   const [sending,     setSending]     = useState(false)
   const [error,       setError]       = useState(null)
   const [file,        setFile]        = useState(null)
-  const bottomRef = useRef(null)
-  const fileRef   = useRef(null)
+  const bottomRef       = useRef(null)
+  const fileRef         = useRef(null)
+  const autoDetectedRef = useRef(false)  // only auto-detect channel once per ticket
 
   const isEmail    = replyType === 'email'
   const isInternal = replyType === 'internal'
 
-  // Pre-fill email subject/to from ticket when switching to email mode
+  // Auto-detect reply channel from the first external article.
+  // If the ticket came in via email, default compose to email mode.
   useEffect(() => {
-    if (replyType === 'email' && ticket) {
-      if (!emailSubject) setEmailSubject(`Re: ${ticket.title || ''}`)
-      if (!emailTo && ticket.customer) setEmailTo(ticket.customer)
-    }
-  }, [replyType, ticket])
+    if (autoDetectedRef.current || articles.length === 0) return
+    autoDetectedRef.current = true
+    const firstExternal = articles.find(a => !a.internal)
+    if (firstExternal?.type === 'email') setReplyType('email')
+  }, [articles])
+
+  // When email mode is active, pre-fill To / Subject if not already set.
+  // To comes from customerUser.email (real address), not ticket.customer (display name).
+  useEffect(() => {
+    if (replyType !== 'email') return
+    if (!emailTo && customerUser?.email) setEmailTo(customerUser.email)
+    if (!emailSubject && ticket?.title)  setEmailSubject(`Re: ${ticket.title}`)
+  }, [replyType, customerUser])
 
   const load = () => {
     setLoading(true)
@@ -153,7 +163,12 @@ export default function ConversationTab({ ticketId, ticket, onReplySent, isAgent
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [ticketId])
+  useEffect(() => {
+    autoDetectedRef.current = false  // reset so new ticket re-runs channel detection
+    setReplyType('public')
+    setEmailTo(''); setEmailCc(''); setEmailSubject('')
+    load()
+  }, [ticketId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
