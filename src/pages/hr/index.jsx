@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { T, hrApi, isAdmin, globalStyle } from './shared'
+import { T, hrApi, isAdmin, globalStyle, ADMIN_ROLES } from './shared'
 import HRSidebar from './Sidebar'
 import HRPanel from './HRPanel'
 import MyProfile from './MyProfile'
@@ -36,18 +36,21 @@ const VIEW_COMPONENTS = {
   deductions:      Deductions,
 }
 
+function getDefaultView() {
+  try {
+    const stored = localStorage.getItem('faya_user')
+    if (stored) {
+      const u = JSON.parse(stored)
+      if (ADMIN_ROLES.includes(u?.role)) return 'hr_panel'
+    }
+  } catch {}
+  return 'my_profile'
+}
+
 export default function HR() {
   const { user } = useAuth()
-  const [activeView, setActiveView] = useState('my_profile')
-  const initialViewSet = useRef(false)
+  const [activeView, setActiveView] = useState(getDefaultView)
   const [counts, setCounts] = useState({ pendingLeave: 0, pendingTimesheets: 0 })
-
-  useEffect(() => {
-    if (user && !initialViewSet.current) {
-      initialViewSet.current = true
-      if (isAdmin(user)) setActiveView('hr_panel')
-    }
-  }, [user])
 
   useEffect(() => {
     if (!isAdmin(user)) return
