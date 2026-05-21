@@ -18,22 +18,26 @@ const PRIORITIES = [
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
 export default function NewTicketModal({ onCreated, onClose }) {
-  const [title,       setTitle]      = useState('')
-  const [body,        setBody]       = useState('')
-  const [priorityId,  setPriority]   = useState('2')
-  const [ownerId,     setOwner]      = useState('')
-  const [categories,  setCategories] = useState([])
-  const [deptId,      setDeptId]     = useState('')
-  const [contactId,   setContactId]  = useState('')
-  const [file,        setFile]       = useState(null)
-  const [agents,      setAgents]     = useState([])
-  const [departments, setDepartments]= useState([])
-  const [allUsers,    setAllUsers]   = useState([])
-  const [submitting,  setSubmitting] = useState(false)
-  const [error,       setError]      = useState(null)
+  const settings = getTicketSettings()
+  const [title,        setTitle]       = useState('')
+  const [body,         setBody]        = useState('')
+  const [priorityId,   setPriority]    = useState('2')
+  const [ownerId,      setOwner]       = useState('')
+  const [categories,   setCategories]  = useState([])
+  const [deptId,       setDeptId]      = useState('')
+  const [contactId,    setContactId]   = useState('')
+  const [file,         setFile]        = useState(null)
+  const [sendEmail,    setSendEmail]   = useState(false)
+  const [emailTo,      setEmailTo]     = useState('')
+  const [agents,       setAgents]      = useState([])
+  const [departments,  setDepartments] = useState([])
+  const [allUsers,     setAllUsers]    = useState([])
+  const [submitting,   setSubmitting]  = useState(false)
+  const [error,        setError]       = useState(null)
   const fileRef = useRef(null)
 
-  const predefinedCategories = getTicketSettings().predefinedTags
+  const predefinedCategories = settings.predefinedTags
+  const templates = settings.templates || []
 
   useEffect(() => {
     zammadApi.getUsers()
@@ -43,11 +47,23 @@ export default function NewTicketModal({ onCreated, onClose }) {
     apiGet('/api/users').then(u => setAllUsers(Array.isArray(u) ? u : []))
   }, [])
 
-  // When a dept is selected, filter the customer list to that dept.
-  // Otherwise show all portal users.
   const customerList = deptId
     ? allUsers.filter(u => String(u.department_id) === String(deptId))
     : allUsers
+
+  // When a contact is selected and sendEmail is on, pre-fill emailTo
+  useEffect(() => {
+    if (!sendEmail || !contactId) return
+    const user = allUsers.find(u => String(u.id) === String(contactId))
+    if (user?.email) setEmailTo(user.email)
+  }, [contactId, sendEmail])
+
+  const applyTemplate = (tpl) => {
+    if (tpl.title)       setTitle(tpl.title)
+    if (tpl.body)        setBody(tpl.body)
+    if (tpl.priority_id) setPriority(String(tpl.priority_id))
+    if (Array.isArray(tpl.categories)) setCategories(tpl.categories)
+  }
 
   const toggleCategory = (cat) => {
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
@@ -69,9 +85,13 @@ export default function NewTicketModal({ onCreated, onClose }) {
         if (contact) allTags.push(`contact:${contact.name}`)
       }
 
+      const article = sendEmail
+        ? { body: body.trim(), type: 'email', to: emailTo, internal: false }
+        : { body: body.trim(), type: 'web', internal: false }
+
       const payload = {
         title: title.trim(),
-        article: { body: body.trim(), type: 'note', internal: false },
+        article,
         priority_id: Number(priorityId) || 2,
         ...(ownerId    ? { owner_id: Number(ownerId) } : {}),
         ...(allTags.length ? { tags: allTags.join(',') } : {}),
@@ -88,7 +108,6 @@ export default function NewTicketModal({ onCreated, onClose }) {
   const canSubmit = title.trim() && body.trim() && !submitting
 
   return (
-    // No onClick on the outer div — only the Cancel button and form submission close this modal
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -100,8 +119,22 @@ export default function NewTicketModal({ onCreated, onClose }) {
         boxShadow: '0 -4px 40px rgba(0,0,0,0.18)',
       }}>
         {/* Header */}
-        <div style={{ padding: '18px 24px 14px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <div style={{ padding: '18px 24px 14px', borderBottom: `1px solid ${T.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: T.navy }}>New Ticket</div>
+          {templates.length > 0 && (
+            <select
+              defaultValue=""
+              onChange={e => { if (e.target.value) { applyTemplate(templates.find(t => t.id === e.target.value) || {}); e.target.value = '' } }}
+              style={{
+                padding: '5px 10px', borderRadius: 6, fontSize: 12, fontFamily: T.font,
+                border: `1px solid #6366f1`, color: '#6366f1', background: '#eef2ff',
+                cursor: 'pointer', outline: 'none',
+              }}
+            >
+              <option value="" disabled>Use template…</option>
+              {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
         </div>
 
         {/* Body */}
@@ -157,7 +190,7 @@ export default function NewTicketModal({ onCreated, onClose }) {
             </select>
           </Field>
 
-          {/* Customer — always shown; filtered by dept when one is selected */}
+          {/* Customer */}
           <Field label="Customer">
             <select
               value={contactId}
@@ -171,7 +204,38 @@ export default function NewTicketModal({ onCreated, onClose }) {
             </select>
           </Field>
 
-          {/* Category (predefined tags) */}
+          {/* Email notification toggle */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <div
+                onClick={() => setSendEmail(v => !v)}
+                style={{
+                  width: 34, height: 18, borderRadius: 9, position: 'relative',
+                  background: sendEmail ? '#6366f1' : '#d1d5db', transition: 'background 0.2s', cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 2, left: sendEmail ? 18 : 2,
+                  width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </div>
+              <span style={{ fontSize: 13, color: T.navy, fontFamily: T.font }}>
+                Send email notification to customer
+              </span>
+            </label>
+            {sendEmail && (
+              <input
+                value={emailTo}
+                onChange={e => setEmailTo(e.target.value)}
+                placeholder="Customer email address"
+                type="email"
+                style={{ ...inp, marginTop: 8 }}
+              />
+            )}
+          </div>
+
+          {/* Category */}
           {predefinedCategories.length > 0 && (
             <Field label="Category">
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -242,11 +306,11 @@ export default function NewTicketModal({ onCreated, onClose }) {
             style={{
               padding: '8px 22px', borderRadius: 7, border: 'none', fontSize: 13,
               fontWeight: 600, fontFamily: T.font, cursor: canSubmit ? 'pointer' : 'default',
-              background: canSubmit ? '#6366f1' : '#e5e7eb',
+              background: canSubmit ? (sendEmail ? '#0ea5e9' : '#6366f1') : '#e5e7eb',
               color: canSubmit ? '#fff' : T.muted,
             }}
           >
-            {submitting ? 'Creating…' : 'Create Ticket'}
+            {submitting ? 'Creating…' : sendEmail ? 'Create & Send Email' : 'Create Ticket'}
           </button>
         </div>
       </div>

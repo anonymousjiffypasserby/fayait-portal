@@ -37,7 +37,7 @@ function readZammadUserIdFromJwt() {
 async function fetchAllTickets() {
   const [active, closed] = await Promise.all([
     zammadApi.searchTickets(
-      'state.name:new OR state.name:open OR state.name:"pending reminder"', 200
+      'state.name:new OR state.name:open OR state.name:"pending reminder" OR state.name:"pending close"', 200
     ).catch(() => []),
     zammadApi.searchTickets('state.name:closed', 100).catch(() => []),
   ])
@@ -95,6 +95,7 @@ export default function Tickets() {
   const [showNew,      setShowNew]      = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [newBanner,    setNewBanner]    = useState(0)
+  const [agents,       setAgents]       = useState([])
   // Live search is kept separate — not cached
   const [searchRows,   setSearchRows]   = useState([])
   const [searchLoading,setSearchLoading]= useState(false)
@@ -153,6 +154,11 @@ export default function Tickets() {
       await doRefresh()
     }
     init()
+
+    // Fetch agents once for board/bulk-assign
+    zammadApi.getUsers()
+      .then(u => setAgents(Array.isArray(u) ? u.filter(x => x.role_ids?.some(id => id === 1 || id === 2)) : []))
+      .catch(() => {})
 
     // Background poll
     const timer = setInterval(() => doRefresh({ detectNew: true }), POLL_INTERVAL)
@@ -289,6 +295,7 @@ export default function Tickets() {
               tickets={tickets}
               onSelect={t => setSelectedId(t.id)}
               onTicketUpdated={handleUpdated}
+              agents={agents}
             />
           ) : (
             <ListView
@@ -296,6 +303,8 @@ export default function Tickets() {
               loading={loading}
               onSelect={t => setSelectedId(t.id)}
               isAdmin={admin}
+              isAgent={agent}
+              agents={agents}
               newBanner={newBanner}
               onDismissBanner={() => setNewBanner(0)}
               onBulkUpdated={handleUpdated}

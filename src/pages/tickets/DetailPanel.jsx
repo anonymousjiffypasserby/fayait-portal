@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { T, zammadApi, stateColor, priorityColor, fmtDateTime, slaStatus, SLA_COLORS, isNewTicket } from './shared'
 import { useIsMobile } from '../../hooks/useIsMobile'
-import { getTicketSettings } from './ticketSettings'
+import { getTicketSettings, loadTicketSettings } from './ticketSettings'
 import ConversationTab   from './tabs/ConversationTab'
 import DetailsTab        from './tabs/DetailsTab'
 import KnowledgeBaseTab  from './tabs/KnowledgeBaseTab'
@@ -38,12 +38,23 @@ function defaultPendingTime() {
 
 const isZammadAgent = (u) => Array.isArray(u.role_ids) && u.role_ids.some(id => id === 1 || id === 2)
 
+function readZammadUserIdFromJwt() {
+  try {
+    const token = localStorage.getItem('faya_token')
+    if (!token) return null
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')))
+    return payload.zammad_user_id || null
+  } catch { return null }
+}
+
 export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpdated, isAdmin, isAgent }) {
   const isMobile = useIsMobile()
   const [ticket,      setTicket]      = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [tab,         setTab]         = useState('Conversation')
   const [agents,      setAgents]      = useState([])
+  const [groups,      setGroups]      = useState([])
   const [departments, setDepartments] = useState([])
   const [allUsers,    setAllUsers]    = useState([])
   const [tags,        setTags]        = useState([])
@@ -61,8 +72,28 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const [mergeWorking,  setMergeWorking]  = useState(false)
   const [mergeError,    setMergeError]    = useState(null)
   const [customerUser,  setCustomerUser]  = useState(null)
+  // Zammad customer search
+  const [custSearch,    setCustSearch]    = useState('')
+  const [custResults,   setCustResults]   = useState([])
+  const [custOpen,      setCustOpen]      = useState(false)
+  const custTimer = useRef(null)
+  // Links
+  const [links,         setLinks]         = useState([])
+  const [showAddLink,   setShowAddLink]   = useState(false)
+  const [linkType,      setLinkType]      = useState('normal')
+  const [linkQuery,     setLinkQuery]     = useState('')
+  const [linkResults,   setLinkResults]   = useState([])
+  const [linkWorking,   setLinkWorking]   = useState(false)
+  const linkTimer = useRef(null)
+  // Macros
+  const [macros,        setMacros]        = useState([])
+  const [showMacros,    setShowMacros]    = useState(false)
+  const [macroWorking,  setMacroWorking]  = useState(false)
 
-  const predefinedCategories = getTicketSettings().predefinedTags
+  const settings = getTicketSettings()
+  const predefinedCategories = settings.predefinedTags
+  const zammadMeId = readZammadUserIdFromJwt()
+  const watchTag   = zammadMeId ? `watching:${zammadMeId}` : null
 
   const load = () => {
     setLoading(true)
@@ -83,6 +114,13 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
             .then(u => setCustomerUser(u))
             .catch(() => {})
         }
+        // Fetch linked tickets (non-blocking)
+        zammadApi.getTicketLinks(ticketId)
+          .then(data => {
+            const list = data?.links || []
+            setLinks(list.filter(l => l.link_object === 'Ticket' || l.linked_object === 'Ticket'))
+          })
+          .catch(() => {})
       })
       .catch(() => setError('Failed to load ticket'))
       .finally(() => setLoading(false))
@@ -93,8 +131,12 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
     zammadApi.getUsers()
       .then(users => setAgents(Array.isArray(users) ? users.filter(isZammadAgent) : []))
       .catch(() => {})
+    zammadApi.getGroups()
+      .then(g => setGroups(Array.isArray(g) ? g : []))
+      .catch(() => {})
     apiGet('/api/departments').then(d => setDepartments(Array.isArray(d) ? d : []))
     apiGet('/api/users').then(u => setAllUsers(Array.isArray(u) ? u : []))
+    loadTicketSettings().then(s => setMacros(s.macros || []))
   }, [ticketId])
 
   // Derive dept/contact/category from tags
@@ -174,6 +216,124 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
   const saveTitle = () => {
     setEditTitle(false)
     if (titleVal.trim() && titleVal.trim() !== ticket.title) patch({ title: titleVal.trim() })
+  }
+
+  const handleCustInput = (q) => {
+    setCustSearch(q)
+    clearTimeout(custTimer.current)
+    if (!q.trim()) { setCustResults([]); return }
+    custTimer.current = setTimeout(async () => {
+      try {
+        const res = await zammadApi.searchUsers(q.trim())
+        setCustResults(Array.isArray(res) ? res : (res?.assets ? Object.values(res.assets?.User || {}) : []))
+      } catch { setCustResults([]) }
+    }, 300)
+  }
+
+  const handleCustSelect = async (user) => {
+    setCustOpen(false)
+    setCustSearch('')
+    setCustResults([])
+    await patch({ customer_id: user.id })
+    setCustomerUser(user)
+  }
+
+  // ── Watch / Subscribe (tag-based) ─────────────────────────────────────────
+  const isWatching = watchTag ? tags.includes(watchTag) : false
+
+  const toggleWatch = async () => {
+    if (!watchTag) return
+    if (isWatching) {
+      await zammadApi.removeTicketTag(ticketId, watchTag).catch(() => {})
+      const newTags = tags.filter(t => t !== watchTag)
+      setTags(newTags)
+    } else {
+      await zammadApi.addTicketTag(ticketId, watchTag).catch(() => {})
+      const newTags = [...tags, watchTag]
+      setTags(newTags)
+    }
+  }
+
+  // ── Links ─────────────────────────────────────────────────────────────────
+  const handleLinkSearch = (q) => {
+    setLinkQuery(q)
+    clearTimeout(linkTimer.current)
+    if (!q.trim()) { setLinkResults([]); return }
+    linkTimer.current = setTimeout(async () => {
+      try {
+        const r = await zammadApi.searchTickets(q.trim(), 10)
+        setLinkResults(Array.isArray(r) ? r.filter(t => t.id !== ticketId) : [])
+      } catch { setLinkResults([]) }
+    }, 300)
+  }
+
+  const addLink = async (targetId) => {
+    setLinkWorking(true)
+    try {
+      await zammadApi.createTicketLink({
+        link_type: linkType,
+        link_object_1: 'Ticket', link_object_1_id: ticketId,
+        link_object_2: 'Ticket', link_object_2_id: targetId,
+      })
+      const data = await zammadApi.getTicketLinks(ticketId)
+      setLinks(data?.links?.filter(l => l.link_object === 'Ticket' || l.linked_object === 'Ticket') || [])
+      setShowAddLink(false)
+      setLinkQuery('')
+      setLinkResults([])
+    } catch {}
+    setLinkWorking(false)
+  }
+
+  const removeLink = async (link) => {
+    try {
+      await zammadApi.deleteTicketLink({
+        link_type: link.link_type,
+        link_object_1: 'Ticket', link_object_1_id: ticketId,
+        link_object_2: link.link_object, link_object_2_id: link.link_object_id,
+      })
+      setLinks(prev => prev.filter(l => l !== link))
+    } catch {}
+  }
+
+  // ── Macros ────────────────────────────────────────────────────────────────
+  const runMacro = async (macro) => {
+    setShowMacros(false)
+    setMacroWorking(true)
+    setSaving(true)
+    setError(null)
+    try {
+      const ticketUpdates = {}
+      const notes = []
+      const newTags = []
+      for (const action of macro.actions) {
+        if (action.type === 'state')    ticketUpdates.state = action.value
+        if (action.type === 'priority') ticketUpdates.priority_id = Number(action.value)
+        if (action.type === 'owner')    ticketUpdates.owner_id = Number(action.value)
+        if (action.type === 'note')     notes.push(action.value)
+        if (action.type === 'tag')      newTags.push(action.value)
+      }
+      if (Object.keys(ticketUpdates).length > 0) {
+        const updated = await zammadApi.updateTicket(ticketId, ticketUpdates)
+        setTicket(updated)
+        setTitleVal(updated.title || '')
+        onTicketUpdated?.({ ...updated, tags })
+      }
+      for (const body of notes) {
+        await zammadApi.createArticle({ ticket_id: ticketId, body, type: 'note', internal: true, sender: 'Agent' })
+      }
+      for (const tag of newTags) {
+        await zammadApi.addTicketTag(ticketId, tag).catch(() => {})
+      }
+      if (newTags.length > 0) {
+        setTags(prev => [...prev, ...newTags.filter(t => !prev.includes(t))])
+      }
+      if (notes.length > 0) load()  // refresh conversation thread
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+      setMacroWorking(false)
+    }
   }
 
   // GDPR: processing restriction toggle (tag-based)
@@ -351,8 +511,40 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
             }}>NEW</span>
           )}
           <div style={{ flex: 1 }} />
-          {saving && <span style={{ fontSize: 11, color: T.muted }}>Saving…</span>}
+          {(saving || macroWorking) && <span style={{ fontSize: 11, color: T.muted }}>Saving…</span>}
           {error && <span style={{ fontSize: 11, color: T.red, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{error}</span>}
+          {watchTag && (
+            <button onClick={toggleWatch} style={actionBtn(isWatching ? '#6366f1' : T.muted, isWatching ? '#eef2ff' : '#fafafa')} title={isWatching ? 'Stop watching this ticket' : 'Watch this ticket for updates'}>
+              {isWatching ? '👁 Watching' : '👁 Watch'}
+            </button>
+          )}
+          {isAgent && macros.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setShowMacros(v => !v)} style={actionBtn('#8b5cf6', '#f5f3ff')}>
+                ⚡ Macro
+              </button>
+              {showMacros && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, zIndex: 50, marginTop: 4,
+                  background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8,
+                  boxShadow: '0 4px 18px rgba(0,0,0,0.12)', minWidth: 180, overflow: 'hidden',
+                }}>
+                  {macros.map(m => (
+                    <div
+                      key={m.id}
+                      onClick={() => runMacro(m)}
+                      style={{ padding: '9px 14px', fontSize: 13, color: T.navy, cursor: 'pointer', borderBottom: `1px solid ${T.border}`, fontFamily: T.font }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>{m.name}</div>
+                      <div style={{ fontSize: 10, color: T.muted }}>{m.actions.length} action{m.actions.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {ticketState !== 'closed' ? (
             <button onClick={() => patch({ state: 'closed' })} style={actionBtn('#1D9E75', '#f0fdf4')}>
               Close Ticket
@@ -460,7 +652,81 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           </div>
         )}
 
-        {/* Department + Customer — both always visible */}
+        {/* Group */}
+        {isAgent && groups.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Group</span>
+            <select
+              value={ticket.group_id || ''}
+              onChange={e => patch({ group_id: Number(e.target.value) || undefined })}
+              style={{ ...dropdownStyle, flex: 1 }}
+            >
+              <option value="">— None —</option>
+              {groups.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Zammad customer — inline search to change */}
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span style={{ fontSize: 11, color: T.muted, minWidth: 60, paddingTop: 5 }}>Customer</span>
+          <div style={{ flex: 1, position: 'relative' }}>
+            {custOpen ? (
+              <input
+                autoFocus
+                value={custSearch}
+                onChange={e => handleCustInput(e.target.value)}
+                onBlur={() => setTimeout(() => { setCustOpen(false); setCustSearch(''); setCustResults([]) }, 180)}
+                placeholder="Search Zammad users…"
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '4px 8px',
+                  borderRadius: 6, border: `1px solid #6366f1`, fontSize: 12,
+                  fontFamily: T.font, color: T.navy, outline: 'none',
+                }}
+              />
+            ) : (
+              <div
+                onClick={() => setCustOpen(true)}
+                style={{
+                  padding: '4px 8px', borderRadius: 6, fontSize: 12, color: T.navy,
+                  border: `1px solid ${T.border}`, cursor: 'pointer', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}
+                title="Click to change customer"
+              >
+                <span>{ticket.customer || '—'}</span>
+                <span style={{ fontSize: 10, color: T.muted }}>✎</span>
+              </div>
+            )}
+            {custResults.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                background: '#fff', border: `1px solid ${T.border}`, borderRadius: 7,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.12)', marginTop: 2, maxHeight: 180, overflowY: 'auto',
+              }}>
+                {custResults.map(u => (
+                  <div
+                    key={u.id}
+                    onMouseDown={() => handleCustSelect(u)}
+                    style={{
+                      padding: '7px 10px', fontSize: 12, color: T.navy, cursor: 'pointer',
+                      borderBottom: `1px solid ${T.border}`,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = ''}
+                  >
+                    {u.firstname} {u.lastname}
+                    {u.email && <span style={{ color: T.muted, marginLeft: 6 }}>{u.email}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Department + portal contact */}
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: T.muted, minWidth: 60 }}>Dept</span>
           <select
@@ -473,7 +739,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
               <option key={d.id} value={String(d.id)}>{d.name}</option>
             ))}
           </select>
-          <span style={{ fontSize: 11, color: T.muted }}>Customer</span>
+          <span style={{ fontSize: 11, color: T.muted }}>Contact</span>
           <select
             value={currentContactId}
             onChange={e => handleContactChange(e.target.value)}
@@ -543,6 +809,63 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
             >
               {anonymizing ? 'Anonymizing…' : '🗑 Anonymize (GDPR Art. 17)'}
             </button>
+          )}
+        </div>
+
+        {/* Linked tickets */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: T.muted }}>Links</span>
+            {links.map((link, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '2px 8px', borderRadius: 5, fontSize: 11,
+                background: '#f1f5f9', border: `1px solid ${T.border}`, color: T.navy,
+              }}>
+                <span style={{ color: T.muted, fontSize: 10 }}>{link.link_type}</span>
+                #{link.link_object_id}
+                <button onClick={() => removeLink(link)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1, marginLeft: 2 }}>✕</button>
+              </span>
+            ))}
+            {isAgent && !showAddLink && (
+              <button onClick={() => setShowAddLink(true)} style={{ padding: '2px 8px', borderRadius: 5, fontSize: 11, background: 'none', border: `1px dashed ${T.border}`, color: T.muted, cursor: 'pointer', fontFamily: T.font }}>+ Link</button>
+            )}
+          </div>
+          {showAddLink && (
+            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#f8fafc', borderRadius: 7, padding: '10px 12px', border: `1px solid ${T.border}` }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select value={linkType} onChange={e => setLinkType(e.target.value)} style={{ ...dropdownStyle, fontSize: 11 }}>
+                  <option value="normal">Related</option>
+                  <option value="parent">Parent</option>
+                  <option value="child">Child</option>
+                </select>
+                <input
+                  autoFocus
+                  value={linkQuery}
+                  onChange={e => handleLinkSearch(e.target.value)}
+                  placeholder="Search ticket #number or title…"
+                  style={{ flex: 1, padding: '5px 9px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.font, color: T.navy, outline: 'none' }}
+                />
+                <button onClick={() => { setShowAddLink(false); setLinkQuery(''); setLinkResults([]) }} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 14 }}>✕</button>
+              </div>
+              {linkResults.length > 0 && (
+                <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden', maxHeight: 140, overflowY: 'auto' }}>
+                  {linkResults.map(t => (
+                    <div
+                      key={t.id}
+                      onClick={() => !linkWorking && addLink(t.id)}
+                      style={{ padding: '7px 10px', fontSize: 12, color: T.navy, cursor: 'pointer', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 8, alignItems: 'center' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}
+                    >
+                      <span style={{ color: T.muted, fontSize: 10, flexShrink: 0 }}>#{t.number || t.id}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                      <span style={{ fontSize: 10, color: T.muted, flexShrink: 0 }}>{t.state}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

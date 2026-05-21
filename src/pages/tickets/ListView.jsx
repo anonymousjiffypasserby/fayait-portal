@@ -140,7 +140,7 @@ ${ticketBlocks || '<p style="color:#aaa">No tickets found for this customer.</p>
 </body></html>`
 }
 
-export default function ListView({ tickets, loading, onSelect, isAdmin, newBanner, onDismissBanner, onBulkUpdated }) {
+export default function ListView({ tickets, loading, onSelect, isAdmin, isAgent, agents = [], newBanner, onDismissBanner, onBulkUpdated }) {
   const isMobile = useIsMobile()
   const [search,      setSearch]      = useState('')
   const [filters,     setFilters]     = useState(EMPTY_FILTERS)
@@ -152,6 +152,7 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
   const [sarError,    setSarError]    = useState(null)
   const [selected,    setSelected]    = useState(new Set())
   const [bulkWorking, setBulkWorking] = useState(false)
+  const [bulkAssign,  setBulkAssign]  = useState('')
 
   const activeFilterCount = [
     (filters.status || []).length,
@@ -401,6 +402,28 @@ export default function ListView({ tickets, loading, onSelect, isAdmin, newBanne
               disabled={bulkWorking}
               style={bulkBtn('#e74c3c')}
             >Delete</button>
+          )}
+          {(isAgent || isAdmin) && agents.length > 0 && (
+            <select
+              value={bulkAssign}
+              onChange={e => {
+                const val = e.target.value
+                setBulkAssign('')
+                if (!val) return
+                bulkUpdate(id => zammadApi.updateTicket(id, { owner_id: Number(val) }))
+              }}
+              disabled={bulkWorking}
+              style={{
+                padding: '4px 8px', borderRadius: 5, fontSize: 11, fontFamily: T.font,
+                border: '1px solid #4b5563', background: '#374151', color: '#fff',
+                cursor: 'pointer', outline: 'none',
+              }}
+            >
+              <option value="">Assign to…</option>
+              {agents.map(a => (
+                <option key={a.id} value={a.id}>{a.firstname} {a.lastname}</option>
+              ))}
+            </select>
           )}
           {bulkWorking && <span style={{ fontSize: 11, color: '#9ca3af' }}>Working…</span>}
           <button

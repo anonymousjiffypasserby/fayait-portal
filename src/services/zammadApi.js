@@ -77,6 +77,23 @@ const zammadApi = {
   getUser: (id) =>
     fetch(`${BASE}/api/proxy/zammad/users/${id}`, { headers: headers() }).then(handle),
 
+  searchUsers: (query) =>
+    fetch(`${BASE}/api/proxy/zammad/users/search${qs({ query, limit: 10 })}`, { headers: headers() }).then(handle),
+
+  // ── Ticket links ───────────────────────────────────────────────────────────
+  getTicketLinks: (ticketId) =>
+    fetch(`${BASE}/api/proxy/zammad/links${qs({ link_object: 'Ticket', link_object_id: ticketId })}`, { headers: headers() }).then(handle),
+
+  createTicketLink: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/links`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  deleteTicketLink: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/links`, {
+      method: 'DELETE', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
   // ── States / Priorities / Groups ──────────────────────────────────────────
   getTicketStates: () =>
     fetch(`${BASE}/api/proxy/zammad/ticket_states`, { headers: headers() }).then(handle),

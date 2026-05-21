@@ -32,6 +32,7 @@ function ArticleBubble({ article }) {
   const isEmail    = article.type === 'email'
   const channel    = CHANNEL_ICONS[article.type] || '📝'
   const attachments = (article.attachments || []).filter(a => !a.preferences?.['Content-Disposition']?.includes('inline'))
+  const timeSpent = article.time_unit ? Number(article.time_unit) : 0
 
   return (
     <div style={{
@@ -61,6 +62,9 @@ function ArticleBubble({ article }) {
           <strong style={{ color: T.navy }}>{article.from || 'Unknown'}</strong>
           <span>·</span>
           <span>{fmtDateTime(article.created_at)}</span>
+          {timeSpent > 0 && (
+            <span style={{ color: T.muted }}>· ⏱ {timeSpent}m</span>
+          )}
           {isInternal && (
             <span style={{
               background: '#fef9c3', color: '#854d0e',
@@ -84,7 +88,7 @@ function ArticleBubble({ article }) {
           color: isAgent ? '#fff' : T.navy,
           borderRadius: isAgent ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
           padding: '10px 14px', fontSize: 13, lineHeight: 1.6,
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          wordBreak: 'break-word',
         }}
           dangerouslySetInnerHTML={{ __html: article.body || '' }}
         />
@@ -120,10 +124,43 @@ const REPLY_TYPES = [
   { key: 'internal', label: 'Internal Note',  active: '#f59e0b', activeText: '#fff' },
 ]
 
+// Minimal WYSIWYG toolbar button
+function FmtBtn({ title, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      title={title}
+      style={{
+        background: 'none', border: `1px solid ${T.border}`, borderRadius: 4,
+        padding: '2px 7px', fontSize: 13, cursor: 'pointer', color: T.navy,
+        fontFamily: 'inherit', lineHeight: 1.4,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Toolbar({ onLink }) {
+  const fmt = (cmd, val) => document.execCommand(cmd, false, val)
+  return (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+      <FmtBtn title="Bold (Ctrl+B)"     onClick={() => fmt('bold')}><strong>B</strong></FmtBtn>
+      <FmtBtn title="Italic (Ctrl+I)"   onClick={() => fmt('italic')}><em>I</em></FmtBtn>
+      <FmtBtn title="Underline (Ctrl+U)"onClick={() => fmt('underline')}><u>U</u></FmtBtn>
+      <FmtBtn title="Bullet list"       onClick={() => fmt('insertUnorderedList')}>• List</FmtBtn>
+      <FmtBtn title="Numbered list"     onClick={() => fmt('insertOrderedList')}>1. List</FmtBtn>
+      <FmtBtn title="Insert link"       onClick={onLink}>🔗 Link</FmtBtn>
+      <FmtBtn title="Clear formatting"  onClick={() => fmt('removeFormat')}>✕ Clear</FmtBtn>
+    </div>
+  )
+}
+
 export default function ConversationTab({ ticketId, ticket, customerUser, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
   const [articles,    setArticles]    = useState([])
   const [loading,     setLoading]     = useState(true)
-  const [reply,       setReply]       = useState('')
+  const [isEmpty,     setIsEmpty]     = useState(true)
   const [replyType,   setReplyType]   = useState('public')
   const [emailTo,     setEmailTo]     = useState('')
   const [emailCc,     setEmailCc]     = useState('')
@@ -131,15 +168,16 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
   const [sending,     setSending]     = useState(false)
   const [error,       setError]       = useState(null)
   const [file,        setFile]        = useState(null)
+  const [timeSpent,   setTimeSpent]   = useState('')
   const bottomRef       = useRef(null)
   const fileRef         = useRef(null)
-  const autoDetectedRef = useRef(false)  // only auto-detect channel once per ticket
+  const editorRef       = useRef(null)
+  const autoDetectedRef = useRef(false)
 
   const isEmail    = replyType === 'email'
   const isInternal = replyType === 'internal'
 
-  // Auto-detect reply channel from the first external article.
-  // If the ticket came in via email, default compose to email mode.
+  // Auto-detect reply channel from the first external article
   useEffect(() => {
     if (autoDetectedRef.current || articles.length === 0) return
     autoDetectedRef.current = true
@@ -147,13 +185,17 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
     if (firstExternal?.type === 'email') setReplyType('email')
   }, [articles])
 
-  // When email mode is active, pre-fill To / Subject if not already set.
-  // To comes from customerUser.email (real address), not ticket.customer (display name).
+  // Pre-fill To / Subject in email mode
   useEffect(() => {
     if (replyType !== 'email') return
     if (!emailTo && customerUser?.email) setEmailTo(customerUser.email)
     if (!emailSubject && ticket?.title)  setEmailSubject(`Re: ${ticket.title}`)
   }, [replyType, customerUser])
+
+  const clearEditor = () => {
+    if (editorRef.current) editorRef.current.innerHTML = ''
+    setIsEmpty(true)
+  }
 
   const load = () => {
     setLoading(true)
@@ -164,9 +206,11 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
   }
 
   useEffect(() => {
-    autoDetectedRef.current = false  // reset so new ticket re-runs channel detection
+    autoDetectedRef.current = false
     setReplyType('public')
     setEmailTo(''); setEmailCc(''); setEmailSubject('')
+    setTimeSpent('')
+    clearEditor()
     load()
   }, [ticketId])
 
@@ -178,21 +222,41 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
     if (isActive) requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }))
   }, [isActive])
 
+  // Insert KB text into editor
   useEffect(() => {
     if (!insertText) return
-    setReply(prev => prev ? prev + '\n\n' + insertText : insertText)
+    const el = editorRef.current
+    if (el) {
+      const current = el.innerHTML
+      el.innerHTML = current && current !== '' ? current + '<br><br>' + insertText : insertText
+      setIsEmpty(false)
+    }
     setReplyType('public')
     onInsertConsumed?.()
   }, [insertText])
 
+  const handleLink = () => {
+    const url = window.prompt('Enter URL:')
+    if (url) document.execCommand('createLink', false, url)
+  }
+
+  const getEditorBody = () => {
+    const el = editorRef.current
+    if (!el) return ''
+    const html = el.innerHTML.trim()
+    if (html === '' || html === '<br>') return ''
+    return html
+  }
+
   const sendReply = async () => {
-    if (!reply.trim() || sending) return
+    const body = getEditorBody()
+    if (!body || sending) return
     setSending(true)
     setError(null)
     try {
       const payload = {
         ticket_id: ticketId,
-        body: reply.trim(),
+        body,
         internal: isInternal,
         sender: isAgent ? 'Agent' : 'Customer',
       }
@@ -208,13 +272,17 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
         payload.type = 'web'
       }
 
+      const mins = parseInt(timeSpent, 10)
+      if (mins > 0) payload.time_unit = mins
+
       if (file) {
         const data = await readFileAsBase64(file)
         payload.attachments = [{ filename: file.name, data, 'mime-type': file.type || 'application/octet-stream' }]
       }
       await zammadApi.createArticle(payload)
-      setReply('')
+      clearEditor()
       setFile(null)
+      setTimeSpent('')
       if (isEmail) { setEmailCc(''); setEmailSubject(''); setEmailTo('') }
       load()
       onReplySent?.()
@@ -225,12 +293,25 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
     }
   }
 
+  const editorBg = isInternal ? '#fffef7' : isEmail ? '#f0f9ff' : '#fafafa'
+  const editorBorder = isInternal ? '#fef08a' : isEmail ? '#bae6fd' : T.border
+
   if (loading) {
     return <div style={{ padding: 32, textAlign: 'center', color: T.muted, fontSize: 13 }}>Loading…</div>
   }
 
+  // Total time on ticket
+  const totalTime = articles.reduce((sum, a) => sum + (Number(a.time_unit) || 0), 0)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Thread header with total time */}
+      {totalTime > 0 && (
+        <div style={{ padding: '4px 20px', background: '#f8f9fb', borderBottom: `1px solid ${T.border}`, fontSize: 11, color: T.muted }}>
+          ⏱ Total time logged: {totalTime}m
+        </div>
+      )}
+
       {/* Thread */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {articles.map(a => <ArticleBubble key={a.id} article={a} />)}
@@ -300,21 +381,45 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
           </div>
         )}
 
-        <textarea
-          value={reply}
-          onChange={e => setReply(e.target.value)}
-          placeholder={isInternal ? 'Write an internal note…' : isEmail ? 'Compose email…' : 'Write a reply…'}
-          rows={3}
-          style={{
-            width: '100%', boxSizing: 'border-box', padding: '9px 12px',
-            borderRadius: 7,
-            border: `1px solid ${isInternal ? '#fef08a' : isEmail ? '#bae6fd' : T.border}`,
-            fontSize: 13, fontFamily: T.font, color: T.navy,
-            background: isInternal ? '#fffef7' : isEmail ? '#f0f9ff' : '#fafafa',
-            resize: 'vertical', outline: 'none',
-          }}
-          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply() }}
-        />
+        {/* WYSIWYG toolbar */}
+        <Toolbar onLink={handleLink} />
+
+        {/* Contenteditable editor */}
+        <div style={{ position: 'relative' }}>
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={() => {
+              const el = editorRef.current
+              if (!el) return
+              const html = el.innerHTML
+              setIsEmpty(html === '' || html === '<br>')
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                sendReply()
+              }
+            }}
+            style={{
+              minHeight: 72, maxHeight: 200, overflowY: 'auto',
+              padding: '9px 12px', borderRadius: 7,
+              border: `1px solid ${editorBorder}`,
+              fontSize: 13, fontFamily: T.font, color: T.navy,
+              background: editorBg, outline: 'none',
+              lineHeight: 1.6,
+            }}
+          />
+          {isEmpty && (
+            <div style={{
+              position: 'absolute', top: '9px', left: '13px',
+              fontSize: 13, color: '#bbb', pointerEvents: 'none', fontFamily: T.font,
+            }}>
+              {isInternal ? 'Write an internal note…' : isEmail ? 'Compose email…' : 'Write a reply…'}
+            </div>
+          )}
+        </div>
 
         {/* File preview */}
         {file && (
@@ -327,25 +432,46 @@ export default function ConversationTab({ ticketId, ticket, customerUser, onRepl
         {error && <div style={{ fontSize: 11, color: T.red, marginTop: 6 }}>{error}</div>}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, justifyContent: 'space-between' }}>
-          <button
-            onClick={() => fileRef.current?.click()}
-            style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 13, padding: '4px 8px' }}
-            title="Attach file"
-          >
-            📎
-          </button>
-          <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0] || null)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => fileRef.current?.click()}
+              style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 13, padding: '4px 8px' }}
+              title="Attach file"
+            >
+              📎
+            </button>
+            <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0] || null)} />
+
+            {/* Time tracking */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: T.muted }}>⏱</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={timeSpent}
+                onChange={e => setTimeSpent(e.target.value)}
+                placeholder="min"
+                style={{
+                  width: 54, padding: '4px 6px', borderRadius: 5,
+                  border: `1px solid ${T.border}`, fontSize: 12,
+                  fontFamily: T.font, color: T.navy, outline: 'none',
+                  background: '#fafafa',
+                }}
+              />
+            </div>
+          </div>
 
           <button
             onClick={sendReply}
-            disabled={!reply.trim() || sending}
+            disabled={isEmpty || sending}
             style={{
               padding: '7px 20px', borderRadius: 7, border: 'none',
               fontSize: 13, fontWeight: 600, fontFamily: T.font, cursor: 'pointer',
-              background: !reply.trim() || sending
+              background: isEmpty || sending
                 ? '#e5e7eb'
                 : isInternal ? '#f59e0b' : isEmail ? '#0ea5e9' : '#6366f1',
-              color: !reply.trim() || sending ? T.muted : '#fff',
+              color: isEmpty || sending ? T.muted : '#fff',
             }}
           >
             {sending ? 'Sending…' : isInternal ? 'Add Note' : isEmail ? 'Send Email' : 'Send Reply'}
