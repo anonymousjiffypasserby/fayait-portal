@@ -17,6 +17,17 @@ const hr = async (method, path, body) => {
   return data
 }
 
+const api = async (method, path, body) => {
+  const res = await fetch(`${BASE}/api${path}`, {
+    method,
+    headers: hdrs(true),
+    body: body != null ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Request failed')
+  return data
+}
+
 export const hrApi = {
   // Dashboard
   getDashboard: () => hr('GET', '/dashboard'),
@@ -24,6 +35,7 @@ export const hrApi = {
   // Employees
   getMe:           ()        => hr('GET',    '/employees/me'),
   getEmployees:    (q = '')  => hr('GET',    `/employees${q}`),
+  getDepartments:  ()        => api('GET',   '/departments'),
   getEmployee:     (id)      => hr('GET',    `/employees/${id}`),
   updateEmployee:  (id, b)   => hr('PUT',    `/employees/${id}`, b),
   getDocs:         (id)      => hr('GET',    `/employees/${id}/documents`),
@@ -64,6 +76,7 @@ export const hrApi = {
   // Leave
   getLeaveTypes:        ()           => hr('GET',  '/leave-types'),
   getLeaveBalances:     (q = '')     => hr('GET',  `/leave-balances${q}`),
+  updateLeaveBalance:   (id, b)      => hr('PUT',  `/leave-balances/${id}`, b),
   getLeaveRequests:     (q = '')     => hr('GET',  `/leave-requests${q}`),
   createLeaveRequest:   (b)          => hr('POST', '/leave-requests', b),
   updateLeaveRequest:   (id, b)      => hr('PUT',  `/leave-requests/${id}`, b),
@@ -144,7 +157,8 @@ export const fmtTime = (t) => {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
 }
 export const fmtHours = (h) => (h == null ? '—' : `${parseFloat(h).toFixed(1)}h`)
-export const fmtMoney = (n) => (n == null ? '—' : `€${parseFloat(n).toFixed(2)}`)
+const CURRENCY = import.meta.env.VITE_CURRENCY_SYMBOL ?? 'SRD'
+export const fmtMoney = (n) => (n == null ? '—' : `${CURRENCY} ${parseFloat(n).toFixed(2)}`)
 
 export const isoMonday = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00Z')

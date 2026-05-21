@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { T, hrApi, fmtDate, Avatar, Spinner, EmptyState, EmpStatusBadge, ContractBadge, GoalStatusBadge, Btn } from './shared'
+import { T, hrApi, fmtDate, fmtMoney, Avatar, Spinner, EmptyState, EmpStatusBadge, ContractBadge, GoalStatusBadge, Btn } from './shared'
 
 const TABS = ['Profile', 'Documents', 'Goals', 'Reviews']
 
@@ -117,9 +117,7 @@ export default function MyProfile({ user }) {
             <InfoRow label="Contract Type" value={(profile.contract_type || '').replace('_', ' ')} />
             {profile.rate_type && (
               <InfoRow label="Rate" value={
-                profile.rate_type === 'salary'
-                  ? `$${parseFloat(profile.rate_amount || 0).toFixed(2)} / year`
-                  : `$${parseFloat(profile.rate_amount || 0).toFixed(2)} / hour`
+                `${fmtMoney(profile.rate_amount)} / ${profile.rate_type === 'salary' ? 'year' : 'hour'}`
               } />
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { T, hrApi, fmtDate, fmtTime, fmtHours, Avatar, Spinner, EmptyState,
+import { T, hrApi, fmtDate, fmtTime, fmtHours, fmtMoney, Avatar, Spinner, EmptyState,
          EmpStatusBadge, ContractBadge, LeaveStatusBadge, TsBadge, GoalStatusBadge,
          Modal, Field, Input, Select, Textarea, Btn, ErrMsg, isAdmin } from './shared'
 
@@ -152,13 +152,18 @@ function StartReviewModal({ employeeId, onClose, onSaved }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+const DOC_TYPES = ['Contract', 'ID Document', 'Certificate', 'Payslip', 'Warning', 'Other']
+
 export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
   const [tab, setTab]     = useState('Profile')
   const [data, setData]   = useState(null)
   const [docs, setDocs]   = useState([])
   const [leave, setLeave] = useState([])
+  const [balances, setBalances] = useState([])
   const [ts, setTs]       = useState([])
   const [jfs, setJfs]     = useState([])
+  const [allEmployees, setAllEmployees] = useState([])
+  const [departments, setDepartments] = useState([])
   const [goals, setGoals] = useState([])
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -166,7 +171,12 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
   const [form, setForm]   = useState({})
   const [saving, setSaving] = useState(false)
   const [formErr, setFormErr] = useState(null)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadType, setUploadType] = useState('Contract')
   const [uploading, setUploading] = useState(false)
+  const [editingBalance, setEditingBalance] = useState(null) // { id, allocated }
+  const [balanceSaving, setBalanceSaving] = useState(false)
   const [expandedGoal, setExpandedGoal] = useState(null)
   const [showAddGoal, setShowAddGoal] = useState(false)
   const [showStartReview, setShowStartReview] = useState(false)
@@ -184,7 +194,10 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
 
   useEffect(() => {
     if (tab === 'Documents')  hrApi.getDocs(employee.id).then(setDocs).catch(() => {})
-    if (tab === 'Leave')      hrApi.getLeaveRequests(`?employee_id=${employee.id}`).then(d => setLeave(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
+    if (tab === 'Leave') {
+      hrApi.getLeaveRequests(`?employee_id=${employee.id}`).then(d => setLeave(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
+      hrApi.getLeaveBalances(`?employee_id=${employee.id}`).then(d => setBalances(Array.isArray(d) ? d : [])).catch(() => {})
+    }
     if (tab === 'Timesheets') hrApi.getTimesheets(`?employee_id=${employee.id}&limit=10`).then(d => setTs(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
     if (tab === 'Goals')      hrApi.getGoals(`?employee_id=${employee.id}`).then(d => setGoals(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
     if (tab === 'Reviews')    hrApi.getReviews(`?employee_id=${employee.id}`).then(d => setReviews(Array.isArray(d) ? d : (d?.rows || []))).catch(() => {})
@@ -192,17 +205,23 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
 
   useEffect(() => {
     hrApi.getJobFunctions().then(d => setJfs(Array.isArray(d) ? d : [])).catch(() => {})
+    hrApi.getEmployees('').then(d => setAllEmployees(Array.isArray(d) ? d : [])).catch(() => {})
+    hrApi.getDepartments?.().then(d => setDepartments(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
   const profileFields = (e) => ({
     job_title: e.job_title || '',
     job_function_id: e.job_function_id || '',
+    manager_id: e.manager_id || '',
+    department: e.department || '',
     phone: e.phone || '',
     employee_number: e.employee_number || '',
     contract_type: e.contract_type || '',
     employment_status: e.employment_status || 'active',
     start_date: e.start_date?.slice(0, 10) || '',
     end_date: e.end_date?.slice(0, 10) || '',
+    rate_type: e.rate_type || '',
+    rate_amount: e.rate_amount != null ? String(e.rate_amount) : '',
   })
 
   const saveProfile = async () => {
@@ -215,17 +234,29 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
     finally { setSaving(false) }
   }
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0]; if (!file) return
-    const type = window.prompt('Document type:', 'General')
-    if (type === null) { fileRef.current.value = ''; return }
+  const handleUpload = async () => {
+    if (!uploadFile) return
     setUploading(true)
     const fd = new FormData()
-    fd.append('file', file)
-    fd.append('document_type', type.trim() || 'General')
-    try { await hrApi.uploadDoc(employee.id, fd); hrApi.getDocs(employee.id).then(setDocs) }
-    catch {}
-    finally { setUploading(false); fileRef.current.value = '' }
+    fd.append('file', uploadFile)
+    fd.append('document_type', uploadType)
+    try {
+      await hrApi.uploadDoc(employee.id, fd)
+      hrApi.getDocs(employee.id).then(setDocs)
+      setShowUploadModal(false); setUploadFile(null); setUploadType('Contract')
+    } catch {}
+    finally { setUploading(false) }
+  }
+
+  const saveBalance = async () => {
+    if (!editingBalance) return
+    setBalanceSaving(true)
+    try {
+      await hrApi.updateLeaveBalance(editingBalance.id, { allocated: parseFloat(editingBalance.allocated) })
+      hrApi.getLeaveBalances(`?employee_id=${employee.id}`).then(d => setBalances(Array.isArray(d) ? d : []))
+      setEditingBalance(null)
+    } catch {}
+    finally { setBalanceSaving(false) }
   }
 
   const handleDocDownload = async (doc) => {
@@ -314,7 +345,26 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
                 <Field label="Job Function">
                   <Select value={form.job_function_id} onChange={e => setForm(f => ({ ...f, job_function_id: e.target.value }))}>
                     <option value="">None</option>
-                    {jfs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                    {jfs.map(j => <option key={j.id} value={j.id}>{j.name || j.title}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Department">
+                  {departments.length > 0
+                    ? (
+                      <Select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
+                        <option value="">None</option>
+                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      </Select>
+                    )
+                    : <Input value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} placeholder="Department name" />
+                  }
+                </Field>
+                <Field label="Manager">
+                  <Select value={form.manager_id} onChange={e => setForm(f => ({ ...f, manager_id: e.target.value }))}>
+                    <option value="">No manager</option>
+                    {allEmployees.filter(e => e.id !== employee.id).map(e => (
+                      <option key={e.id} value={e.id}>{e.name}</option>
+                    ))}
                   </Select>
                 </Field>
                 <Field label="Phone">
@@ -346,6 +396,21 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
                     <Input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                   </Field>
                 </div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: T.muted, margin: '14px 0 6px' }}>Compensation</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="Rate Type">
+                    <Select value={form.rate_type} onChange={e => setForm(f => ({ ...f, rate_type: e.target.value }))}>
+                      <option value="">Inherited from job function</option>
+                      <option value="hourly">Hourly</option>
+                      <option value="salary">Annual salary</option>
+                    </Select>
+                  </Field>
+                  <Field label="Rate Amount">
+                    <Input type="number" min={0} step={0.01} value={form.rate_amount}
+                      onChange={e => setForm(f => ({ ...f, rate_amount: e.target.value }))}
+                      placeholder="Leave blank to inherit" />
+                  </Field>
+                </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                   <Btn variant="ghost" onClick={() => { setEditing(false); setFormErr(null) }}>Cancel</Btn>
                   <Btn variant="primary" loading={saving} onClick={saveProfile}>Save</Btn>
@@ -363,10 +428,11 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
                   ['Manager', data.manager_name],
                   ['Start Date', fmtDate(data.start_date)],
                   ['End Date', fmtDate(data.end_date)],
-                ].map(([label, val]) => (
+                  ['Rate', data.rate_type ? `${fmtMoney(data.rate_amount)} / ${data.rate_type === 'salary' ? 'year' : 'hour'}` : null],
+                ].filter(([, v]) => v).map(([label, val]) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
                     <dt style={{ fontSize: 12, color: T.muted }}>{label}</dt>
-                    <dd style={{ fontSize: 12, color: T.navy, fontWeight: 500, margin: 0 }}>{val || '—'}</dd>
+                    <dd style={{ fontSize: 12, color: T.navy, fontWeight: 500, margin: 0 }}>{val}</dd>
                   </div>
                 ))}
               </dl>
@@ -376,8 +442,7 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
         {tab === 'Documents' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-              <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleUpload} />
-              <Btn variant="ghost" style={{ fontSize: 12 }} loading={uploading} onClick={() => fileRef.current?.click()}>
+              <Btn variant="ghost" style={{ fontSize: 12 }} onClick={() => { setShowUploadModal(true); setUploadFile(null); setUploadType('Contract') }}>
                 Upload Document
               </Btn>
             </div>
@@ -405,19 +470,61 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
         )}
 
         {tab === 'Leave' && (
-          leave.length === 0
-            ? <EmptyState icon="🌴" title="No leave requests" />
-            : leave.map(r => (
-              <div key={r.id} style={{ padding: '10px 0', borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{r.leave_type_name} · {r.days}d</div>
-                  <LeaveStatusBadge status={r.status} />
-                </div>
-                <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>
-                  {fmtDate(r.start_date)} – {fmtDate(r.end_date)}
+          <div>
+            {/* Balance grid */}
+            {balances.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: T.muted, marginBottom: 8 }}>Leave Balances</div>
+                <div style={{ background: '#f8fafc', borderRadius: 8, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+                  {balances.map((b, i) => (
+                    <div key={b.id} style={{ padding: '10px 14px', borderBottom: i < balances.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: T.navy, flex: 1 }}>{b.leave_type_name}</div>
+                        {editingBalance?.id === b.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input
+                              type="number" min={0} step={0.5}
+                              value={editingBalance.allocated}
+                              onChange={e => setEditingBalance(eb => ({ ...eb, allocated: e.target.value }))}
+                              style={{ width: 60, padding: '3px 6px', borderRadius: 5, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.font, outline: 'none' }}
+                            />
+                            <Btn variant="primary" style={{ fontSize: 11, padding: '3px 8px' }} loading={balanceSaving} onClick={saveBalance}>Save</Btn>
+                            <Btn variant="ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => setEditingBalance(null)}>✕</Btn>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 11, color: T.muted }}>{b.allocated}d alloc · {b.used}d used · <strong style={{ color: T.green }}>{b.remaining}d left</strong></span>
+                            {canEdit && (
+                              <button onClick={() => setEditingBalance({ id: b.id, allocated: String(b.allocated) })}
+                                style={{ fontSize: 10, color: T.blue, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: T.font }}>
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))
+            )}
+            {/* Leave request history */}
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: T.muted, marginBottom: 8 }}>Requests</div>
+            {leave.length === 0
+              ? <EmptyState icon="🌴" title="No leave requests" />
+              : leave.map(r => (
+                <div key={r.id} style={{ padding: '10px 0', borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{r.leave_type_name} · {r.days_requested ?? r.days}d</div>
+                    <LeaveStatusBadge status={r.status} />
+                  </div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>
+                    {fmtDate(r.start_date)} – {fmtDate(r.end_date)}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
         )}
 
         {tab === 'Timesheets' && (
@@ -531,6 +638,33 @@ export default function EmployeeDetail({ employee, user, onClose, onUpdated }) {
           </div>
         )}
       </div>
+
+      {showUploadModal && (
+        <Modal title="Upload Document" onClose={() => setShowUploadModal(false)}>
+          <Field label="Document Type">
+            <Select value={uploadType} onChange={e => setUploadType(e.target.value)}>
+              {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </Field>
+          <Field label="File" required>
+            <input
+              ref={fileRef}
+              type="file"
+              onChange={e => setUploadFile(e.target.files[0] || null)}
+              style={{ fontSize: 13, fontFamily: T.font, width: '100%' }}
+            />
+          </Field>
+          {uploadFile && (
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
+              {uploadFile.name} ({(uploadFile.size / 1024).toFixed(0)} KB)
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setShowUploadModal(false)}>Cancel</Btn>
+            <Btn variant="primary" loading={uploading} disabled={!uploadFile} onClick={handleUpload}>Upload</Btn>
+          </div>
+        </Modal>
+      )}
 
       {showAddGoal && (
         <AddGoalModal
