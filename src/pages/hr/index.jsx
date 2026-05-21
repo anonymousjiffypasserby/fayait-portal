@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { T, hrApi, isAdmin, globalStyle } from './shared'
 import HRSidebar from './Sidebar'
@@ -38,8 +38,16 @@ const VIEW_COMPONENTS = {
 
 export default function HR() {
   const { user } = useAuth()
-  const [activeView, setActiveView] = useState(isAdmin(user) ? 'hr_panel' : 'my_profile')
+  const [activeView, setActiveView] = useState('my_profile')
+  const initialViewSet = useRef(false)
   const [counts, setCounts] = useState({ pendingLeave: 0, pendingTimesheets: 0 })
+
+  useEffect(() => {
+    if (user && !initialViewSet.current) {
+      initialViewSet.current = true
+      if (isAdmin(user)) setActiveView('hr_panel')
+    }
+  }, [user])
 
   useEffect(() => {
     if (!isAdmin(user)) return
