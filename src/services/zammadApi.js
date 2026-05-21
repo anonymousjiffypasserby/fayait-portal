@@ -158,11 +158,89 @@ const zammadApi = {
   },
 
   // ── Knowledge Base ────────────────────────────────────────────────────────
-  getKnowledgeBase: () =>
+  getKnowledgeBases: () =>
     fetch(`${BASE}/api/proxy/zammad/knowledge_bases`, { headers: headers() }).then(handle),
 
-  getKnowledgeBaseAnswers: (kbId) =>
-    fetch(`${BASE}/api/proxy/zammad/knowledge_base/${kbId}/locale/en/answers`, { headers: headers() }).then(handle),
+  createKnowledgeBase: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_bases`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  getKBCategories: (kbId) =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_bases/${kbId}/categories`, { headers: headers() }).then(handle),
+
+  getKBAnswers: (kbId, locale = 'en-us') =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_bases/${kbId}/locale/${locale}/answers`, { headers: headers() }).then(handle),
+
+  searchKBAnswers: (kbId, query, locale = 'en-us') =>
+    fetch(`${BASE}/api/proxy/zammad/knowledge_bases/${kbId}/locale/${locale}/answers/search${qs({ query, limit: 50 })}`, { headers: headers() }).then(handle),
+
+  // ── Email Channels ─────────────────────────────────────────────────────────
+  getEmailChannels: () =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email`, { headers: headers() }).then(handle),
+
+  probeEmailChannel: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email_probe`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  setEmailChannelInbound: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email_inbound`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  setEmailChannelOutbound: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email_outbound`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  verifyEmailChannel: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email_verify`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  deleteEmailChannel: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/channels_email/${id}`, {
+      method: 'DELETE', headers: headers(),
+    }).then(handle),
+
+  // ── Email Addresses ────────────────────────────────────────────────────────
+  getEmailAddresses: () =>
+    fetch(`${BASE}/api/proxy/zammad/email_addresses`, { headers: headers() }).then(handle),
+
+  createEmailAddress: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/email_addresses`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  updateEmailAddress: (id, data) =>
+    fetch(`${BASE}/api/proxy/zammad/email_addresses/${id}`, {
+      method: 'PUT', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  deleteEmailAddress: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/email_addresses/${id}`, {
+      method: 'DELETE', headers: headers(),
+    }).then(handle),
+
+  // ── Signatures ─────────────────────────────────────────────────────────────
+  getSignatures: () =>
+    fetch(`${BASE}/api/proxy/zammad/signatures`, { headers: headers() }).then(handle),
+
+  createSignature: (data) =>
+    fetch(`${BASE}/api/proxy/zammad/signatures`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  updateSignature: (id, data) =>
+    fetch(`${BASE}/api/proxy/zammad/signatures/${id}`, {
+      method: 'PUT', headers: headers(), body: JSON.stringify(data),
+    }).then(handle),
+
+  deleteSignature: (id) =>
+    fetch(`${BASE}/api/proxy/zammad/signatures/${id}`, {
+      method: 'DELETE', headers: headers(),
+    }).then(handle),
 }
 
 export default zammadApi

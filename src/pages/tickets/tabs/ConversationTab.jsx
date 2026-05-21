@@ -27,9 +27,10 @@ function readFileAsBase64(file) {
 const CHANNEL_ICONS = { email: '✉', phone: '📞', chat: '💬', web: '🌐', note: '📝' }
 
 function ArticleBubble({ article }) {
-  const isAgent     = article.sender === 'Agent'
-  const isInternal  = article.internal
-  const channel     = CHANNEL_ICONS[article.type] || '📝'
+  const isAgent    = article.sender === 'Agent'
+  const isInternal = article.internal
+  const isEmail    = article.type === 'email'
+  const channel    = CHANNEL_ICONS[article.type] || '📝'
   const attachments = (article.attachments || []).filter(a => !a.preferences?.['Content-Disposition']?.includes('inline'))
 
   return (
@@ -68,6 +69,15 @@ function ArticleBubble({ article }) {
           )}
         </div>
 
+        {/* Email headers (To / CC / Subject) */}
+        {isEmail && (article.to || article.cc || article.subject) && (
+          <div style={{ fontSize: 11, color: T.muted, marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 2, textAlign: isAgent ? 'right' : 'left' }}>
+            {article.subject && <span><strong style={{ color: T.navy }}>Subject:</strong> {article.subject}</span>}
+            {article.to      && <span><strong style={{ color: T.navy }}>To:</strong> {article.to}</span>}
+            {article.cc      && <span><strong style={{ color: T.navy }}>CC:</strong> {article.cc}</span>}
+          </div>
+        )}
+
         {/* Body */}
         <div style={{
           background: isAgent ? '#6366f1' : isInternal ? '#fef9c3' : '#f1f5f9',
@@ -103,16 +113,37 @@ function ArticleBubble({ article }) {
   )
 }
 
-export default function ConversationTab({ ticketId, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
-  const [articles,   setArticles]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [reply,      setReply]      = useState('')
-  const [internal,   setInternal]   = useState(false)
-  const [sending,    setSending]    = useState(false)
-  const [error,      setError]      = useState(null)
-  const [file,       setFile]       = useState(null)
+// Reply type: 'public' | 'email' | 'internal'
+const REPLY_TYPES = [
+  { key: 'public',   label: 'Reply',         active: '#6366f1', activeText: '#fff' },
+  { key: 'email',    label: 'Send Email',     active: '#0ea5e9', activeText: '#fff' },
+  { key: 'internal', label: 'Internal Note',  active: '#f59e0b', activeText: '#fff' },
+]
+
+export default function ConversationTab({ ticketId, ticket, onReplySent, isAgent, insertText, onInsertConsumed, isActive }) {
+  const [articles,    setArticles]    = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [reply,       setReply]       = useState('')
+  const [replyType,   setReplyType]   = useState('public')
+  const [emailTo,     setEmailTo]     = useState('')
+  const [emailCc,     setEmailCc]     = useState('')
+  const [emailSubject,setEmailSubject]= useState('')
+  const [sending,     setSending]     = useState(false)
+  const [error,       setError]       = useState(null)
+  const [file,        setFile]        = useState(null)
   const bottomRef = useRef(null)
   const fileRef   = useRef(null)
+
+  const isEmail    = replyType === 'email'
+  const isInternal = replyType === 'internal'
+
+  // Pre-fill email subject/to from ticket when switching to email mode
+  useEffect(() => {
+    if (replyType === 'email' && ticket) {
+      if (!emailSubject) setEmailSubject(`Re: ${ticket.title || ''}`)
+      if (!emailTo && ticket.customer) setEmailTo(ticket.customer)
+    }
+  }, [replyType, ticket])
 
   const load = () => {
     setLoading(true)
@@ -128,8 +159,6 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [articles])
 
-  // When the tab becomes visible after being hidden (display:none → flex),
-  // scroll to the bottom so the most recent message is in view.
   useEffect(() => {
     if (isActive) requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }))
   }, [isActive])
@@ -137,7 +166,7 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
   useEffect(() => {
     if (!insertText) return
     setReply(prev => prev ? prev + '\n\n' + insertText : insertText)
-    setInternal(false)
+    setReplyType('public')
     onInsertConsumed?.()
   }, [insertText])
 
@@ -149,10 +178,21 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
       const payload = {
         ticket_id: ticketId,
         body: reply.trim(),
-        type: internal ? 'note' : 'web',
-        internal,
+        internal: isInternal,
         sender: isAgent ? 'Agent' : 'Customer',
       }
+
+      if (isEmail) {
+        payload.type = 'email'
+        if (emailTo)      payload.to      = emailTo
+        if (emailCc)      payload.cc      = emailCc
+        if (emailSubject) payload.subject = emailSubject
+      } else if (isInternal) {
+        payload.type = 'note'
+      } else {
+        payload.type = 'web'
+      }
+
       if (file) {
         const data = await readFileAsBase64(file)
         payload.attachments = [{ filename: file.name, data, 'mime-type': file.type || 'application/octet-stream' }]
@@ -160,6 +200,7 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
       await zammadApi.createArticle(payload)
       setReply('')
       setFile(null)
+      if (isEmail) { setEmailCc(''); setEmailSubject(''); setEmailTo('') }
       load()
       onReplySent?.()
     } catch (err) {
@@ -183,18 +224,18 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
 
       {/* Reply box */}
       <div style={{ borderTop: `1px solid ${T.border}`, padding: '12px 16px', background: T.card, flexShrink: 0 }}>
-        {/* Toggle */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {['Public Reply', 'Internal Note'].map((label, i) => (
+        {/* Type toggle */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {(isAgent ? REPLY_TYPES : REPLY_TYPES.filter(t => t.key !== 'internal')).map(({ key, label, active, activeText }) => (
             <button
-              key={label}
-              onClick={() => setInternal(i === 1)}
+              key={key}
+              onClick={() => setReplyType(key)}
               style={{
                 padding: '4px 12px', borderRadius: 6, fontSize: 12, fontFamily: T.font,
-                border: `1px solid ${(i === 1) === internal ? '#6366f1' : T.border}`,
-                background: (i === 1) === internal ? '#eef2ff' : '#fafafa',
-                color: (i === 1) === internal ? '#6366f1' : T.muted,
-                cursor: 'pointer', fontWeight: (i === 1) === internal ? 600 : 400,
+                border: `1px solid ${replyType === key ? active : T.border}`,
+                background: replyType === key ? active : '#fafafa',
+                color: replyType === key ? activeText : T.muted,
+                cursor: 'pointer', fontWeight: replyType === key ? 600 : 400,
               }}
             >
               {label}
@@ -202,16 +243,59 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
           ))}
         </div>
 
+        {/* Email headers */}
+        {isEmail && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.muted, width: 48, flexShrink: 0 }}>To</span>
+              <input
+                value={emailTo}
+                onChange={e => setEmailTo(e.target.value)}
+                placeholder="recipient@example.com"
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+                  fontSize: 12, fontFamily: T.font, color: T.navy, background: '#fafafa', outline: 'none',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.muted, width: 48, flexShrink: 0 }}>CC</span>
+              <input
+                value={emailCc}
+                onChange={e => setEmailCc(e.target.value)}
+                placeholder="cc@example.com (optional)"
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+                  fontSize: 12, fontFamily: T.font, color: T.navy, background: '#fafafa', outline: 'none',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.muted, width: 48, flexShrink: 0 }}>Subject</span>
+              <input
+                value={emailSubject}
+                onChange={e => setEmailSubject(e.target.value)}
+                placeholder="Subject…"
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+                  fontSize: 12, fontFamily: T.font, color: T.navy, background: '#fafafa', outline: 'none',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <textarea
           value={reply}
           onChange={e => setReply(e.target.value)}
-          placeholder={internal ? 'Write an internal note…' : 'Write a reply…'}
+          placeholder={isInternal ? 'Write an internal note…' : isEmail ? 'Compose email…' : 'Write a reply…'}
           rows={3}
           style={{
             width: '100%', boxSizing: 'border-box', padding: '9px 12px',
-            borderRadius: 7, border: `1px solid ${internal ? '#fef08a' : T.border}`,
+            borderRadius: 7,
+            border: `1px solid ${isInternal ? '#fef08a' : isEmail ? '#bae6fd' : T.border}`,
             fontSize: 13, fontFamily: T.font, color: T.navy,
-            background: internal ? '#fffef7' : '#fafafa',
+            background: isInternal ? '#fffef7' : isEmail ? '#f0f9ff' : '#fafafa',
             resize: 'vertical', outline: 'none',
           }}
           onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply() }}
@@ -243,11 +327,13 @@ export default function ConversationTab({ ticketId, onReplySent, isAgent, insert
             style={{
               padding: '7px 20px', borderRadius: 7, border: 'none',
               fontSize: 13, fontWeight: 600, fontFamily: T.font, cursor: 'pointer',
-              background: !reply.trim() || sending ? '#e5e7eb' : (internal ? '#f59e0b' : '#6366f1'),
+              background: !reply.trim() || sending
+                ? '#e5e7eb'
+                : isInternal ? '#f59e0b' : isEmail ? '#0ea5e9' : '#6366f1',
               color: !reply.trim() || sending ? T.muted : '#fff',
             }}
           >
-            {sending ? 'Sending…' : internal ? 'Add Note' : 'Send Reply'}
+            {sending ? 'Sending…' : isInternal ? 'Add Note' : isEmail ? 'Send Email' : 'Send Reply'}
           </button>
         </div>
       </div>

@@ -9,6 +9,7 @@ import DetailPanel         from './DetailPanel'
 import NewTicketModal      from './NewTicketModal'
 import TicketSettingsModal from './TicketSettingsModal'
 import TicketReports       from '../reports/TicketReports'
+import MailSettings        from './MailSettings'
 
 const POLL_INTERVAL = 60000
 
@@ -103,6 +104,7 @@ export default function Tickets() {
   const agent        = isAgent(user)
   const isReport     = REPORT_VIEWS.has(view)
   const isSearch     = view.startsWith('search:')
+  const isMailSettings = view === 'mail-settings'
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -237,6 +239,7 @@ export default function Tickets() {
         displayMode={displayMode}
         onDisplayMode={setMode}
         isAgent={agent}
+        isAdmin={admin}
         onOpenSettings={() => { setShowSettings(true); setSidebarOpen(false) }}
         isMobile={isMobile}
         sidebarOpen={sidebarOpen}
@@ -275,7 +278,9 @@ export default function Tickets() {
 
         {/* Content */}
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          {isReport ? (
+          {isMailSettings ? (
+            <MailSettings />
+          ) : isReport ? (
             <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <TicketReports view={view} />
             </div>
@@ -360,6 +365,7 @@ function viewLabel(view) {
     'tk-agent-perf': 'Reports — Agent Performance',
     'tk-sla':        'Reports — SLA Compliance',
     'tk-csat':       'Reports — Customer Satisfaction',
+    'mail-settings': 'Mail Settings',
   }
   return labels[view] || view
 }

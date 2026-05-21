@@ -576,6 +576,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
         <div style={{ display: tab === 'Conversation' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
           <ConversationTab
             ticketId={ticketId}
+            ticket={ticket}
             onReplySent={() => load()}
             isAgent={isAgent}
             insertText={kbInsert}
@@ -590,6 +591,7 @@ export default function DetailPanel({ ticketId, onClose, onUpdated, onTicketUpda
           <KnowledgeBaseTab
             ticketTitle={ticket.title}
             onInsert={text => { setKbInsert(text); setTab('Conversation') }}
+            isAdmin={isAdmin}
           />
         </div>
       </div>

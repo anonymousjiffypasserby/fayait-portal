@@ -42,7 +42,7 @@ const REPORT_VIEWS = [
   { key: 'tk-csat',        label: 'Customer Satisfaction',icon: '⭐' },
 ]
 
-export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent, onOpenSettings, isMobile, sidebarOpen, onCloseSidebar }) {
+export default function TicketSidebar({ view, counts, onView, onNew, displayMode, onDisplayMode, isAgent, isAdmin, onOpenSettings, isMobile, sidebarOpen, onCloseSidebar }) {
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e) => {
@@ -167,7 +167,18 @@ export default function TicketSidebar({ view, counts, onView, onNew, displayMode
       </div>
 
       {/* Settings */}
-      <div style={{ marginTop: 'auto', borderTop: `1px solid ${T.border}`, padding: '8px 12px' }}>
+      <div style={{ marginTop: 'auto', borderTop: `1px solid ${T.border}`, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {isAdmin && (
+          <button onClick={() => onView('mail-settings')} style={{
+            width: '100%', padding: '7px 12px', borderRadius: 7, fontSize: 12,
+            border: `1px solid ${view === 'mail-settings' ? '#6366f1' : T.border}`,
+            background: view === 'mail-settings' ? '#eef2ff' : '#fafafa',
+            color: view === 'mail-settings' ? '#6366f1' : T.muted,
+            cursor: 'pointer', fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span>✉</span> Mail Settings
+          </button>
+        )}
         <button onClick={onOpenSettings} style={{
           width: '100%', padding: '7px 12px', borderRadius: 7, fontSize: 12,
           border: `1px solid ${T.border}`, background: '#fafafa', color: T.muted,
