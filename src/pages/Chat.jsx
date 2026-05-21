@@ -1364,5 +1364,3 @@ function MenuItem({ onClick, red, children }) {
     </div>
   )
 }
-
-const T_REF = T
