@@ -495,14 +495,14 @@ export default function Wiki() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [pagesRes, metaRes, foldersRes] = await Promise.all([
+      const [pagesRes, metaRes, foldersRes] = await Promise.allSettled([
         api.get('/wiki/pages'),
         api.get('/wiki/meta'),
         api.get('/wiki/folders'),
       ])
-      setPages(pagesRes.data)
-      setMeta(metaRes.data)
-      setFolders(foldersRes.data)
+      setPages(pagesRes.status === 'fulfilled' ? pagesRes.value.data : [])
+      setMeta(metaRes.status === 'fulfilled' ? metaRes.value.data : {})
+      setFolders(foldersRes.status === 'fulfilled' ? foldersRes.value.data : [])
     } catch {
       setPages([])
     } finally {
