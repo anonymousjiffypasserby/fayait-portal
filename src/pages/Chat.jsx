@@ -1,45 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-// ── MeetingRoomEmbed — Jitsi panel used inside Chat ────────────────────────────
-function MeetingRoomEmbed({ domain, roomName, displayName, jwt, audioOnly, onLeave }) {
-  const containerRef = useRef(null)
-  const apiRef = useRef(null)
-
-  useEffect(() => {
-    if (!containerRef.current || !window.JitsiMeetExternalAPI) return
-    const toolbarButtons = audioOnly
-      ? ['microphone', 'hangup', 'raisehand', 'settings', 'fodeviceselection']
-      : ['microphone', 'camera', 'desktop', 'fullscreen', 'hangup', 'raisehand', 'settings', 'tileview', 'fodeviceselection']
-
-    apiRef.current = new window.JitsiMeetExternalAPI(domain, {
-      roomName,
-      parentNode: containerRef.current,
-      userInfo: { displayName },
-      ...(jwt ? { jwt } : {}),
-      configOverwrite: {
-        startWithAudioMuted: false,
-        startWithVideoMuted: audioOnly,
-        disableDeepLinking: true,
-        prejoinPageEnabled: false,
-      },
-      interfaceConfigOverwrite: {
-        TOOLBAR_BUTTONS: toolbarButtons,
-        SHOW_JITSI_WATERMARK: false,
-        SHOW_BRAND_WATERMARK: false,
-        SHOW_POWERED_BY: false,
-        MOBILE_APP_PROMO: false,
-      },
-      width: '100%',
-      height: '100%',
-    })
-    apiRef.current.addEventListener('videoConferenceLeft', onLeave)
-    return () => { apiRef.current?.dispose() }
-  }, [domain, roomName, displayName, jwt, audioOnly, onLeave])
-
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-}
-
 const BASE     = import.meta.env.VITE_API_URL || 'https://api.fayait.com'
 const getToken = () => localStorage.getItem('faya_token')
 const authHdr  = () => ({ 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) })
@@ -74,10 +35,6 @@ const GROUP_MS   = 5 * 60 * 1000
 const QUICK_EMOJIS = ['👍','👎','❤️','😂','🎉','😮','😢','😡','🔥','✅','🙏','💯','🚀','🤔','👏','💪']
 
 // ── utils ──────────────────────────────────────────────────────────────────────
-function slugifyRoom(name) {
-  return 'chat-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
-
 function ts2time(ts) {
   if (!ts) return ''
   const d = new Date(ts), now = new Date()
@@ -578,12 +535,11 @@ function MessageList({ messages, myMxid, onReply, onEdit, onDelete, onReact, onU
 
 // ── Main Chat component ───────────────────────────────────────────────────────
 export default function Chat() {
-  const { user, serviceUrls, jitsiToken, jitsiUrl } = useAuth()
+  const { user, serviceUrls } = useAuth()
   const isAdmin      = ['admin', 'superadmin'].includes(user?.role)
   const matrixServer = serviceUrls?.matrixServerName || 'matrix.fayait.com'
   const myMxid       = user?.matrix_username ? `@${user.matrix_username}:${matrixServer}` : null
   const workspaceName = serviceUrls?.companyName || 'Chat'
-  const jitsiDomain   = (jitsiUrl || serviceUrls?.meetings || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
 
   // ─── core state ────────────────────────────────────────────────────────────
   const [rooms, setRooms]               = useState([])
@@ -636,9 +592,15 @@ export default function Chat() {
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching]     = useState(false)
 
-  // ─── call ────────────────────────────────────────────────────────────────────
-  const [activeCall, setActiveCall]   = useState(null)  // null | { slug, mode }
-  const [jitsiLoaded, setJitsiLoaded] = useState(!!window.JitsiMeetExternalAPI)
+  // ─── Matrix WebRTC call ──────────────────────────────────────────────────────
+  const [callState, setCallState]       = useState(null)    // null | 'calling' | 'incoming' | 'active'
+  const [callMode, setCallMode]         = useState(null)    // 'audio' | 'video'
+  const [callId, setCallId]             = useState(null)
+  const [callRoom, setCallRoom]         = useState(null)    // roomId of the call
+  const [incomingCall, setIncomingCall] = useState(null)    // { callId, roomId, roomName, offer, mode }
+  const [callMuted, setCallMuted]       = useState(false)
+  const [localStream, setLocalStream]   = useState(null)
+  const [remoteStream, setRemoteStream] = useState(null)
 
   // ─── refs ───────────────────────────────────────────────────────────────────
   const bottomRef       = useRef(null)
@@ -648,6 +610,16 @@ export default function Chat() {
   const scrollRef       = useRef(null)
   const selectedRoomRef = useRef(null)
   selectedRoomRef.current = selectedRoom
+
+  // ─── call refs (readable inside interval callbacks without closure issues) ───
+  const pcRef           = useRef(null)
+  const localStreamRef  = useRef(null)
+  const callIdRef       = useRef(null)
+  const callRoomRef     = useRef(null)
+  const remoteVideoRef  = useRef(null)
+  const localVideoRef   = useRef(null)
+  callIdRef.current   = callId
+  callRoomRef.current = callRoom
 
   // ─── scroll helpers ─────────────────────────────────────────────────────────
   const scrollBottom = (smooth = true) => {
@@ -742,22 +714,19 @@ export default function Chat() {
     n.onclick = () => window.focus()
   }
 
-  // ─── load Jitsi script ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!jitsiDomain || window.JitsiMeetExternalAPI) return
-    const script = document.createElement('script')
-    script.src = `https://${jitsiDomain}/external_api.js`
-    script.async = true
-    script.onload = () => setJitsiLoaded(true)
-    document.head.appendChild(script)
-    return () => { if (document.head.contains(script)) document.head.removeChild(script) }
-  }, [jitsiDomain])
+  // ─── wire remote stream to media element ────────────────────────────────────
+  useEffect(() => { if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream }, [remoteStream])
+  useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream }, [localStream])
 
   // ─── init ────────────────────────────────────────────────────────────────────
   useEffect(() => { loadRooms() }, [loadRooms])
   useEffect(() => { if (rooms.length && !selectedRoom) setSelectedRoom(rooms[0]) }, [rooms, selectedRoom])
   useEffect(() => {
-    if (selectedRoom?.roomId) { setShowMembers(false); setActiveCall(null); loadMessages(selectedRoom.roomId) }
+    if (selectedRoom?.roomId) {
+      setShowMembers(false)
+      cleanupCall({ sendHangup: callIdRef.current != null })
+      loadMessages(selectedRoom.roomId)
+    }
   }, [selectedRoom?.roomId, loadMessages])
 
   // ─── sync poll ───────────────────────────────────────────────────────────────
@@ -796,7 +765,38 @@ export default function Chat() {
           const cur = selectedRoomRef.current
 
           for (const [roomId, roomData] of Object.entries(updates)) {
-            const { messages: newMsgs = [], edits = [], reactions: newReacts = [], redactions = [] } = roomData
+            const { messages: newMsgs = [], edits = [], reactions: newReacts = [], redactions = [], callEvents: evts = [] } = roomData
+
+            // Handle Matrix call signaling events
+            for (const ev of evts) {
+              if (ev.sender === myMxid) continue // skip own events
+              const cid = callIdRef.current
+
+              if (ev.type === 'm.call.invite' && !cid) {
+                // Incoming call
+                const hasvideo = ev.content?.offer?.sdp?.includes('\r\nm=video') || ev.content?.offer?.sdp?.includes('\nm=video')
+                const mode = hasvideo ? 'video' : 'audio'
+                const roomName = rooms.find(r => r.roomId === roomId)?.name || roomId
+                setIncomingCall({ callId: ev.callId, roomId, roomName, offer: ev.content?.offer, mode })
+                setCallState('incoming'); setCallId(ev.callId); callIdRef.current = ev.callId
+                setCallRoom(roomId); callRoomRef.current = roomId; setCallMode(mode)
+              }
+
+              if (ev.type === 'm.call.answer' && ev.callId === cid && pcRef.current && callState === 'calling') {
+                pcRef.current.setRemoteDescription(new RTCSessionDescription(ev.content?.answer))
+                  .then(() => setCallState('active')).catch(() => {})
+              }
+
+              if (ev.type === 'm.call.candidates' && ev.callId === cid && pcRef.current) {
+                for (const c of (ev.content?.candidates || [])) {
+                  pcRef.current.addIceCandidate(new RTCIceCandidate(c)).catch(() => {})
+                }
+              }
+
+              if (ev.type === 'm.call.hangup' && ev.callId === cid) {
+                cleanupCall({ sendHangup: false })
+              }
+            }
 
             if (cur && roomId === cur.roomId) {
               // New messages
@@ -998,15 +998,81 @@ export default function Chat() {
     })
   }
 
-  // ─── call ────────────────────────────────────────────────────────────────────
-  function startCall(mode) {
-    if (!selectedRoom || !jitsiDomain) return
-    const slug = slugifyRoom(selectedRoom.name)
-    setActiveCall({ slug, mode })
-    const body = mode === 'video'
-      ? `📹 Video call started — click the call button to join`
-      : `📞 Voice call started — click the call button to join`
-    cx('POST', `/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/send`, { body }).catch(() => {})
+  // ─── Matrix WebRTC call functions ────────────────────────────────────────────
+  async function sendEvent(roomId, type, content) {
+    return cx('POST', `/chat/rooms/${encodeURIComponent(roomId)}/event`, { type, content })
+  }
+
+  function cleanupCall({ sendHangup = false } = {}) {
+    const cid = callIdRef.current
+    const rid = callRoomRef.current
+    if (sendHangup && cid && rid) {
+      sendEvent(rid, 'm.call.hangup', { call_id: cid, version: 0, reason: 'user_hangup' }).catch(() => {})
+    }
+    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null }
+    if (pcRef.current) { pcRef.current.close(); pcRef.current = null }
+    setCallState(null); setCallId(null); setCallRoom(null); setCallMode(null)
+    setIncomingCall(null); setLocalStream(null); setRemoteStream(null); setCallMuted(false)
+  }
+
+  function endCall() { cleanupCall({ sendHangup: true }) }
+
+  function createPC(roomId, cid) {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
+    let pending = []; let timer = null
+    pc.onicecandidate = ({ candidate }) => {
+      if (!candidate) return
+      pending.push({ sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, candidate: candidate.candidate })
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        sendEvent(roomId, 'm.call.candidates', { call_id: cid, version: 0, candidates: [...pending] })
+        pending = []
+      }, 200)
+    }
+    pc.ontrack = ev => setRemoteStream(ev.streams[0] || new MediaStream([ev.track]))
+    return pc
+  }
+
+  async function startCall(mode) {
+    if (!selectedRoom || callState) return
+    const cid = crypto.randomUUID()
+    setCallId(cid); callIdRef.current = cid
+    setCallMode(mode); setCallRoom(selectedRoom.roomId); callRoomRef.current = selectedRoom.roomId
+    setCallState('calling')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === 'video' })
+      localStreamRef.current = stream; setLocalStream(stream)
+      const pc = createPC(selectedRoom.roomId, cid); pcRef.current = pc
+      stream.getTracks().forEach(t => pc.addTrack(t, stream))
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      await sendEvent(selectedRoom.roomId, 'm.call.invite', {
+        call_id: cid, version: 0, lifetime: 60000,
+        offer: { type: offer.type, sdp: offer.sdp },
+      })
+    } catch (err) {
+      console.error('[call] startCall failed:', err)
+      cleanupCall({ sendHangup: false })
+    }
+  }
+
+  async function answerCall() {
+    if (!incomingCall || callState !== 'incoming') return
+    const { callId: cid, roomId, offer } = incomingCall
+    setCallState('active')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.mode === 'video' })
+      localStreamRef.current = stream; setLocalStream(stream)
+      const pc = createPC(roomId, cid); pcRef.current = pc
+      stream.getTracks().forEach(t => pc.addTrack(t, stream))
+      await pc.setRemoteDescription(new RTCSessionDescription(offer))
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      await sendEvent(roomId, 'm.call.answer', { call_id: cid, version: 0, answer: { type: answer.type, sdp: answer.sdp } })
+    } catch (err) {
+      console.error('[call] answerCall failed:', err)
+      cleanupCall({ sendHangup: true })
+    }
   }
 
   // ─── load older ──────────────────────────────────────────────────────────────
@@ -1210,16 +1276,16 @@ export default function Chat() {
               )}
               {/* Call buttons */}
               <button
-                onClick={() => activeCall ? setActiveCall(null) : startCall('audio')}
-                title={activeCall?.mode === 'audio' ? 'End voice call' : 'Start voice call'}
-                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'audio' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'audio' ? '#fff' : T.muted }}
+                onClick={() => callState ? endCall() : startCall('audio')}
+                title={callState && callMode === 'audio' ? 'End voice call' : 'Start voice call'}
+                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: callState && callMode === 'audio' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: callState && callMode === 'audio' ? '#fff' : T.muted }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
               </button>
               <button
-                onClick={() => activeCall ? setActiveCall(null) : startCall('video')}
-                title={activeCall?.mode === 'video' ? 'End video call' : 'Start video call'}
-                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'video' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'video' ? '#fff' : T.muted }}
+                onClick={() => callState ? endCall() : startCall('video')}
+                title={callState && callMode === 'video' ? 'End video call' : 'Start video call'}
+                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: callState && callMode === 'video' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: callState && callMode === 'video' ? '#fff' : T.muted }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
               </button>
@@ -1249,36 +1315,67 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Active call panel */}
-          {activeCall && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000' }}>
-              <div style={{ padding: '0 16px', height: 40, background: T.navy, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 500, flex: 1 }}>
-                  {activeCall.mode === 'video' ? '📹' : '📞'} {selectedRoom.name}
-                </span>
-                <button onClick={() => setActiveCall(null)}
-                  style={{ background: T.red, color: '#fff', border: 'none', padding: '4px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.font }}>
-                  Leave
-                </button>
+          {/* Incoming call overlay */}
+          {callState === 'incoming' && incomingCall && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', borderRadius: 16, padding: '32px 40px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', minWidth: 280 }}>
+                <Av name={incomingCall.roomName} size={64} />
+                <div style={{ marginTop: 12, fontWeight: 700, fontSize: 17, color: T.navy }}>{incomingCall.roomName}</div>
+                <div style={{ color: T.muted, fontSize: 13, margin: '6px 0 24px' }}>
+                  Incoming {incomingCall.mode === 'video' ? 'video' : 'voice'} call…
+                </div>
+                <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+                  <button
+                    onClick={() => { sendEvent(incomingCall.roomId, 'm.call.hangup', { call_id: incomingCall.callId, version: 0, reason: 'user_hangup' }).catch(() => {}); cleanupCall({ sendHangup: false }) }}
+                    style={{ padding: '10px 28px', background: T.red, color: '#fff', border: 'none', borderRadius: 24, fontWeight: 600, cursor: 'pointer', fontSize: 14, fontFamily: T.font }}>Decline</button>
+                  <button onClick={answerCall}
+                    style={{ padding: '10px 28px', background: T.green, color: '#fff', border: 'none', borderRadius: 24, fontWeight: 600, cursor: 'pointer', fontSize: 14, fontFamily: T.font }}>Answer</button>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                {jitsiLoaded
-                  ? <MeetingRoomEmbed
-                      domain={jitsiDomain}
-                      roomName={activeCall.slug}
-                      displayName={user?.name || 'User'}
-                      jwt={jitsiToken}
-                      audioOnly={activeCall.mode === 'audio'}
-                      onLeave={() => setActiveCall(null)}
-                    />
-                  : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13, fontFamily: T.font }}>Connecting to call server…</div>
-                }
+            </div>
+          )}
+
+          {/* Active call panel */}
+          {(callState === 'calling' || callState === 'active') && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#111' }}>
+              {callMode === 'video' ? (
+                <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                  <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                  <video ref={localVideoRef} autoPlay playsInline muted style={{ position: 'absolute', bottom: 80, right: 16, width: 140, height: 100, borderRadius: 8, objectFit: 'cover', border: '2px solid rgba(255,255,255,0.25)', background: '#222' }} />
+                  {callState === 'calling' && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <Av name={selectedRoom?.name || ''} size={72} />
+                      <div style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>{selectedRoom?.name}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Calling…</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                  <audio ref={remoteVideoRef} autoPlay />
+                  <Av name={selectedRoom?.name || ''} size={80} />
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>{selectedRoom?.name}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>{callState === 'calling' ? 'Calling…' : 'Connected'}</div>
+                </div>
+              )}
+              <div style={{ height: 68, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, flexShrink: 0 }}>
+                <button
+                  onClick={() => setCallMuted(m => { const next = !m; localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !next }); return next })}
+                  title={callMuted ? 'Unmute' : 'Mute'}
+                  style={{ width: 44, height: 44, borderRadius: '50%', background: callMuted ? '#444' : '#333', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {callMuted ? '🔇' : '🎙️'}
+                </button>
+                <button onClick={endCall} title="Hang up"
+                  style={{ width: 52, height: 52, borderRadius: '50%', background: T.red, border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style={{ transform: 'rotate(135deg)' }}><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+                </button>
               </div>
             </div>
           )}
 
           {/* Messages area */}
-          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: 'auto', display: activeCall ? 'none' : 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: 'auto', display: callState === 'calling' || callState === 'active' ? 'none' : 'flex', flexDirection: 'column', position: 'relative' }}>
             {msgsEnd && (
               <div style={{ textAlign: 'center', padding: '12px 20px 0' }}>
                 <button onClick={loadOlder} style={{ padding: '4px 14px', border: `1px solid ${T.border}`, borderRadius: 20, background: 'none', cursor: 'pointer', fontSize: 11, color: T.muted }}>Load older messages</button>
@@ -1327,7 +1424,7 @@ export default function Chat() {
           )}
 
           {/* Edit mode banner */}
-          {!activeCall && editingMsg && (
+          {!callState && editingMsg && (
             <div style={{ padding: '8px 16px', borderTop: `1px solid ${T.border}`, background: '#fffbeb', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: T.yellow, fontWeight: 500 }}>✏️ Editing message</span>
@@ -1344,7 +1441,7 @@ export default function Chat() {
           )}
 
           {/* Input area */}
-          {!activeCall && !editingMsg && (
+          {!callState && !editingMsg && (
             <div style={{ padding: '8px 16px 12px', borderTop: `1px solid ${T.border}`, flexShrink: 0, position: 'relative' }}>
               {/* Reply bar */}
               {replyTo && (
