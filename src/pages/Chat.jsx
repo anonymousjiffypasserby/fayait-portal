@@ -773,6 +773,9 @@ export default function Chat() {
               const cid = callIdRef.current
 
               if (ev.type === 'm.call.invite' && !cid) {
+                // Ignore expired invites
+                const lifetime = ev.content?.lifetime || 60000
+                if (ev.ts && Date.now() - ev.ts > lifetime) continue
                 // Incoming call
                 const hasvideo = ev.content?.offer?.sdp?.includes('\r\nm=video') || ev.content?.offer?.sdp?.includes('\nm=video')
                 const mode = hasvideo ? 'video' : 'audio'
