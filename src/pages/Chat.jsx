@@ -1050,6 +1050,9 @@ export default function Chat() {
         call_id: cid, version: 0, lifetime: 60000,
         offer: { type: offer.type, sdp: offer.sdp },
       })
+      cx('POST', `/chat/rooms/${encodeURIComponent(selectedRoom.roomId)}/send`, {
+        body: mode === 'video' ? '📹 Video call started' : '📞 Voice call started',
+      }).catch(() => {})
     } catch (err) {
       console.error('[call] startCall failed:', err)
       cleanupCall({ sendHangup: false })
