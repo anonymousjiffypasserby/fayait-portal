@@ -70,6 +70,20 @@ export function AuthProvider({ children }) {
     setSnipeToken(snipe_token || null)
     setJitsiToken(jitsi_token || null)
 
+    // Fetch service URLs immediately after login so they're available on first render
+    api.getCompanyConfig()
+      .then(data => {
+        const urls = data.serviceUrls || {}
+        localStorage.setItem('faya_service_urls', JSON.stringify(urls))
+        setServiceUrls(urls)
+        const services = {}
+        Object.entries(data.services || {}).forEach(([k, v]) => { services[k] = v.status })
+        const updated = { ...user, services }
+        localStorage.setItem('faya_user', JSON.stringify(updated))
+        setUser(updated)
+      })
+      .catch(() => {})
+
     return user
   }
 
