@@ -646,6 +646,23 @@ export const api = {
 
   getFilesLoginToken: () =>
     fetch(`${BASE}/api/files/login-token`, { headers: headers() }).then(handle),
+
+  // Generic axios-compatible methods for pages that use api.get/post/put/patch/delete
+  get: (path) =>
+    fetch(`${BASE}/api${path}`, { headers: headers() })
+      .then(async res => { const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Request failed'); return { data } }),
+  post: (path, body) =>
+    fetch(`${BASE}/api${path}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) })
+      .then(async res => { const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Request failed'); return { data } }),
+  put: (path, body) =>
+    fetch(`${BASE}/api${path}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) })
+      .then(async res => { const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Request failed'); return { data } }),
+  patch: (path, body) =>
+    fetch(`${BASE}/api${path}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(body) })
+      .then(async res => { const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Request failed'); return { data } }),
+  delete: (path) =>
+    fetch(`${BASE}/api${path}`, { method: 'DELETE', headers: headers() })
+      .then(async res => { const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Request failed'); return { data } }),
 }
 
 export default api
