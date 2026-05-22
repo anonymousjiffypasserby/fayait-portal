@@ -69,7 +69,7 @@ export default function Whiteboard() {
           initialData={initialData}
           onChange={handleSave}
           UIOptions={{
-            canvasActions: { saveToActiveFile: false, loadScene: false, export: true },
+            canvasActions: { saveToActiveFile: false, loadScene: false, export: { saveFileToDisk: true } },
           }}
         />
       </div>
