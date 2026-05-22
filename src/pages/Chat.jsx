@@ -578,12 +578,12 @@ function MessageList({ messages, myMxid, onReply, onEdit, onDelete, onReact, onU
 
 // ── Main Chat component ───────────────────────────────────────────────────────
 export default function Chat() {
-  const { user, serviceUrls, jitsiToken } = useAuth()
+  const { user, serviceUrls, jitsiToken, jitsiUrl } = useAuth()
   const isAdmin      = ['admin', 'superadmin'].includes(user?.role)
   const matrixServer = serviceUrls?.matrixServerName || 'matrix.fayait.com'
   const myMxid       = user?.matrix_username ? `@${user.matrix_username}:${matrixServer}` : null
   const workspaceName = serviceUrls?.companyName || 'Chat'
-  const jitsiDomain   = (serviceUrls?.meetings || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const jitsiDomain   = (jitsiUrl || serviceUrls?.meetings || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
 
   // ─── core state ────────────────────────────────────────────────────────────
   const [rooms, setRooms]               = useState([])

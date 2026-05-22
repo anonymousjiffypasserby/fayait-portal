@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [zammadToken, setZammadToken] = useState(null)
   const [snipeToken, setSnipeToken]   = useState(null)
   const [jitsiToken, setJitsiToken]   = useState(null)
+  const [jitsiUrl, setJitsiUrl]       = useState(null)
   const [serviceUrls, setServiceUrls] = useState({})
   const [loading, setLoading]         = useState(true)
 
@@ -18,8 +19,9 @@ export function AuthProvider({ children }) {
     const storedPerms  = localStorage.getItem('faya_permissions')
     const storedZammad = localStorage.getItem('faya_zammad_token')
     const storedSnipe  = localStorage.getItem('faya_snipe_token')
-    const storedJitsi  = localStorage.getItem('faya_jitsi_token')
-    const storedUrls   = localStorage.getItem('faya_service_urls')
+    const storedJitsi    = localStorage.getItem('faya_jitsi_token')
+    const storedJitsiUrl = localStorage.getItem('faya_jitsi_url')
+    const storedUrls     = localStorage.getItem('faya_service_urls')
 
     if (stored && token) {
       const parsedUser = JSON.parse(stored)
@@ -29,7 +31,8 @@ export function AuthProvider({ children }) {
       }
       if (storedZammad) setZammadToken(storedZammad)
       if (storedSnipe)  setSnipeToken(storedSnipe)
-      if (storedJitsi)  setJitsiToken(storedJitsi)
+      if (storedJitsi)    setJitsiToken(storedJitsi)
+      if (storedJitsiUrl) setJitsiUrl(storedJitsiUrl)
       if (storedUrls) {
         try { setServiceUrls(JSON.parse(storedUrls)) } catch {}
       }
@@ -55,7 +58,7 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await api.login(email, password)
-    const { user, token, zammad_token, snipe_token, jitsi_token, permissions: perms = [] } = data
+    const { user, token, zammad_token, snipe_token, jitsi_token, jitsi_url, permissions: perms = [] } = data
 
     localStorage.setItem('faya_token', token)
     localStorage.setItem('faya_user', JSON.stringify(user))
@@ -63,12 +66,14 @@ export function AuthProvider({ children }) {
     localStorage.setItem('faya_zammad_token', zammad_token || '')
     localStorage.setItem('faya_snipe_token', snipe_token || '')
     localStorage.setItem('faya_jitsi_token', jitsi_token || '')
+    localStorage.setItem('faya_jitsi_url', jitsi_url || '')
 
     setUser(user)
     setPermissions(perms)
     setZammadToken(zammad_token || null)
     setSnipeToken(snipe_token || null)
     setJitsiToken(jitsi_token || null)
+    setJitsiUrl(jitsi_url || null)
 
     // Fetch service URLs before returning so they're set before the app renders post-login
     try {
@@ -93,12 +98,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('faya_zammad_token')
     localStorage.removeItem('faya_snipe_token')
     localStorage.removeItem('faya_jitsi_token')
+    localStorage.removeItem('faya_jitsi_url')
     localStorage.removeItem('faya_service_urls')
     setUser(null)
     setPermissions([])
     setZammadToken(null)
     setSnipeToken(null)
     setJitsiToken(null)
+    setJitsiUrl(null)
     setServiceUrls({})
   }
 
@@ -109,7 +116,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, permissions, login, logout, loading, updateUser, zammadToken, snipeToken, jitsiToken, serviceUrls }}>
+    <AuthContext.Provider value={{ user, permissions, login, logout, loading, updateUser, zammadToken, snipeToken, jitsiToken, jitsiUrl, serviceUrls }}>
       {children}
     </AuthContext.Provider>
   )
