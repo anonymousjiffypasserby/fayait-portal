@@ -1208,25 +1208,21 @@ export default function Chat() {
                   👥 {selectedRoom.member_count}
                 </button>
               )}
-              {/* Call buttons — only when Jitsi is configured */}
-              {jitsiDomain && (
-                <>
-                  <button
-                    onClick={() => activeCall ? setActiveCall(null) : startCall('audio')}
-                    title={activeCall?.mode === 'audio' ? 'End voice call' : 'Start voice call'}
-                    style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'audio' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'audio' ? '#fff' : T.muted }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
-                  </button>
-                  <button
-                    onClick={() => activeCall ? setActiveCall(null) : startCall('video')}
-                    title={activeCall?.mode === 'video' ? 'End video call' : 'Start video call'}
-                    style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'video' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'video' ? '#fff' : T.muted }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                  </button>
-                </>
-              )}
+              {/* Call buttons */}
+              <button
+                onClick={() => activeCall ? setActiveCall(null) : startCall('audio')}
+                title={activeCall?.mode === 'audio' ? 'End voice call' : 'Start voice call'}
+                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'audio' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'audio' ? '#fff' : T.muted }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+              </button>
+              <button
+                onClick={() => activeCall ? setActiveCall(null) : startCall('video')}
+                title={activeCall?.mode === 'video' ? 'End video call' : 'Start video call'}
+                style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, background: activeCall?.mode === 'video' ? T.red : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeCall?.mode === 'video' ? '#fff' : T.muted }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+              </button>
               {/* ⋯ dropdown */}
               <div style={{ position: 'relative' }}>
                 <button onClick={e => { e.stopPropagation(); setShowRoomMenu(v => !v) }}
