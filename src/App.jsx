@@ -23,6 +23,7 @@ import BI from './pages/BI'
 import Files from './pages/Files'
 import Passwords from './pages/Passwords'
 import ERP from './pages/erp'
+import AuthCallback from './pages/AuthCallback'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -51,6 +52,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
         path="/*"
         element={

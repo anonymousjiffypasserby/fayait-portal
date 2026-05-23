@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+const KC_ENABLED = !!(import.meta.env.VITE_KC_URL && import.meta.env.VITE_KC_REALM)
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const [ssoLoading, setSsoLoading] = useState(false)
+  const { login, startOIDC } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e) => {
@@ -21,6 +24,16 @@ export default function Login() {
       setError('Invalid email or password')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSSO = async () => {
+    setSsoLoading(true)
+    try {
+      await startOIDC()
+    } catch (err) {
+      setError('Could not start SSO login: ' + err.message)
+      setSsoLoading(false)
     }
   }
 
@@ -104,6 +117,32 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+
+        {KC_ENABLED && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.08)' }} />
+              <span style={{ fontSize: 12, color: '#bbb' }}>or</span>
+              <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.08)' }} />
+            </div>
+            <button
+              type="button"
+              onClick={handleSSO}
+              disabled={ssoLoading}
+              style={{
+                width: '100%', padding: '11px 0',
+                background: ssoLoading ? '#f0f2f5' : '#fff',
+                color: '#1a1f2e', border: '1px solid rgba(0,0,0,0.12)',
+                borderRadius: 8, fontSize: 14, fontWeight: 600,
+                cursor: ssoLoading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🔐</span>
+              {ssoLoading ? 'Redirecting…' : 'Sign in with SSO'}
+            </button>
+          </>
+        )}
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#aaa' }}>
           Need help?{' '}

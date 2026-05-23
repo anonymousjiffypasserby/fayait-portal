@@ -27,6 +27,13 @@ export const api = {
       body: JSON.stringify({ email, password })
     }).then(handle),
 
+  oidcLogin: (access_token) =>
+    fetch(`${BASE}/api/auth/oidc-callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token })
+    }).then(handle),
+
   changePassword: (currentPassword, newPassword) =>
     fetch(`${BASE}/api/auth/change-password`, {
       method: 'POST',
