@@ -42,6 +42,7 @@ const SERVICES = [
       { key: 'tickets',   label: 'Tickets',    icon: '🎫', path: '/tickets' },
       { key: 'projects',  label: 'Projects',   icon: '📋', path: '/projects',  permissionModule: 'projects' },
       { key: 'hr',        label: 'HR',         icon: '👔', path: '/hr',        permissionModule: 'hr_employees' },
+      { key: 'erp',       label: 'ERP',        icon: '⚙️',  path: '/erp' },
       { key: 'assets',    label: 'Assets',     icon: '💻', path: '/assets',    permissionModule: 'assets' },
     ]
   },

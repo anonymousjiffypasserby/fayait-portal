@@ -22,6 +22,7 @@ import Analytics from './pages/Analytics'
 import BI from './pages/BI'
 import Files from './pages/Files'
 import Passwords from './pages/Passwords'
+import ERP from './pages/erp'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -78,6 +79,7 @@ function AppRoutes() {
                 <Route path="/documents"  element={<ServiceRoute service="documents"><Documents /></ServiceRoute>} />
                 <Route path="/passwords"  element={<ServiceRoute service="passwords"><Passwords /></ServiceRoute>} />
                 <Route path="/bi"         element={<ServiceRoute service="bi"><BI /></ServiceRoute>} />
+                <Route path="/erp/*"      element={<ServiceRoute service="erp"><ERP /></ServiceRoute>} />
               </Routes>
             </Layout>
           </PrivateRoute>
