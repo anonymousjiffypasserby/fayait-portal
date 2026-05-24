@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { T, fetchReport, exportReport, formatDate, formatCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle, BASE, authHeaders } from './shared'
+import { T, fetchReport, exportReport, formatDate, formatCurrency, useCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle, BASE, authHeaders } from './shared'
 import { usePermission } from '../../hooks/usePermission'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
@@ -161,6 +161,7 @@ function DateRange({ from, to, setFrom, setTo }) {
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
 function Inventory() {
+  const currency = useCurrency()
   const [filters, setFilters] = useState({ status: '', category: '', location: '', department: '', manufacturer: '', model: '', date_from: '', date_to: '' })
   const [data, setData]     = useState(null)
   const [loading, setLoading] = useState(false)
@@ -193,7 +194,7 @@ function Inventory() {
     { key: 'department', label: 'Department' },
     { key: 'location', label: 'Location' },
     { key: 'purchase_date', label: 'Purchase Date' },
-    { key: 'purchase_cost', label: 'Cost', render: v => formatCurrency(v) },
+    { key: 'purchase_cost', label: 'Cost', render: v => formatCurrency(v, currency) },
     { key: 'warranty_expires', label: 'Warranty' },
     { key: 'ip_address', label: 'IP' },
     { key: 'os', label: 'OS' },

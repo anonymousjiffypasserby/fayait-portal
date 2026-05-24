@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { T, fetchReport, exportReport, formatCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
+import { T, fetchReport, exportReport, formatCurrency, useCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
 import { usePermission } from '../../hooks/usePermission'
 
 function ReportShell({ title, description, children }) {
@@ -109,6 +109,7 @@ function SortableTable({ columns, rows }) {
 
 // ── Depreciation ──────────────────────────────────────────────────────────────
 function Depreciation() {
+  const currency = useCurrency()
   const [data, setData]       = useState(null)
   const [loading, setLoading]   = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -134,9 +135,9 @@ function Depreciation() {
     { key: 'model',             label: 'Model' },
     { key: 'asset_type',        label: 'Category' },
     { key: 'purchase_date',     label: 'Purchase Date' },
-    { key: 'purchase_cost',     label: 'Purchase Cost', render: v => formatCurrency(v) },
-    { key: 'current_value',     label: 'Current Value', render: v => v !== null ? formatCurrency(v) : '—' },
-    { key: 'depreciation_loss', label: 'Depreciation', render: v => v !== null ? <span style={{ color: T.red }}>{formatCurrency(v)}</span> : '—' },
+    { key: 'purchase_cost',     label: 'Purchase Cost', render: v => formatCurrency(v, currency) },
+    { key: 'current_value',     label: 'Current Value', render: v => v !== null ? formatCurrency(v, currency) : '—' },
+    { key: 'depreciation_loss', label: 'Depreciation', render: v => v !== null ? <span style={{ color: T.red }}>{formatCurrency(v, currency)}</span> : '—' },
     { key: 'depreciation_method',label: 'Method' },
     { key: 'depreciation_years',label: 'Life (Yrs)' },
     { key: 'fully_depreciated', label: 'Fully Dep.', render: v => v === 'Yes' ? <span style={{ color: T.orange, fontWeight: 600 }}>Yes</span> : 'No' },
@@ -150,9 +151,9 @@ function Depreciation() {
       {data && (
         <SummaryBar stats={[
           { label: 'Assets', value: data.count },
-          { label: 'Total Purchase Cost', value: formatCurrency(data.total_purchase_cost) },
-          { label: 'Total Current Value', value: formatCurrency(data.total_current_value), color: T.green },
-          { label: 'Total Depreciation', value: formatCurrency(data.total_depreciation), color: T.red },
+          { label: 'Total Purchase Cost', value: formatCurrency(data.total_purchase_cost, currency) },
+          { label: 'Total Current Value', value: formatCurrency(data.total_current_value, currency), color: T.green },
+          { label: 'Total Depreciation', value: formatCurrency(data.total_depreciation, currency), color: T.red },
         ]} />
       )}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 24px' }}>
@@ -167,6 +168,7 @@ function Depreciation() {
 
 // ── Purchase Cost ─────────────────────────────────────────────────────────────
 function PurchaseCost() {
+  const currency = useCurrency()
   const [groupBy, setGroupBy] = useState('category')
   const [data, setData]       = useState(null)
   const [loading, setLoading]   = useState(false)
@@ -190,10 +192,10 @@ function PurchaseCost() {
   const cols = [
     { key: 'group_name',  label: colLabel },
     { key: 'asset_count', label: 'Assets' },
-    { key: 'total_cost',  label: 'Total Cost', render: v => formatCurrency(v) },
-    { key: 'avg_cost',    label: 'Avg Cost',   render: v => formatCurrency(v) },
-    { key: 'min_cost',    label: 'Min Cost',   render: v => formatCurrency(v) },
-    { key: 'max_cost',    label: 'Max Cost',   render: v => formatCurrency(v) },
+    { key: 'total_cost',  label: 'Total Cost', render: v => formatCurrency(v, currency) },
+    { key: 'avg_cost',    label: 'Avg Cost',   render: v => formatCurrency(v, currency) },
+    { key: 'min_cost',    label: 'Min Cost',   render: v => formatCurrency(v, currency) },
+    { key: 'max_cost',    label: 'Max Cost',   render: v => formatCurrency(v, currency) },
   ]
 
   return (
@@ -211,7 +213,7 @@ function PurchaseCost() {
       {data && (
         <SummaryBar stats={[
           { label: 'Groups', value: data.count },
-          { label: 'Grand Total', value: formatCurrency(data.grand_total), color: T.green },
+          { label: 'Grand Total', value: formatCurrency(data.grand_total, currency), color: T.green },
         ]} />
       )}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 24px' }}>
@@ -226,6 +228,7 @@ function PurchaseCost() {
 
 // ── Maintenance Costs ─────────────────────────────────────────────────────────
 function MaintenanceCosts() {
+  const currency = useCurrency()
   const [data, setData]       = useState(null)
   const [loading, setLoading]   = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -252,7 +255,7 @@ function MaintenanceCosts() {
     { key: 'department',        label: 'Department' },
     { key: 'location',          label: 'Location' },
     { key: 'maintenance_count', label: 'Events' },
-    { key: 'total_cost',        label: 'Total Cost', render: v => formatCurrency(v) },
+    { key: 'total_cost',        label: 'Total Cost', render: v => formatCurrency(v, currency) },
     { key: 'last_maintenance',  label: 'Last Maintenance' },
   ]
 
@@ -262,7 +265,7 @@ function MaintenanceCosts() {
       {data && (
         <SummaryBar stats={[
           { label: 'Assets with Maintenance', value: data.count },
-          { label: 'Total Spend', value: formatCurrency(data.grand_total), color: T.orange },
+          { label: 'Total Spend', value: formatCurrency(data.grand_total, currency), color: T.orange },
         ]} />
       )}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 24px' }}>

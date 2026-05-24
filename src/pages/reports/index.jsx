@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { T } from './shared'
+import { T, CurrencyContext } from './shared'
 import AssetReports from './AssetReports'
 import FinancialReports from './FinancialReports'
 import MonitoringReports from './MonitoringReports'
@@ -93,6 +93,7 @@ const TICKET_VIEWS    = new Set(['tk-overview','tk-by-priority','tk-by-group','t
 
 export default function Reports() {
   const [view, setView] = useState('inventory')
+  const [currency, setCurrency] = useState('USD')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640)
 
   useEffect(() => {
@@ -165,13 +166,37 @@ export default function Reports() {
 
       {/* ── Right content ── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {ASSET_VIEWS.has(view)      && <AssetReports view={view} />}
-        {FINANCIAL_VIEWS.has(view)  && <FinancialReports view={view} />}
-        {MONITORING_VIEWS.has(view) && <MonitoringReports view={view} />}
-        {PROJECTS_VIEWS.has(view)   && <ProjectReports view={view} />}
-        {HR_VIEWS.has(view)         && <HRReports view={view} />}
-        {TICKET_VIEWS.has(view)     && <TicketReports view={view} />}
-        {view === 'custom'          && <CustomReport />}
+        {/* Currency toggle */}
+        <div style={{
+          padding: '8px 20px', background: '#fff', borderBottom: `1px solid ${T.border}`,
+          display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {['USD', 'SRD'].map(c => (
+              <button
+                key={c}
+                onClick={() => setCurrency(c)}
+                style={{
+                  padding: '5px 16px', border: 'none', fontSize: 12, fontWeight: 600,
+                  fontFamily: T.font, cursor: 'pointer', transition: 'background 0.15s',
+                  background: currency === c ? T.blue : '#fff',
+                  color: currency === c ? '#fff' : T.muted,
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+        <CurrencyContext.Provider value={currency}>
+          {ASSET_VIEWS.has(view)      && <AssetReports view={view} />}
+          {FINANCIAL_VIEWS.has(view)  && <FinancialReports view={view} />}
+          {MONITORING_VIEWS.has(view) && <MonitoringReports view={view} />}
+          {PROJECTS_VIEWS.has(view)   && <ProjectReports view={view} />}
+          {HR_VIEWS.has(view)         && <HRReports view={view} />}
+          {TICKET_VIEWS.has(view)     && <TicketReports view={view} />}
+          {view === 'custom'          && <CustomReport />}
+        </CurrencyContext.Provider>
       </div>
     </div>
   )

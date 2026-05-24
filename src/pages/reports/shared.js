@@ -1,3 +1,10 @@
+import { createContext, useContext } from 'react'
+
+export const CurrencyContext = createContext('USD')
+export const useCurrency = () => useContext(CurrencyContext)
+
+export const SRD_RATE = 36.1
+
 export const T = {
   navy:   '#1e3a5f',
   blue:   '#2563eb',
@@ -53,9 +60,15 @@ export function formatDate(v) {
   return isNaN(d) ? v : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-export function formatCurrency(v) {
+export function formatCurrency(v, currency = 'USD') {
   if (v === null || v === undefined || v === '') return '—'
-  return `$${parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const num = parseFloat(v)
+  if (isNaN(num)) return '—'
+  if (currency === 'SRD') {
+    const srd = num * SRD_RATE
+    return `SRD ${srd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 // Shared styles

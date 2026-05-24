@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { T, fetchReport, exportReport, formatDate, formatCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
+import { T, fetchReport, exportReport, formatDate, formatCurrency, useCurrency, inputStyle, selectStyle, btnStyle, outlineBtnStyle } from './shared'
 import { usePermission } from '../../hooks/usePermission'
 
 // ── Shared primitives (same pattern as AssetReports) ─────────────────────────
@@ -189,6 +189,7 @@ function useReport(path) {
 
 // ── Payroll Summary ───────────────────────────────────────────────────────────
 function PayrollSummary() {
+  const currency = useCurrency()
   const [payPeriodId, setPayPeriodId] = useState('')
   const [deptId, setDeptId]           = useState('')
   const [data, setData]       = useState(null)
@@ -214,16 +215,16 @@ function PayrollSummary() {
   const deptCols = [
     { key: 'department',  label: 'Department' },
     { key: 'employees',   label: 'Employees', render: fmtNum },
-    { key: 'gross',       label: 'Gross Pay',  render: formatCurrency },
-    { key: 'deductions',  label: 'Deductions', render: formatCurrency },
-    { key: 'net',         label: 'Net Pay',    render: formatCurrency },
+    { key: 'gross',       label: 'Gross Pay',  render: v => formatCurrency(v, currency) },
+    { key: 'deductions',  label: 'Deductions', render: v => formatCurrency(v, currency) },
+    { key: 'net',         label: 'Net Pay',    render: v => formatCurrency(v, currency) },
   ]
 
   const jfCols = [
     { key: 'job_function', label: 'Job Function' },
     { key: 'employees',    label: 'Employees', render: fmtNum },
-    { key: 'gross',        label: 'Gross Pay', render: formatCurrency },
-    { key: 'net',          label: 'Net Pay',   render: formatCurrency },
+    { key: 'gross',        label: 'Gross Pay', render: v => formatCurrency(v, currency) },
+    { key: 'net',          label: 'Net Pay',   render: v => formatCurrency(v, currency) },
   ]
 
   const rows = data?.by_department || []
@@ -242,8 +243,8 @@ function PayrollSummary() {
       {data && (
         <SummaryBar stats={[
           { label: 'Total Employees', value: fmtNum(data.total_employees) },
-          { label: 'Total Gross',     value: formatCurrency(data.total_gross), color: T.navy },
-          { label: 'Total Net',       value: formatCurrency(data.total_net),   color: T.green },
+          { label: 'Total Gross',     value: formatCurrency(data.total_gross, currency), color: T.navy },
+          { label: 'Total Net',       value: formatCurrency(data.total_net, currency),   color: T.green },
         ]} />
       )}
       <div style={{ flex: 1, overflow: 'auto', padding: '0 24px' }}>
